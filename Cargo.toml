@@ -1,9 +1,11 @@
 [package]
 name = "acid-rain"
 version = "0.1.0"
-authors = ["PHO <pho@cielonegro.org>"]
+authors = ["PHO <pho at cielonegro dot org>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "TTY-based factory simulation game"
+keywords = ["game"]
+license = "CC0-1.0"
 
 [dependencies]
+clap = "~2"
