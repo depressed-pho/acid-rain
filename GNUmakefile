@@ -5,3 +5,7 @@ all:
 
 run:
 	cargo run
+
+# Requires https://github.com/passcod/cargo-watch
+watch:
+	cargo watch

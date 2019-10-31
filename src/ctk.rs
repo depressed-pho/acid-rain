@@ -1,3 +1,5 @@
+mod window;
+
 extern crate pancurses_result;
 
 use pancurses_result::{
@@ -6,8 +8,24 @@ use pancurses_result::{
     InputBufferingMode
 };
 
-pub struct Ctk {
-    curses: Curses
+use window::RootWindow;
+
+/* I admit I'm a beginner but this really boggles my mind. C'mon
+ * Rust. How dare you say this is the simplest way to define a struct
+ * which has both an owner and its borrower? Make the damn syntax a
+ * part of the language itself!
+ */
+pub use rentals::Ctk;
+rental! {
+    mod rentals {
+        use super::*;
+
+        #[rental_mut]
+        pub struct Ctk {
+            curses: Box<Curses>,
+            root: RootWindow<'curses>
+        }
+    }
 }
 
 impl Ctk {
@@ -15,7 +33,7 @@ impl Ctk {
      * exist. Violating this would cause a panic.
      */
     pub(crate) fn initiate() -> Ctk {
-        let mut curses = pancurses_result::initscr().unwrap();
+        let mut curses = Box::new(pancurses_result::initscr().unwrap());
 
         /* We are going to use colors. */
         curses.start_color().unwrap();
@@ -34,8 +52,8 @@ impl Ctk {
         /* We don't want curses to treat RET specially. */
         curses.set_translate_new_lines(false).unwrap();
 
-        Ctk {
-            curses: curses
-        }
+        Ctk::new(curses, |c: &mut Curses| {
+            RootWindow::new(c.window_mut())
+        })
     }
 }

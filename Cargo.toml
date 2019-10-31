@@ -8,5 +8,6 @@ keywords = ["game"]
 license = "CC0-1.0"
 
 [dependencies]
-clap = "~2"
-pancurses-result = "~0"
+clap = "~2.33"
+pancurses-result = "~0.5"
+rental = "^0.5"

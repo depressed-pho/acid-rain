@@ -1,10 +1,13 @@
+mod ctk;
+mod world;
+
 #[macro_use]
 extern crate clap;
 
-use clap::{Arg, ArgMatches};
+#[macro_use]
+extern crate rental;
 
-mod ctk;
-mod world;
+use clap::{Arg, ArgMatches};
 
 fn opt_matches<'a>() -> ArgMatches<'a> {
     app_from_crate!()
