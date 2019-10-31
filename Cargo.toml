@@ -3,11 +3,20 @@ name = "acid-rain"
 version = "0.1.0"
 authors = ["PHO <pho at cielonegro dot org>"]
 edition = "2018"
+
 description = "TTY-based factory simulation game"
 keywords = ["game"]
 license = "CC0-1.0"
+
+homepage = "https://github.com/depressed-pho/acid-rain"
+repository = "https://github.com/depressed-pho/acid-rain.git"
+
+readme = "README.md"
 
 [dependencies]
 clap = "~2.33"
 pancurses-result = "~0.5"
 rental = "^0.5"
+
+[badges]
+maintenance = { status = "experimental" }
