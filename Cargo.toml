@@ -15,8 +15,8 @@ readme = "README.md"
 
 [dependencies]
 clap = "~2.33"
-pancurses-result = "~0.5"
-rental = "^0.5"
+lazy_static = "~1.4"
+pancurses = "~0.16"
 
 [badges]
 maintenance = { status = "experimental" }

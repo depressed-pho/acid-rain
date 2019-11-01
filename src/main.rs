@@ -5,7 +5,7 @@ mod world;
 extern crate clap;
 
 #[macro_use]
-extern crate rental;
+extern crate lazy_static;
 
 use clap::{Arg, ArgMatches};
 
@@ -19,5 +19,6 @@ fn main() {
 
     //let w = world::World::new();
 
-    let tk = ctk::Ctk::initiate();
+    let mut tk = ctk::Ctk::initiate().unwrap();
+    tk.main();
 }
