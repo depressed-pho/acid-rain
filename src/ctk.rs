@@ -1,10 +1,12 @@
+mod component;
 mod util;
 mod window;
 
 extern crate pancurses;
 
+use crate::ctk::component::Component;
 use crate::ctk::util::check;
-use crate::ctk::window::{Component, RootWindow};
+use crate::ctk::window::RootWindow;
 use std::sync::Mutex;
 
 lazy_static! {
