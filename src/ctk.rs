@@ -3,9 +3,9 @@ mod window;
 
 extern crate pancurses;
 
-use self::util::check;
+use crate::ctk::util::check;
+use crate::ctk::window::{Component, RootWindow};
 use std::sync::Mutex;
-use window::RootWindow;
 
 lazy_static! {
     static ref INITIALIZED: Mutex<bool> = Mutex::new(false);
@@ -16,7 +16,7 @@ pub struct Ctk {
 }
 
 impl Ctk {
-    /* Create an instance of Ctk. At most one instance can
+    /** Create an instance of Ctk. At most one instance can
      * exist. Violating this would return an error.
      */
     pub(crate) fn initiate() -> Result<Ctk, ()> {
@@ -57,19 +57,21 @@ impl Ctk {
         Ok(tk)
     }
 
-    /* endwin(3) does not shutdown curses, which is why this method
+    /** endwin(3) does not shutdown curses, which is why this method
      * borrows self instead of taking ownership. */
     pub(crate) fn end(&mut self) -> Result<(), ()> {
         check(pancurses::endwin())
     }
 
-    /* The main loop. */
+    /** The main loop. */
     pub fn main(&mut self) {
         self.update().unwrap();
     }
 
-    /* Redraw windows and update the screen. */
+    /** Refresh the content of the off-screen buffer curscr, and then
+     * update the screen by actually writing data to the terminal. */
     fn update(&mut self) -> Result<(), ()> {
+        self.root.refresh()?;
         check(pancurses::doupdate())
     }
 }
