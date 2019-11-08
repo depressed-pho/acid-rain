@@ -16,7 +16,7 @@ readme = "README.md"
 [dependencies]
 clap = "~2.33"
 lazy_static = "~1.4"
-pancurses = "~0.16"
+ncurses = "~5.99"
 
 [badges]
 maintenance = { status = "experimental" }

@@ -2,7 +2,7 @@
  * success or a failure.
  */
 pub(crate) fn check(r: i32) -> Result<(), ()> {
-    if r == pancurses::ERR {
+    if r == ncurses::ERR {
         Err(())
     }
     else {

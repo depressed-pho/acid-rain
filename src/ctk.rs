@@ -3,7 +3,7 @@ pub mod layout;
 mod util;
 pub mod window;
 
-extern crate pancurses;
+extern crate ncurses;
 
 use crate::ctk::component::Component;
 use crate::ctk::layout::Layout;
@@ -38,35 +38,38 @@ impl Ctk {
         }
 
         let mut tk = Ctk {
-            root: RootWindow::new(pancurses::initscr(), layout)
+            root: RootWindow::new(ncurses::initscr(), layout)
         };
 
         /* We are going to use colors. */
-        check(pancurses::start_color())?;
+        check(ncurses::start_color())?;
 
         /* Cursor should be hidden by default. It should only be
          * visible when a text input field is active and focused. */
-        check(pancurses::curs_set(0))?;
+        match (ncurses::curs_set(ncurses::CURSOR_VISIBILITY::CURSOR_INVISIBLE)) {
+            Some(_) => Ok(()),
+            None    => Err(())
+        }?;
 
         /* We don't want the TTY driver to echo inputs. */
-        check(pancurses::noecho())?;
+        check(ncurses::noecho())?;
 
         /* We are going to rebind keys like C-s and C-c, and also
          * dislike cooked mode. */
-        check(pancurses::raw())?;
-        check(pancurses::cbreak())?;
+        check(ncurses::raw())?;
+        check(ncurses::cbreak())?;
 
-        /* We don't want curses to treat RET specially. */
-        check(pancurses::nonl())?;
+        /* We don't want ncurses to treat RET specially. */
+        check(ncurses::nonl())?;
 
         /* Done the initial configuration. */
         Ok(tk)
     }
 
-    /** endwin(3) does not shutdown curses, which is why this method
+    /** endwin(3) does not shutdown ncurses, which is why this method
      * borrows self instead of taking ownership. */
     pub(crate) fn end(&mut self) -> Result<(), ()> {
-        check(pancurses::endwin())
+        check(ncurses::endwin())
     }
 
     /** The main loop. */
@@ -78,7 +81,7 @@ impl Ctk {
      * update the screen by actually writing data to the terminal. */
     fn update(&mut self) -> Result<(), ()> {
         self.root.refresh()?;
-        check(pancurses::doupdate())
+        check(ncurses::doupdate())
     }
 }
 

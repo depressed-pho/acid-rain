@@ -1,5 +1,6 @@
 use crate::ctk::component::Component;
 use crate::ctk::layout::Layout;
+use crate::ctk::util::check;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -8,13 +9,13 @@ use std::rc::Rc;
  * only be changed by changing the terminal size itself.
  */
 pub struct RootWindow {
-    c_win: pancurses::Window,
+    c_win: ncurses::WINDOW,
     layout: Rc<RefCell<dyn Layout>>
 }
 
 impl RootWindow {
     pub(crate) fn new(
-        c_win: pancurses::Window,
+        c_win: ncurses::WINDOW,
         layout: Rc<RefCell<dyn Layout>>) -> RootWindow {
 
         RootWindow {
@@ -25,7 +26,11 @@ impl RootWindow {
 }
 
 impl Component for RootWindow {
-    fn buffer(&self) -> &pancurses::Window {
+    fn buffer(&self) -> &ncurses::WINDOW {
         &self.c_win
+    }
+
+    fn refresh(&self) -> Result<(), ()> {
+        check(ncurses::wnoutrefresh(*self.buffer()))
     }
 }
