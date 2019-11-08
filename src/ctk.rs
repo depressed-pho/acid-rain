@@ -1,3 +1,6 @@
+pub mod buffer;
+pub use buffer::*;
+
 pub mod component;
 pub mod layout;
 mod util;
@@ -37,16 +40,14 @@ impl Ctk {
             }
         }
 
-        let mut tk = Ctk {
-            root: RootWindow::new(ncurses::initscr(), layout)
-        };
+        ncurses::initscr();
 
         /* We are going to use colors. */
         check(ncurses::start_color())?;
 
         /* Cursor should be hidden by default. It should only be
          * visible when a text input field is active and focused. */
-        match (ncurses::curs_set(ncurses::CURSOR_VISIBILITY::CURSOR_INVISIBLE)) {
+        match ncurses::curs_set(ncurses::CURSOR_VISIBILITY::CURSOR_INVISIBLE) {
             Some(_) => Ok(()),
             None    => Err(())
         }?;
@@ -63,6 +64,9 @@ impl Ctk {
         check(ncurses::nonl())?;
 
         /* Done the initial configuration. */
+        let tk = Ctk {
+            root: RootWindow::new(layout)
+        };
         Ok(tk)
     }
 
