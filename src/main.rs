@@ -8,6 +8,9 @@ extern crate clap;
 extern crate lazy_static;
 
 use clap::{Arg, ArgMatches};
+use std::cell::RefCell;
+use std::rc::Rc;
+use crate::ctk::layout::GridLayout;
 
 fn opt_matches<'a>() -> ArgMatches<'a> {
     app_from_crate!()
@@ -19,6 +22,9 @@ fn main() {
 
     //let w = world::World::new();
 
-    let mut tk = ctk::Ctk::initiate().unwrap();
+    let layout = Rc::new(RefCell::new(GridLayout::new()));
+    layout.borrow_mut().set_cols(1);
+
+    let mut tk = ctk::Ctk::initiate(layout).unwrap();
     tk.main();
 }

@@ -1,3 +1,5 @@
+use super::Layout;
+
 pub struct GridLayout {
     rows: usize,
     cols: usize,
@@ -38,4 +40,7 @@ impl GridLayout {
         self.vgap = vgap;
         self
     }
+}
+
+impl Layout for GridLayout {
 }

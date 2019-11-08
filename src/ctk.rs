@@ -1,14 +1,17 @@
 mod component;
-mod layout;
+pub mod layout;
 mod util;
 mod window;
 
 extern crate pancurses;
 
 use crate::ctk::component::Component;
+use crate::ctk::layout::Layout;
 use crate::ctk::util::check;
 use crate::ctk::window::RootWindow;
+use std::cell::RefCell;
 use std::sync::Mutex;
+use std::rc::Rc;
 
 lazy_static! {
     static ref INITIALIZED: Mutex<bool> = Mutex::new(false);
@@ -22,7 +25,7 @@ impl Ctk {
     /** Create an instance of Ctk. At most one instance can
      * exist. Violating this would return an error.
      */
-    pub(crate) fn initiate() -> Result<Ctk, ()> {
+    pub(crate) fn initiate(layout: Rc<RefCell<dyn Layout>>) -> Result<Ctk, ()> {
         {
             let mut initialized = INITIALIZED.lock().unwrap();
 
@@ -35,7 +38,7 @@ impl Ctk {
         }
 
         let mut tk = Ctk {
-            root: RootWindow::new(pancurses::initscr())
+            root: RootWindow::new(pancurses::initscr(), layout)
         };
 
         /* We are going to use colors. */
