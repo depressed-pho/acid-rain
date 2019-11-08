@@ -10,6 +10,7 @@ extern crate lazy_static;
 use clap::{Arg, ArgMatches};
 use std::cell::RefCell;
 use std::rc::Rc;
+use crate::ctk::component::Label;
 use crate::ctk::layout::GridLayout;
 
 fn opt_matches<'a>() -> ArgMatches<'a> {
@@ -24,6 +25,8 @@ fn main() {
 
     let layout = Rc::new(RefCell::new(GridLayout::new()));
     layout.borrow_mut().set_cols(1);
+
+    let title = Rc::new(RefCell::new(Label::new("A c i d   R a i n")));
 
     let mut tk = ctk::Ctk::initiate(layout).unwrap();
     tk.main();

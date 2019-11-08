@@ -1,7 +1,7 @@
-mod component;
+pub mod component;
 pub mod layout;
 mod util;
-mod window;
+pub mod window;
 
 extern crate pancurses;
 

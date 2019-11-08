@@ -1,3 +1,6 @@
+mod label;
+pub use label::*;
+
 use crate::ctk::util::check;
 
 pub trait Component {
