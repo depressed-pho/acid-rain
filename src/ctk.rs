@@ -1,5 +1,5 @@
-pub mod buffer;
-pub use buffer::*;
+pub mod graphics;
+pub use graphics::*;
 
 pub mod component;
 pub mod layout;

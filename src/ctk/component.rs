@@ -1,14 +1,14 @@
 mod label;
 pub use label::*;
 
-use crate::ctk::Buffer;
+use crate::ctk::Graphics;
 
 pub trait Component {
-    /** Borrow the graphics buffer associated to this component. Every
-     * component must own one.
+    /** Borrow the graphics context associated to this
+     * component. Every component must own one.
      */
-    fn buffer(&self) -> &Buffer;
+    fn graphics(&self) -> &Graphics;
 
-    /** Refresh the content of the off-screen buffer. */
+    /** Refresh the content of the graphics context. */
     fn paint(&mut self) -> Result<(), ()>;
 }

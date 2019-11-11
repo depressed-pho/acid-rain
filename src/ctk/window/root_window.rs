@@ -1,4 +1,4 @@
-use crate::ctk::Buffer;
+use crate::ctk::Graphics;
 use crate::ctk::component::Component;
 use crate::ctk::layout::Layout;
 use crate::ctk::util::check;
@@ -10,14 +10,14 @@ use std::rc::Rc;
  * only be changed by changing the terminal size itself.
  */
 pub struct RootWindow {
-    buffer: Buffer,
+    graphics: Graphics,
     layout: Rc<RefCell<dyn Layout>>
 }
 
 impl RootWindow {
     pub(crate) fn new(layout: Rc<RefCell<dyn Layout>>) -> RootWindow {
         RootWindow {
-            buffer: Buffer::new(),
+            graphics: Graphics::new(),
             layout
         }
     }
@@ -27,7 +27,7 @@ impl RootWindow {
         /*
         check(
             ncurses::pnoutrefresh(
-                self.buffer,
+                self.graphics,
                 0, // pmin_row
                 0, // pmin_col
         */
@@ -36,12 +36,12 @@ impl RootWindow {
 }
 
 impl Component for RootWindow {
-    fn buffer(&self) -> &Buffer {
-        &self.buffer
+    fn graphics(&self) -> &Graphics {
+        &self.graphics
     }
 
     fn paint(&mut self) -> Result<(), ()> {
-        //check(ncurses::wnoutrefresh(*self.buffer()))
+        //check(ncurses::wnoutrefresh(*self.graphics()))
         Ok(())
     }
 }
