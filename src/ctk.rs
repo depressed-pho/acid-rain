@@ -1,17 +1,20 @@
-pub mod graphics;
-pub use graphics::*;
-
-pub mod component;
-pub mod layout;
-mod util;
-pub mod window;
-
 extern crate ncurses;
 
-use crate::ctk::component::Component;
-use crate::ctk::layout::Layout;
+pub mod graphics;
+pub use graphics::Graphics;
+
+pub mod component;
+pub use component::Component;
+
+pub mod layout;
+pub use layout::Layout;
+
+mod util;
 use crate::ctk::util::check;
+
+pub mod window;
 use crate::ctk::window::RootWindow;
+
 use std::cell::RefCell;
 use std::sync::Mutex;
 use std::rc::Rc;
