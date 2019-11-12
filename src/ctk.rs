@@ -82,12 +82,13 @@ impl Ctk {
 
     /** The main loop. */
     pub fn main(&mut self) {
-        self.update().unwrap();
+        self.root.validate();
+        self.update_graphics().unwrap();
     }
 
     /** Refresh the content of the off-screen buffer curscr, and then
      * update the screen by actually writing data to the terminal. */
-    fn update(&mut self) -> Result<(), ()> {
+    fn update_graphics(&mut self) -> Result<(), ()> {
         self.root.refresh()?;
         check(ncurses::doupdate())
     }

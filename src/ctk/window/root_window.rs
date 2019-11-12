@@ -46,4 +46,8 @@ impl Component for RootWindow {
         //check(ncurses::wnoutrefresh(*self.graphics()))
         Ok(())
     }
+
+    fn validate(&mut self) {
+        self.layout.borrow_mut().validate(self);
+    }
 }
