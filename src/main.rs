@@ -19,6 +19,8 @@ fn opt_matches<'a>() -> ArgMatches<'a> {
 }
 
 fn main() {
+    ctk::install_default_panic_hook();
+
     let matches = opt_matches();
 
     //let w = world::World::new();

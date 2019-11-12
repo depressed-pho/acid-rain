@@ -62,7 +62,7 @@ impl GridLayout {
 }
 
 impl Layout for GridLayout {
-    fn validate(&mut self, c: &Component) {
+    fn validate(&mut self, c: &dyn Component) {
         unimplemented!();
     }
 

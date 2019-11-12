@@ -22,6 +22,6 @@ pub trait Layout {
      * layout managers must call validate() on each of them,
      * regardless of whether the layout manager is itself invalid.
      */
-    fn validate(&mut self, c: &Component);
+    fn validate(&mut self, c: &dyn Component);
     fn invalidate(&mut self);
 }

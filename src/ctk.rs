@@ -16,6 +16,7 @@ pub mod window;
 use crate::ctk::window::RootWindow;
 
 use std::cell::RefCell;
+use std::panic;
 use std::sync::Mutex;
 use std::rc::Rc;
 
@@ -99,4 +100,20 @@ impl Drop for Ctk {
         self.end().unwrap();
         *initialized = false;
     }
+}
+
+pub fn default_panic_hook(_: &panic::PanicInfo) {
+    let initialized = INITIALIZED.lock().unwrap();
+
+    if *initialized {
+        check(ncurses::endwin()).unwrap();
+    }
+}
+
+pub fn install_default_panic_hook() {
+    let old = panic::take_hook();
+    panic::set_hook(Box::new(move |pi| {
+        default_panic_hook(pi);
+        old(pi);
+    }));
 }
