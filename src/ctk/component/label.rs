@@ -1,5 +1,7 @@
-use crate::ctk::Component;
-use crate::ctk::Graphics;
+use crate::ctk::{
+    Component,
+    Graphics
+};
 
 pub struct Label {
     graphics: Graphics,

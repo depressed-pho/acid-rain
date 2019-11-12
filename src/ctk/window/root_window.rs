@@ -1,7 +1,9 @@
-use crate::ctk::Graphics;
-use crate::ctk::component::Component;
-use crate::ctk::layout::Layout;
-use crate::ctk::util::check;
+use crate::ctk::{
+    Component,
+    Graphics,
+    Layout,
+    util::check
+};
 use std::cell::RefCell;
 use std::rc::Rc;
 

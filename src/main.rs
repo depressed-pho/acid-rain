@@ -27,6 +27,7 @@ fn main() {
     layout.borrow_mut().set_cols(1);
 
     let title = Rc::new(RefCell::new(Label::new("A c i d   R a i n")));
+    layout.borrow_mut().add(title);
 
     let mut tk = ctk::Ctk::initiate(layout).unwrap();
     tk.main();
