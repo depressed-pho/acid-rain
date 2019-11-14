@@ -2,6 +2,7 @@ mod label;
 pub use label::*;
 
 use crate::ctk::Graphics;
+use crate::ctk::Insets;
 
 pub trait Component {
     /** Borrow the graphics context associated to this
@@ -21,4 +22,11 @@ pub trait Component {
      * component is not a container.
      */
     fn validate(&mut self) {}
+
+    /** If a border has been set on this component, returns the
+     * border's insets; otherwise returns an empty insets. */
+    fn get_insets(&self) -> Insets {
+        // FIXME: not implemented properly yet
+        Insets::default()
+    }
 }

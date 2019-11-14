@@ -5,6 +5,12 @@ use crate::ctk::{
     Component
 };
 
+/** Layout manager is responsible for laying out sub-components in a
+ * container component.
+ *
+ * Note that layout managers cannot be safely shared by multiple
+ * components.
+ */
 pub trait Layout {
     /** Do laying out sub-components if the layout manager is invalid.
      *
@@ -22,6 +28,6 @@ pub trait Layout {
      * layout managers must call validate() on each of them,
      * regardless of whether the layout manager is itself invalid.
      */
-    fn validate(&mut self, c: &dyn Component);
+    fn validate(&mut self, parent: &dyn Component);
     fn invalidate(&mut self);
 }

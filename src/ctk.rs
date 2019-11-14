@@ -1,13 +1,16 @@
 extern crate ncurses;
 
-pub mod graphics;
-pub use graphics::Graphics;
-
 pub mod component;
-pub use component::Component;
+pub use component::*;
+
+pub mod graphics;
+pub use graphics::*;
+
+pub mod dimensions;
+pub use dimensions::*;
 
 pub mod layout;
-pub use layout::Layout;
+pub use layout::*;
 
 mod util;
 use crate::ctk::util::check;

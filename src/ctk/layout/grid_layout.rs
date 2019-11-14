@@ -59,11 +59,32 @@ impl GridLayout {
         self.invalidate();
         self
     }
+
+    fn do_layout(&mut self, parent: &dyn Component) {
+        assert!(
+            self.rows > 0 || self.cols > 0,
+            "Either rows or cols must be set to non-zero");
+
+        if self.rows > 0 && self.cols > 0 {
+            assert!(
+                self.components.len() <= self.rows * self.cols,
+                "Too many sub-components; at most {} can be added",
+                self.rows * self.cols);
+        }
+
+        unimplemented!();
+    }
 }
 
 impl Layout for GridLayout {
-    fn validate(&mut self, c: &dyn Component) {
-        unimplemented!();
+    fn validate(&mut self, parent: &dyn Component) {
+        if !self.is_valid {
+            self.do_layout(parent);
+            self.is_valid = true;
+        }
+        for child in self.components.iter() {
+            child.borrow_mut().validate();
+        }
     }
 
     fn invalidate(&mut self) {
