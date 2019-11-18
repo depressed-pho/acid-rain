@@ -4,7 +4,9 @@ use crate::ctk::{
     Layout,
     util::check
 };
+use crate::ctk::dimension::Rectangle;
 use std::cell::RefCell;
+use std::convert::TryInto;
 use std::rc::Rc;
 
 /** The root window is a special window which covers the entire
@@ -12,14 +14,29 @@ use std::rc::Rc;
  * only be changed by changing the terminal size itself.
  */
 pub struct RootWindow {
+    screen: ncurses::WINDOW,
     graphics: Graphics,
+    bounds: Rectangle,
     layout: Rc<RefCell<dyn Layout>>
 }
 
 impl RootWindow {
-    pub(crate) fn new(layout: Rc<RefCell<dyn Layout>>) -> RootWindow {
+    pub(crate) fn new(screen: ncurses::WINDOW, layout: Rc<RefCell<dyn Layout>>) -> RootWindow {
+        let (mut width, mut height) = (0, 0);
+        ncurses::getmaxyx(screen, &mut width, &mut height);
+
+        let bounds = Rectangle {
+            x: 0,
+            y: 0,
+            width: width.try_into().unwrap(),
+            height: height.try_into().unwrap()
+        };
+        // FIXME: Set the size of "graphics" here.
+
         RootWindow {
+            screen,
             graphics: Graphics::new(),
+            bounds,
             layout
         }
     }
@@ -49,5 +66,9 @@ impl Component for RootWindow {
 
     fn validate(&mut self) {
         self.layout.borrow_mut().validate(self);
+    }
+
+    fn get_bounds(&self) -> Rectangle {
+        self.bounds
     }
 }

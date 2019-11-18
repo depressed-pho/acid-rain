@@ -6,8 +6,7 @@ pub use component::*;
 pub mod graphics;
 pub use graphics::*;
 
-pub mod dimensions;
-pub use dimensions::*;
+pub mod dimension;
 
 pub mod layout;
 pub use layout::*;
@@ -47,7 +46,7 @@ impl Ctk {
             }
         }
 
-        ncurses::initscr();
+        let stdscr = ncurses::initscr();
 
         /* We are going to use colors. */
         check(ncurses::start_color())?;
@@ -72,7 +71,7 @@ impl Ctk {
 
         /* Done the initial configuration. */
         let tk = Ctk {
-            root: RootWindow::new(layout)
+            root: RootWindow::new(stdscr, layout)
         };
         Ok(tk)
     }

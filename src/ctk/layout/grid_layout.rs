@@ -2,6 +2,7 @@ use crate::ctk::{
     Component,
     Layout
 };
+use crate::ctk::dimension::Dimension;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -71,6 +72,38 @@ impl GridLayout {
                 "Too many sub-components; at most {} can be added",
                 self.rows * self.cols);
         }
+
+        let n_comps = self.components.len();
+        if n_comps == 0 {
+            return;
+        }
+
+        let n_cells = {
+            let n_rows = if self.cols > 0 {
+                (n_comps + self.cols - 1) / self.cols
+            }
+            else {
+                n_comps
+            };
+            let n_cols = if self.rows > 0 {
+                (n_comps + self.rows - 1) / self.rows
+            }
+            else {
+                n_comps
+            };
+            Dimension::new(n_cols, n_rows)
+        };
+
+        let gap         = Dimension::new(self.hgap, self.vgap);
+        let total_gaps  = (n_cells - 1) * gap;
+        let parent_size = parent.get_size();
+        let insets      = parent.get_insets();
+        let inner_space = Dimension::new(
+            parent_size.width  - (insets.left + insets.right ),
+            parent_size.height - (insets.top  + insets.bottom));
+        let comp_size   = (inner_space - total_gaps) / n_cells;
+        let extra_space = (inner_space - (comp_size * n_cells + total_gaps)) / 2;
+        panic!("extra: {:?}", extra_space);
 
         unimplemented!();
     }
