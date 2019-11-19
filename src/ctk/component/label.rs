@@ -32,4 +32,8 @@ impl Component for Label {
     fn get_bounds(&self) -> Rectangle {
         self.bounds
     }
+
+    fn set_bounds(&mut self, b: Rectangle) {
+        self.bounds = b;
+    }
 }

@@ -2,7 +2,11 @@ use crate::ctk::{
     Component,
     Layout
 };
-use crate::ctk::dimension::Dimension;
+use crate::ctk::dimension::{
+    Dimension,
+    Point,
+    Rectangle
+};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -103,9 +107,48 @@ impl GridLayout {
             parent_size.height - (insets.top  + insets.bottom));
         let comp_size   = (inner_space - total_gaps) / n_cells;
         let extra_space = (inner_space - (comp_size * n_cells + total_gaps)) / 2;
-        panic!("extra: {:?}", extra_space);
 
-        unimplemented!();
+        let ltr = true; // THINKME: Currently hard-coded.
+        if ltr {
+            for c in 0 .. n_cells.width {
+                let x = insets.left + extra_space.width
+                      + (comp_size.width + self.hgap) * c;
+
+                for r in 0 .. n_cells.height {
+                    let y = insets.top + extra_space.height
+                          + (comp_size.height + self.vgap) * r;
+
+                    let i = r * n_cells.height + c;
+                    if i < n_comps {
+                        self.components[i].borrow_mut().set_bounds(
+                            Rectangle {
+                                pos: Point { x, y },
+                                size: comp_size
+                            });
+                    }
+                }
+            }
+        }
+        else {
+            for c in 0 .. n_cells.width {
+                let x = parent_size.width - insets.right - comp_size.width - extra_space.width
+                      - (comp_size.width + self.hgap) * c;
+
+                for r in 0 .. n_cells.height {
+                    let y = insets.top + extra_space.height
+                          + (comp_size.height + self.vgap) * r;
+
+                    let i = r * n_cells.height + c;
+                    if i < n_comps {
+                        self.components[i].borrow_mut().set_bounds(
+                            Rectangle {
+                                pos: Point { x, y },
+                                size: comp_size
+                            });
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -22,7 +22,7 @@ impl Dimension {
 
 impl From<Rectangle> for Dimension {
     fn from(rect: Rectangle) -> Self {
-        Self::new(rect.width, rect.height)
+        rect.size
     }
 }
 

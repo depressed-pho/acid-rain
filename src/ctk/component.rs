@@ -33,6 +33,12 @@ pub trait Component {
      */
     fn get_bounds(&self) -> Rectangle;
 
+    /** Move and resize this component. This method changes
+     * layout-related information, and therefore, must invalidate the
+     * component hierarchy.
+     */
+    fn set_bounds(&mut self, b: Rectangle);
+
     /** Get the size of this component, i.e. the size of the bounds.
      */
     fn get_size(&self) -> Dimension {
