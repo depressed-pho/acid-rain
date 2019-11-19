@@ -1,6 +1,9 @@
 mod grid_layout;
 pub use grid_layout::*;
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use crate::ctk::{
     Component
 };
@@ -30,4 +33,8 @@ pub trait Layout {
      */
     fn validate(&mut self, parent: &dyn Component);
     fn invalidate(&mut self);
+
+    // We can't simply do "-> impl Iterator<...>" due to E0562:
+    // https://github.com/rust-lang/rfcs/blob/master/text/1522-conservative-impl-trait.md
+    fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Rc<RefCell<dyn Component>>> + 'a>;
 }

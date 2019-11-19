@@ -58,6 +58,13 @@ impl Ctk {
             None    => Err(())
         }?;
 
+        /* And since the cursor is hidden by default, we can stop
+         * worrying about moving the cursor around. */
+        check(ncurses::leaveok(stdscr, true))?;
+
+        /* We do scrolling in our own way. */
+        check(ncurses::scrollok(stdscr, false))?;
+
         /* We don't want the TTY driver to echo inputs. */
         check(ncurses::noecho())?;
 
@@ -91,7 +98,8 @@ impl Ctk {
     /** Refresh the content of the off-screen buffer curscr, and then
      * update the screen by actually writing data to the terminal. */
     fn update_graphics(&mut self) -> Result<(), ()> {
-        self.root.refresh()?;
+        self.root.paint();
+        self.root.refresh(self.root.get_size());
         check(ncurses::doupdate())
     }
 }

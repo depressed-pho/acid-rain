@@ -8,13 +8,14 @@ use crate::ctk::dimension::{
     Rectangle
 };
 use std::cell::RefCell;
+use std::convert::TryInto;
 use std::rc::Rc;
 
 pub struct GridLayout {
-    rows: usize,
-    cols: usize,
-    hgap: usize,
-    vgap: usize,
+    rows: i32,
+    cols: i32,
+    hgap: i32,
+    vgap: i32,
     components: Vec<Rc<RefCell<dyn Component>>>,
     is_valid: bool
 }
@@ -41,25 +42,25 @@ impl GridLayout {
         self
     }
 
-    pub fn set_rows(&mut self, rows: usize) -> &mut Self {
+    pub fn set_rows(&mut self, rows: i32) -> &mut Self {
         self.rows = rows;
         self.invalidate();
         self
     }
 
-    pub fn set_cols(&mut self, cols: usize) -> &mut Self {
+    pub fn set_cols(&mut self, cols: i32) -> &mut Self {
         self.cols = cols;
         self.invalidate();
         self
     }
 
-    pub fn set_hgap(&mut self, hgap: usize) -> &mut Self {
+    pub fn set_hgap(&mut self, hgap: i32) -> &mut Self {
         self.hgap = hgap;
         self.invalidate();
         self
     }
 
-    pub fn set_vgap(&mut self, vgap: usize) -> &mut Self {
+    pub fn set_vgap(&mut self, vgap: i32) -> &mut Self {
         self.vgap = vgap;
         self.invalidate();
         self
@@ -72,39 +73,39 @@ impl GridLayout {
 
         if self.rows > 0 && self.cols > 0 {
             assert!(
-                self.components.len() <= self.rows * self.cols,
+                self.components.len() <= (self.rows * self.cols).try_into().unwrap(),
                 "Too many sub-components; at most {} can be added",
                 self.rows * self.cols);
         }
 
-        let n_comps = self.components.len();
+        let n_comps = self.components.len().try_into().unwrap();
         if n_comps == 0 {
             return;
         }
 
-        let n_cells = {
-            let n_rows = if self.cols > 0 {
-                (n_comps + self.cols - 1) / self.cols
-            }
-            else {
-                n_comps
-            };
-            let n_cols = if self.rows > 0 {
+        let n_cells = Dimension {
+            width: if self.rows > 0 {
                 (n_comps + self.rows - 1) / self.rows
             }
             else {
                 n_comps
-            };
-            Dimension::new(n_cols, n_rows)
+            },
+            height: if self.cols > 0 {
+                (n_comps + self.cols - 1) / self.cols
+            }
+            else {
+                n_comps
+            }
         };
 
-        let gap         = Dimension::new(self.hgap, self.vgap);
+        let gap         = Dimension { width: self.hgap, height: self.vgap };
         let total_gaps  = (n_cells - 1) * gap;
         let parent_size = parent.get_size();
         let insets      = parent.get_insets();
-        let inner_space = Dimension::new(
-            parent_size.width  - (insets.left + insets.right ),
-            parent_size.height - (insets.top  + insets.bottom));
+        let inner_space = Dimension {
+            width: parent_size.width  - (insets.left + insets.right),
+            height: parent_size.height - (insets.top  + insets.bottom)
+        };
         let comp_size   = (inner_space - total_gaps) / n_cells;
         let extra_space = (inner_space - (comp_size * n_cells + total_gaps)) / 2;
 
@@ -118,8 +119,8 @@ impl GridLayout {
                     let y = insets.top + extra_space.height
                           + (comp_size.height + self.vgap) * r;
 
-                    let i = r * n_cells.height + c;
-                    if i < n_comps {
+                    let i: usize = (r * n_cells.height + c).try_into().unwrap();
+                    if i < n_comps.try_into().unwrap() {
                         self.components[i].borrow_mut().set_bounds(
                             Rectangle {
                                 pos: Point { x, y },
@@ -138,8 +139,8 @@ impl GridLayout {
                     let y = insets.top + extra_space.height
                           + (comp_size.height + self.vgap) * r;
 
-                    let i = r * n_cells.height + c;
-                    if i < n_comps {
+                    let i: usize = (r * n_cells.height + c).try_into().unwrap();
+                    if i < n_comps.try_into().unwrap() {
                         self.components[i].borrow_mut().set_bounds(
                             Rectangle {
                                 pos: Point { x, y },
@@ -165,5 +166,9 @@ impl Layout for GridLayout {
 
     fn invalidate(&mut self) {
         self.is_valid = false;
+    }
+
+    fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Rc<RefCell<dyn Component>>> + 'a> {
+        Box::new(self.components.iter())
     }
 }

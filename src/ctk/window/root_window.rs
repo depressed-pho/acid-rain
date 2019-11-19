@@ -21,7 +21,8 @@ pub struct RootWindow {
     screen: ncurses::WINDOW,
     graphics: Graphics,
     bounds: Rectangle,
-    layout: Rc<RefCell<dyn Layout>>
+    layout: Rc<RefCell<dyn Layout>>,
+    dirty: bool
 }
 
 impl RootWindow {
@@ -31,31 +32,19 @@ impl RootWindow {
 
         let bounds = Rectangle {
             pos: Point { x: 0, y: 0 },
-            size: Dimension {
-                width: width.try_into().unwrap(),
-                height: height.try_into().unwrap()
-            }
+            size: Dimension { width, height }
         };
-        // FIXME: Set the size of "graphics" here.
+
+        let mut graphics = Graphics::new();
+        graphics.set_size(bounds.size);
 
         RootWindow {
             screen,
-            graphics: Graphics::new(),
+            graphics,
             bounds,
-            layout
+            layout,
+            dirty: true
         }
-    }
-
-    pub(crate) fn refresh(&mut self) -> Result<(), ()> {
-        self.paint()?;
-        /*
-        check(
-            ncurses::pnoutrefresh(
-                self.graphics,
-                0, // pmin_row
-                0, // pmin_col
-        */
-        Ok(())
     }
 }
 
@@ -64,9 +53,21 @@ impl Component for RootWindow {
         &self.graphics
     }
 
-    fn paint(&mut self) -> Result<(), ()> {
-        //check(ncurses::wnoutrefresh(*self.graphics()))
-        Ok(())
+    fn paint(&mut self) {
+        if self.dirty {
+            // Do nothing.
+        }
+        self.dirty = false;
+        for child in self.layout.borrow().children() {
+            child.borrow_mut().paint();
+        }
+    }
+
+    fn refresh(&self, scr: Dimension) {
+        self.graphics.refresh(self.get_location(), scr);
+        for child in self.layout.borrow().children() {
+            child.borrow().refresh(scr);
+        }
     }
 
     fn validate(&mut self) {
@@ -82,5 +83,8 @@ impl Component for RootWindow {
     fn set_bounds(&mut self, b: Rectangle) {
         self.bounds = b;
         self.layout.borrow_mut().invalidate();
+        if self.graphics.set_size(b.size) {
+            self.dirty = true;
+        }
     }
 }

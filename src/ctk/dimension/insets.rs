@@ -9,10 +9,10 @@
  */
 #[derive(Eq, PartialEq, Clone, Copy, Hash, Debug)]
 pub struct Insets {
-    pub bottom: usize,
-    pub left: usize,
-    pub right: usize,
-    pub top: usize
+    pub bottom: i32,
+    pub left: i32,
+    pub right: i32,
+    pub top: i32
 }
 
 impl Default for Insets {

@@ -5,6 +5,7 @@ use crate::ctk::Graphics;
 use crate::ctk::dimension::{
     Dimension,
     Insets,
+    Point,
     Rectangle
 };
 
@@ -14,8 +15,17 @@ pub trait Component {
      */
     fn graphics(&self) -> &Graphics;
 
-    /** Refresh the content of the graphics context. */
-    fn paint(&mut self) -> Result<(), ()>;
+    /** Paint the content of the graphics context if it might not
+     * have the desired content. This method must recursively repaint
+     * sub-components if the component is a container.
+     */
+    fn paint(&mut self);
+
+    /** Copy the content of the graphics context to the curses
+     * screen. This method must recursively do the copying if the
+     * component is a container.
+     */
+    fn refresh(&self, scr: Dimension);
 
     /** Validate sub-components if the component has any.
      *
@@ -35,9 +45,17 @@ pub trait Component {
 
     /** Move and resize this component. This method changes
      * layout-related information, and therefore, must invalidate the
-     * component hierarchy.
+     * component hierarchy if the component is a container. It must
+     * also resize the graphics context.
      */
     fn set_bounds(&mut self, b: Rectangle);
+
+    /** Get the location of this component, i.e. the position of the
+     * bounds.
+     */
+    fn get_location(&self) -> Point {
+        Point::from(self.get_bounds())
+    }
 
     /** Get the size of this component, i.e. the size of the bounds.
      */

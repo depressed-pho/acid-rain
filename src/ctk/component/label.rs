@@ -2,11 +2,15 @@ use crate::ctk::{
     Component,
     Graphics
 };
-use crate::ctk::dimension::Rectangle;
+use crate::ctk::dimension::{
+    Dimension,
+    Rectangle
+};
 
 pub struct Label {
     graphics: Graphics,
     bounds: Rectangle,
+    dirty: bool,
     text: String
 }
 
@@ -15,6 +19,7 @@ impl Label {
         Label {
             graphics: Graphics::new(),
             bounds: Rectangle::default(),
+            dirty: true,
             text: text.into()
         }
     }
@@ -25,8 +30,15 @@ impl Component for Label {
         &self.graphics
     }
 
-    fn paint(&mut self) -> Result<(), ()> {
-        unimplemented!();
+    fn paint(&mut self) {
+        if self.dirty {
+            unimplemented!();
+        }
+        self.dirty = false;
+    }
+
+    fn refresh(&self, scr: Dimension) {
+        self.graphics.refresh(self.get_location(), scr);
     }
 
     fn get_bounds(&self) -> Rectangle {
@@ -35,5 +47,8 @@ impl Component for Label {
 
     fn set_bounds(&mut self, b: Rectangle) {
         self.bounds = b;
+        if self.graphics.set_size(b.size) {
+            self.dirty = true;
+        }
     }
 }
