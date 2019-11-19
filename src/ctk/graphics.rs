@@ -80,6 +80,17 @@ impl Graphics {
             None => {}
         }
     }
+
+    pub fn draw_string(&self, s: &str, p: Point) {
+        match self.pad {
+            Some(w) => {
+                check(
+                    ncurses::mvwaddnstr(
+                        w, p.y, p.x, s, s.len().try_into().unwrap())).unwrap();
+            },
+            None => {}
+        }
+    }
 }
 
 impl Drop for Graphics {

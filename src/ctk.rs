@@ -12,7 +12,7 @@ pub mod layout;
 pub use layout::*;
 
 mod util;
-use crate::ctk::util::check;
+use crate::ctk::util::{check, check_null};
 
 pub mod window;
 use crate::ctk::window::RootWindow;
@@ -46,7 +46,7 @@ impl Ctk {
             }
         }
 
-        let stdscr = ncurses::initscr();
+        let stdscr = check_null(ncurses::initscr()).unwrap();
 
         /* We are going to use colors. */
         check(ncurses::start_color())?;

@@ -28,7 +28,7 @@ pub struct RootWindow {
 impl RootWindow {
     pub(crate) fn new(screen: ncurses::WINDOW, layout: Rc<RefCell<dyn Layout>>) -> RootWindow {
         let (mut width, mut height) = (0, 0);
-        ncurses::getmaxyx(screen, &mut width, &mut height);
+        ncurses::getmaxyx(screen, &mut height, &mut width);
 
         let bounds = Rectangle {
             pos: Point { x: 0, y: 0 },

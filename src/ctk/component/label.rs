@@ -4,6 +4,7 @@ use crate::ctk::{
 };
 use crate::ctk::dimension::{
     Dimension,
+    Point,
     Rectangle
 };
 
@@ -32,7 +33,11 @@ impl Component for Label {
 
     fn paint(&mut self) {
         if self.dirty {
-            unimplemented!();
+            // FIXME: word wrapping, and labels longer than the inner width.
+            // FIXME: also alignment
+            let insets = self.get_insets();
+            // FIXME: Clear the context before drawing.
+            self.graphics.draw_string(&self.text, Point { x: insets.left, y: insets.top });
         }
         self.dirty = false;
     }
