@@ -12,8 +12,15 @@ pub struct Dimension {
 }
 
 impl Dimension {
+    pub fn zero() -> Self {
+        Dimension {
+            width: 0,
+            height: 0
+        }
+    }
+
     pub fn is_zero(&self) -> bool {
-        self.width == 0 || self.height == 0
+        self.width <= 0 || self.height <= 0
     }
 }
 
@@ -25,10 +32,7 @@ impl From<Rectangle> for Dimension {
 
 impl Default for Dimension {
     fn default() -> Self {
-        Dimension {
-            width: 0,
-            height: 0
-        }
+        Self::zero()
     }
 }
 

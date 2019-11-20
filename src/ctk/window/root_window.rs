@@ -31,7 +31,7 @@ impl RootWindow {
         ncurses::getmaxyx(screen, &mut height, &mut width);
 
         let bounds = Rectangle {
-            pos: Point { x: 0, y: 0 },
+            pos: Point::zero(),
             size: Dimension { width, height }
         };
 

@@ -10,12 +10,18 @@ pub struct Point {
     pub y: i32
 }
 
-impl Default for Point {
-    fn default() -> Self {
+impl Point {
+    pub fn zero() -> Self {
         Point {
             x: 0,
             y: 0
         }
+    }
+}
+
+impl Default for Point {
+    fn default() -> Self {
+        Self::zero()
     }
 }
 

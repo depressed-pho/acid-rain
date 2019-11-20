@@ -1,5 +1,6 @@
 use crate::ctk::dimension::{
     Dimension,
+    Insets,
     Point
 };
 
@@ -13,11 +14,26 @@ pub struct Rectangle {
     pub size: Dimension
 }
 
+impl Rectangle {
+    pub fn shrink(self, i: Insets) -> Self {
+        Rectangle {
+            pos: Point {
+                x: self.pos.x + i.left,
+                y: self.pos.y + i.top
+            },
+            size: Dimension {
+                width: self.size.width - i.left - i.right,
+                height: self.size.height - i.top - i.bottom
+            }
+        }
+    }
+}
+
 impl Default for Rectangle {
     fn default() -> Self {
         Rectangle {
-            pos: Point { x: 0, y: 0 },
-            size: Dimension { width: 0, height: 0 }
+            pos: Point::zero(),
+            size: Dimension::zero()
         }
     }
 }

@@ -1,18 +1,26 @@
+extern crate unicode_width;
+use unicode_width::UnicodeWidthStr;
+
 use crate::ctk::{
     Component,
-    Graphics
+    Graphics,
+    HorizontalAlignment::{self, self as HA},
+    VerticalAlignment::{self, self as VA}
 };
 use crate::ctk::dimension::{
     Dimension,
     Point,
     Rectangle
 };
+use std::convert::TryInto;
 
 pub struct Label {
     graphics: Graphics,
     bounds: Rectangle,
     dirty: bool,
-    text: String
+    text: String,
+    h_align: HorizontalAlignment,
+    v_align: VerticalAlignment
 }
 
 impl Label {
@@ -21,8 +29,20 @@ impl Label {
             graphics: Graphics::new(),
             bounds: Rectangle::default(),
             dirty: true,
-            text: text.into()
+            text: text.into(),
+            h_align: HA::Leading,
+            v_align: VA::Center
         }
+    }
+
+    pub fn set_horizontal_alignment(&mut self, h_align: HorizontalAlignment) {
+        self.h_align = h_align;
+        self.dirty   = true;
+    }
+
+    pub fn set_vertical_alignment(&mut self, v_align: VerticalAlignment) {
+        self.v_align = v_align;
+        self.dirty   = true;
     }
 }
 
@@ -33,11 +53,36 @@ impl Component for Label {
 
     fn paint(&mut self) {
         if self.dirty {
-            // FIXME: word wrapping, and labels longer than the inner width.
-            // FIXME: also alignment
+            // FIXME: Consider cases where word wrapping is needed, or
+            // labels are longer than the inner width and overwrite
+            // the border.
+
             let insets = self.get_insets();
-            // FIXME: Clear the context before drawing.
-            self.graphics.draw_string(&self.text, Point { x: insets.left, y: insets.top });
+            let inner  = Rectangle {
+                pos: Point::zero(),
+                size: self.get_size()
+            }.shrink(insets);
+
+            let ltr = true; // THINKME: hard-coded for now
+            let pos = Point {
+                x: match self.h_align {
+                    HA::Left            => h_align_left(&self.text, inner),
+                    HA::Center          => h_align_center(&self.text, inner),
+                    HA::Right           => h_align_right(&self.text, inner),
+                    HA::Leading  if ltr => h_align_left(&self.text, inner),
+                    HA::Leading         => h_align_right(&self.text, inner),
+                    HA::Trailing if ltr => h_align_right(&self.text, inner),
+                    HA::Trailing        => h_align_left(&self.text, inner)
+                },
+                y: match self.v_align {
+                    VA::Top    => v_align_top(&self.text, inner),
+                    VA::Center => v_align_center(&self.text, inner),
+                    VA::Bottom => v_align_bottom(&self.text, inner),
+                }
+            };
+
+            self.graphics.clear_rect(inner);
+            self.graphics.draw_string(&self.text, pos);
         }
         self.dirty = false;
     }
@@ -56,4 +101,30 @@ impl Component for Label {
             self.dirty = true;
         }
     }
+}
+
+fn h_align_left(t: &str, r: Rectangle) -> i32 {
+    r.pos.x
+}
+
+fn h_align_center(t: &str, r: Rectangle) -> i32 {
+    let w: i32 = t.width().try_into().unwrap();
+    r.pos.x + (r.size.width - w) / 2
+}
+
+fn h_align_right(t: &str, r: Rectangle) -> i32 {
+    let w: i32 = t.width().try_into().unwrap();
+    r.pos.x + r.size.width - w
+}
+
+fn v_align_top(_t: &str, r: Rectangle) -> i32 {
+    r.pos.y
+}
+
+fn v_align_center(_t: &str, r: Rectangle) -> i32 {
+    r.pos.y + (r.size.height - 1) / 2
+}
+
+fn v_align_bottom(_t: &str, r: Rectangle) -> i32 {
+    r.pos.y + r.size.height - 1
 }

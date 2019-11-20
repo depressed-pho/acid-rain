@@ -10,6 +10,7 @@ extern crate lazy_static;
 use clap::{Arg, ArgMatches};
 use std::cell::RefCell;
 use std::rc::Rc;
+use crate::ctk::HorizontalAlignment as HA;
 use crate::ctk::component::Label;
 use crate::ctk::layout::GridLayout;
 
@@ -29,6 +30,7 @@ fn main() {
     layout.borrow_mut().set_cols(1);
 
     let title = Rc::new(RefCell::new(Label::new("A c i d   R a i n")));
+    title.borrow_mut().set_horizontal_alignment(HA::Center);
     layout.borrow_mut().add(title);
 
     let mut tk = ctk::Ctk::initiate(layout).unwrap();

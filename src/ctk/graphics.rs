@@ -1,7 +1,8 @@
 use crate::ctk::util::{check, check_null};
 use crate::ctk::dimension::{
     Dimension,
-    Point
+    Point,
+    Rectangle
 };
 use std::convert::TryInto;
 use std::cmp::{min, max};
@@ -52,12 +53,9 @@ impl Graphics {
     }
 
     fn drop_pad(&mut self) {
-        match self.pad {
-            Some(w) => {
-                check(ncurses::delwin(w)).unwrap();
-                self.pad = None;
-            },
-            None => ()
+        if let Some(w) = self.pad {
+            check(ncurses::delwin(w)).unwrap();
+            self.pad = None;
         }
     }
 
@@ -65,30 +63,35 @@ impl Graphics {
      * screen.
      */
     pub fn refresh(&self, pos: Point, scr: Dimension) {
-        match self.pad {
-            Some(w) => {
-                let pminrow = max(-pos.y, 0);
-                let pmincol = max(-pos.x, 0);
-                let sminrow = min(0, pos.y);
-                let smincol = min(0, pos.x);
-                let smaxrow = min(pos.y + self.size.height, scr.height);
-                let smaxcol = min(pos.x + self.size.width, scr.width);
-                check(
-                    ncurses::pnoutrefresh(
-                        w, pminrow, pmincol, sminrow, smincol, smaxrow, smaxcol)).unwrap();
-            },
-            None => {}
+        if let Some(w) = self.pad {
+            let pminrow = max(-pos.y, 0);
+            let pmincol = max(-pos.x, 0);
+            let sminrow = min(0, pos.y);
+            let smincol = min(0, pos.x);
+            let smaxrow = min(pos.y + self.size.height, scr.height);
+            let smaxcol = min(pos.x + self.size.width, scr.width);
+            check(
+                ncurses::pnoutrefresh(
+                    w, pminrow, pmincol, sminrow, smincol, smaxrow, smaxcol)).unwrap();
         }
     }
 
-    pub fn draw_string(&self, s: &str, p: Point) {
-        match self.pad {
-            Some(w) => {
+    pub fn clear_rect(&mut self, r: Rectangle) {
+        if let Some(w) = self.pad {
+            let bg = ncurses::getbkgd(w);
+            for y in r.pos.y .. r.pos.y + r.size.height {
                 check(
-                    ncurses::mvwaddnstr(
-                        w, p.y, p.x, s, s.len().try_into().unwrap())).unwrap();
-            },
-            None => {}
+                    ncurses::mvwhline(
+                        w, y, r.pos.x, bg, r.size.width)).unwrap();
+            }
+        }
+    }
+
+    pub fn draw_string(&mut self, s: &str, p: Point) {
+        if let Some(w) = self.pad {
+            check(
+                ncurses::mvwaddnstr(
+                    w, p.y, p.x, s, s.len().try_into().unwrap())).unwrap();
         }
     }
 }

@@ -1,5 +1,8 @@
 extern crate ncurses;
 
+pub mod alignment;
+pub use alignment::*;
+
 pub mod component;
 pub use component::*;
 
