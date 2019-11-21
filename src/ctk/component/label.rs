@@ -9,7 +9,6 @@ use crate::ctk::{
     VerticalAlignment::{self, self as VA}
 };
 use crate::ctk::dimension::{
-    Dimension,
     Point,
     Rectangle
 };
@@ -48,8 +47,8 @@ impl Label {
 }
 
 impl Component for Label {
-    fn graphics(&self) -> &Graphics {
-        &self.graphics
+    fn graphics_mut(&mut self) -> &mut Graphics {
+        &mut self.graphics
     }
 
     fn paint(&mut self) {

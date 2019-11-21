@@ -11,10 +11,10 @@ use crate::ctk::dimension::{
 };
 
 pub trait Component {
-    /** Borrow the graphics context associated to this
+    /** Mut-borrow the graphics context associated to this
      * component. Every component must own one.
      */
-    fn graphics(&self) -> &Graphics;
+    fn graphics_mut(&mut self) -> &mut Graphics;
 
     /** Paint the content of the graphics context if it might not
      * have the desired content. This method must recursively repaint

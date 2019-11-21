@@ -1,8 +1,7 @@
 use crate::ctk::{
     Component,
     Graphics,
-    Layout,
-    util::check
+    Layout
 };
 use crate::ctk::dimension::{
     Dimension,
@@ -10,7 +9,6 @@ use crate::ctk::dimension::{
     Rectangle
 };
 use std::cell::RefCell;
-use std::convert::TryInto;
 use std::rc::Rc;
 
 /** The root window is a special window which covers the entire
@@ -49,8 +47,8 @@ impl RootWindow {
 }
 
 impl Component for RootWindow {
-    fn graphics(&self) -> &Graphics {
-        &self.graphics
+    fn graphics_mut(&mut self) -> &mut Graphics {
+        &mut self.graphics
     }
 
     fn paint(&mut self) {
