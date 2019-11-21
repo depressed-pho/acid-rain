@@ -2,6 +2,7 @@ mod label;
 pub use label::*;
 
 use crate::ctk::Graphics;
+use crate::ctk::RootWindow;
 use crate::ctk::dimension::{
     Dimension,
     Insets,
@@ -25,7 +26,7 @@ pub trait Component {
      * screen. This method must recursively do the copying if the
      * component is a container.
      */
-    fn refresh(&self, scr: Dimension);
+    fn refresh(&self, root: &RootWindow);
 
     /** Validate sub-components if the component has any.
      *

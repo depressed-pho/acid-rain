@@ -102,7 +102,7 @@ impl Ctk {
      * update the screen by actually writing data to the terminal. */
     fn update_graphics(&mut self) -> Result<(), ()> {
         self.root.paint();
-        self.root.refresh(self.root.get_size());
+        self.root.refresh(&self.root);
         check(ncurses::doupdate())
     }
 }

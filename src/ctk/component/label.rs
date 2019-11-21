@@ -5,6 +5,7 @@ use crate::ctk::{
     Component,
     Graphics,
     HorizontalAlignment::{self, self as HA},
+    RootWindow,
     VerticalAlignment::{self, self as VA}
 };
 use crate::ctk::dimension::{
@@ -87,8 +88,8 @@ impl Component for Label {
         self.dirty = false;
     }
 
-    fn refresh(&self, scr: Dimension) {
-        self.graphics.refresh(self.get_location(), scr);
+    fn refresh(&self, root: &RootWindow) {
+        self.graphics.refresh(self.get_location(), root);
     }
 
     fn get_bounds(&self) -> Rectangle {

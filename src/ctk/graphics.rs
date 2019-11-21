@@ -1,3 +1,7 @@
+use crate::ctk::{
+    Component,
+    RootWindow
+};
 use crate::ctk::util::{check, check_null};
 use crate::ctk::dimension::{
     Dimension,
@@ -62,8 +66,9 @@ impl Graphics {
     /** Copy the content of the graphics context to the curses
      * screen.
      */
-    pub fn refresh(&self, pos: Point, scr: Dimension) {
+    pub fn refresh(&self, pos: Point, root: &RootWindow) {
         if let Some(w) = self.pad {
+            let scr     = root.get_size();
             let pminrow = max(-pos.y, 0);
             let pmincol = max(-pos.x, 0);
             let sminrow = min(0, pos.y);

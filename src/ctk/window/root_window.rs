@@ -63,10 +63,11 @@ impl Component for RootWindow {
         }
     }
 
-    fn refresh(&self, scr: Dimension) {
-        self.graphics.refresh(self.get_location(), scr);
+    fn refresh(&self, root: &Self) {
+        // The root must be self, but how do we assert that?
+        self.graphics.refresh(self.get_location(), root);
         for child in self.layout.borrow().children() {
-            child.borrow().refresh(scr);
+            child.borrow().refresh(root);
         }
     }
 
