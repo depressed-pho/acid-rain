@@ -1,4 +1,10 @@
-use crate::ctk::Component;
+mod button_border;
+pub use button_border::*;
+
+mod null_border;
+pub use null_border::*;
+
+use crate::ctk::Graphics;
 use crate::ctk::dimension::Insets;
 
 /** A trait describing an object capable of rendering a border around
@@ -11,5 +17,5 @@ pub trait Border {
 
     /** Paint the border for the specified component.
      */
-    fn paint(c: &mut Component);
+    fn paint(&self, g: &mut Graphics);
 }

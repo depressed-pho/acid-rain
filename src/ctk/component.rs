@@ -1,8 +1,11 @@
 mod label;
 pub use label::*;
 
-use crate::ctk::Graphics;
-use crate::ctk::RootWindow;
+use crate::ctk::{
+    Border,
+    Graphics,
+    RootWindow
+};
 use crate::ctk::dimension::{
     Dimension,
     Insets,
@@ -16,9 +19,10 @@ pub trait Component {
      */
     fn graphics_mut(&mut self) -> &mut Graphics;
 
-    /** Paint the content of the graphics context if it might not
-     * have the desired content. This method must recursively repaint
-     * sub-components if the component is a container.
+    /** Paint the content of the graphics context if it might not have
+     * the desired content. This method must recursively repaint
+     * sub-components if the component is a container. It is for
+     * internal use.
      */
     fn paint(&mut self);
 
@@ -64,10 +68,17 @@ pub trait Component {
         Dimension::from(self.get_bounds())
     }
 
-    /** If a border has been set on this component, returns the
-     * border's insets; otherwise returns an empty insets. */
+    /** Get the border of this component.
+     */
+    fn get_border(&self) -> &Box<dyn Border>;
+
+    /** Set the possible border of this component.
+     */
+    fn set_border(&mut self, b: Box<dyn Border>);
+
+    /** Returns the border's insets.
+     */
     fn get_insets(&self) -> Insets {
-        // FIXME: not implemented properly yet
-        Insets::default()
+        self.get_border().get_insets()
     }
 }

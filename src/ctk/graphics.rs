@@ -1,6 +1,7 @@
 use crate::ctk::{
     Component,
-    RootWindow
+    RootWindow,
+    Symbol
 };
 use crate::ctk::util::{check, check_null};
 use crate::ctk::dimension::{
@@ -28,6 +29,10 @@ impl Graphics {
                 height: 0
             }
         }
+    }
+
+    pub fn get_size(&self) -> Dimension {
+        self.size
     }
 
     /** Resize the graphics context. Returns true iff the size has
@@ -94,9 +99,21 @@ impl Graphics {
 
     pub fn draw_string(&mut self, s: &str, p: Point) {
         if let Some(w) = self.pad {
+            // FIXME: Fix the scrolling problem
             check(
                 ncurses::mvwaddnstr(
                     w, p.y, p.x, s, s.len().try_into().unwrap())).unwrap();
+        }
+    }
+
+    pub fn draw_symbol(&mut self, s: Symbol, p: Point) {
+        if let Some(w) = self.pad {
+            /* We don't use mvwaddch() because it always tries to
+             * advance the cursor, which is impossible if it's already
+             * at the lower-right corner of the window. The function
+             * returns ERR in that case.
+             */
+            check(ncurses::mvwaddchnstr(w, p.y, p.x, &[s.into()], 1)).unwrap();
         }
     }
 }

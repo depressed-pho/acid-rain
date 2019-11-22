@@ -17,6 +17,9 @@ pub mod dimension;
 pub mod layout;
 pub use layout::*;
 
+pub mod symbol;
+pub use symbol::*;
+
 mod util;
 use crate::ctk::util::{check, check_null};
 
@@ -82,6 +85,13 @@ impl Ctk {
         /* We don't want ncurses to treat RET specially. */
         check(ncurses::nonl())?;
 
+        /* Refresh the stdscr before drawing anything. Since we don't
+         * actually draw anything directly on it, it will forever be
+         * blank and the first call of getch() will clear the terminal
+         * entirely.
+         */
+        check(ncurses::wrefresh(stdscr))?;
+
         /* Done the initial configuration. */
         let tk = Ctk {
             root: RootWindow::new(stdscr, layout)
@@ -99,6 +109,9 @@ impl Ctk {
     pub fn main(&mut self) {
         self.root.validate();
         self.update_graphics().unwrap();
+
+        // FIXME
+        ncurses::getch();
     }
 
     /** Refresh the content of the off-screen buffer curscr, and then

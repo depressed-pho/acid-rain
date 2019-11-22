@@ -2,12 +2,14 @@ extern crate unicode_width;
 use unicode_width::UnicodeWidthStr;
 
 use crate::ctk::{
+    Border,
     Component,
     Graphics,
     HorizontalAlignment::{self, self as HA},
     RootWindow,
     VerticalAlignment::{self, self as VA}
 };
+use crate::ctk::border::NullBorder;
 use crate::ctk::dimension::{
     Point,
     Rectangle
@@ -17,6 +19,7 @@ use std::convert::TryInto;
 pub struct Label {
     graphics: Graphics,
     bounds: Rectangle,
+    border: Box<dyn Border>,
     dirty: bool,
     text: String,
     h_align: HorizontalAlignment,
@@ -28,6 +31,7 @@ impl Label {
         Label {
             graphics: Graphics::new(),
             bounds: Rectangle::default(),
+            border: Box::new(NullBorder {}),
             dirty: true,
             text: text.into(),
             h_align: HA::Leading,
@@ -53,6 +57,8 @@ impl Component for Label {
 
     fn paint(&mut self) {
         if self.dirty {
+            self.border.paint(&mut self.graphics);
+
             // FIXME: Consider cases where word wrapping is needed, or
             // labels are longer than the inner width and overwrite
             // the border.
@@ -101,9 +107,17 @@ impl Component for Label {
             self.dirty = true;
         }
     }
+
+    fn get_border(&self) -> &Box<dyn Border> {
+        &self.border
+    }
+
+    fn set_border(&mut self, b: Box<dyn Border>) {
+        self.border = b;
+    }
 }
 
-fn h_align_left(t: &str, r: Rectangle) -> i32 {
+fn h_align_left(_t: &str, r: Rectangle) -> i32 {
     r.pos.x
 }
 

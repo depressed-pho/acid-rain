@@ -1,8 +1,10 @@
 use crate::ctk::{
+    Border,
     Component,
     Graphics,
     Layout
 };
+use crate::ctk::border::NullBorder;
 use crate::ctk::dimension::{
     Dimension,
     Point,
@@ -20,6 +22,9 @@ pub struct RootWindow {
     graphics: Graphics,
     bounds: Rectangle,
     layout: Rc<RefCell<dyn Layout>>,
+    /* We really want to do Box<dyn Border + Copy>> but Rust currently
+     * doesn't allow that: E0225 */
+    border: Box<dyn Border>,
     dirty: bool
 }
 
@@ -41,6 +46,7 @@ impl RootWindow {
             graphics,
             bounds,
             layout,
+            border: Box::new(NullBorder {}),
             dirty: true
         }
     }
@@ -53,7 +59,7 @@ impl Component for RootWindow {
 
     fn paint(&mut self) {
         if self.dirty {
-            // Do nothing.
+            self.border.paint(&mut self.graphics);
         }
         self.dirty = false;
         for child in self.layout.borrow().children() {
@@ -85,5 +91,13 @@ impl Component for RootWindow {
         if self.graphics.set_size(b.size) {
             self.dirty = true;
         }
+    }
+
+    fn get_border(&self) -> &Box<dyn Border> {
+        &self.border
+    }
+
+    fn set_border(&mut self, b: Box<dyn Border>) {
+        self.border = b;
     }
 }

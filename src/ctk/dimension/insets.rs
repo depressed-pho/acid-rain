@@ -15,13 +15,19 @@ pub struct Insets {
     pub top: i32
 }
 
-impl Default for Insets {
-    fn default() -> Self {
+impl Insets {
+    pub fn zero() -> Self {
         Insets {
             bottom: 0,
             left: 0,
             right: 0,
             top: 0
         }
+    }
+}
+
+impl Default for Insets {
+    fn default() -> Self {
+        Self::zero()
     }
 }
