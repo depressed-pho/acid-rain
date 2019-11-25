@@ -1,3 +1,4 @@
+extern crate libc;
 extern crate ncurses;
 
 pub mod alignment;
@@ -27,12 +28,30 @@ pub mod window;
 use crate::ctk::window::RootWindow;
 
 use std::cell::RefCell;
+use std::ffi::{CString, CStr};
 use std::panic;
 use std::sync::Mutex;
 use std::rc::Rc;
 
 lazy_static! {
     static ref INITIALIZED: Mutex<bool> = Mutex::new(false);
+
+    static ref IS_UTF8_LOCALE: bool = {
+        if cfg!(feature = "unicode") {
+            let codeset = unsafe {
+                CStr::from_ptr(
+                    libc::nl_langinfo(libc::CODESET)).to_string_lossy()
+            };
+            codeset == "UTF-8"
+        }
+        else {
+            false
+        }
+    };
+}
+
+pub fn is_utf8_locale() -> bool {
+    *IS_UTF8_LOCALE
 }
 
 pub struct Ctk {
@@ -52,6 +71,18 @@ impl Ctk {
             }
             else {
                 *initialized = true;
+            }
+
+            /* And we must call setlocale() before initializing
+             * libcursesw.
+             */
+            if cfg!(feature = "unicode") {
+                /* THINKME: ncurses::setlocale() seems to be
+                 * malfunctioning but I have no idea why. */
+                let empty = CString::new("").unwrap();
+                unsafe {
+                    libc::setlocale(libc::LC_ALL, empty.as_ptr());
+                }
             }
         }
 

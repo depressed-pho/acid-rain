@@ -1,3 +1,5 @@
+extern crate unicode_width;
+
 use crate::ctk::{
     Component,
     RootWindow,
@@ -11,6 +13,7 @@ use crate::ctk::dimension::{
 };
 use std::convert::TryInto;
 use std::cmp::{min, max};
+use unicode_width::UnicodeWidthChar;
 
 pub struct Graphics {
     /** The pad is initially non-existent. It is created when the area
@@ -106,10 +109,43 @@ impl Graphics {
 
     pub fn draw_string(&mut self, s: &str, p: Point) {
         if let Some(w) = self.pad {
-            // FIXME: Fix the scrolling problem
-            check(
-                ncurses::mvwaddnstr(
-                    w, p.y, p.x, s, s.len().try_into().unwrap())).unwrap();
+            // FIXME: s might contain newlines or any other control
+            // characters. What to do about them?
+            assert!(p.x >= 0 && p.x < self.size.width);
+            assert!(p.y >= 0 && p.y < self.size.height);
+            assert!(s.find('\n') == None);
+
+            if p.y == self.size.height-1 {
+                /* How many code points can we draw without reaching
+                 * the lower-right corner?
+                 */
+                let mut cursor  = p.x;
+                let mut n_bytes = 0;
+                for ch in s.chars() {
+                    let width: i32 = ch.width().unwrap() // FIXME: Not really correct
+                        .try_into().unwrap();
+                    if cursor + width >= self.size.width {
+                        break;
+                    }
+                    else {
+                        cursor  += width;
+                        n_bytes += ch.len_utf8();
+                    }
+                }
+
+                let (add, ins) = s.split_at(n_bytes);
+                check(
+                    ncurses::mvwaddnstr(
+                        w, p.y, p.x, add, add.len().try_into().unwrap())).unwrap();
+                check(
+                    ncurses::mvwinsnstr(
+                        w, p.y, cursor, ins, ins.len().try_into().unwrap())).unwrap();
+            }
+            else {
+                check(
+                    ncurses::mvwaddnstr(
+                        w, p.y, p.x, s, s.len().try_into().unwrap())).unwrap();
+            }
         }
     }
 
