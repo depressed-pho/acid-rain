@@ -19,5 +19,11 @@ lazy_static = "~1.4"
 ncurses = "~5.99"
 unicode-width = "~0.1"
 
+[features]
+default = ["unicode"]
+
+# Try to use Unicode capability of the terminal. Requires libncursesw.
+unicode = ["ncurses/wide"]
+
 [badges]
 maintenance = { status = "experimental" }

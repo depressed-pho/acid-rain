@@ -51,9 +51,16 @@ impl Graphics {
                     check(ncurses::wresize(w, new.height, new.width)).unwrap()
                 },
                 None => {
-                    self.pad = Some(
-                        check_null(
-                            ncurses::newpad(new.height, new.width)).unwrap());
+                    let w = check_null(
+                        ncurses::newpad(new.height, new.width)).unwrap();
+
+                    /* THINKME: I don't know why, but newpad() in
+                     * ncursesw-6.1 seems to set 0x00 for the initial
+                     * background.
+                     */
+                    ncurses::wbkgdset(w, 0x20);
+
+                    self.pad = Some(w);
                 }
             }
         }
