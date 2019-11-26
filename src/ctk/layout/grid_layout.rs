@@ -78,23 +78,21 @@ impl GridLayout {
                 self.rows * self.cols);
         }
 
-        let n_comps = self.components.len().try_into().unwrap();
+        let n_comps: i32 = self.components.len().try_into().unwrap();
         if n_comps == 0 {
             return;
         }
 
-        let n_cells = Dimension {
-            width: if self.rows > 0 {
-                (n_comps + self.rows - 1) / self.rows
+        let n_cells = if self.rows > 0 {
+            Dimension {
+                width: (n_comps + self.rows - 1) / self.rows,
+                height: self.rows
             }
-            else {
-                n_comps
-            },
-            height: if self.cols > 0 {
-                (n_comps + self.cols - 1) / self.cols
-            }
-            else {
-                n_comps
+        }
+        else {
+            Dimension {
+                width: self.cols,
+                height: (n_comps + self.cols - 1) / self.cols
             }
         };
 
@@ -119,7 +117,7 @@ impl GridLayout {
                     let y = insets.top + extra_space.height
                           + (comp_size.height + self.vgap) * r;
 
-                    let i: usize = (r * n_cells.height + c).try_into().unwrap();
+                    let i: usize = (r * n_cells.width + c).try_into().unwrap();
                     if i < n_comps.try_into().unwrap() {
                         self.components[i].borrow_mut().set_bounds(
                             Rectangle {
@@ -139,7 +137,7 @@ impl GridLayout {
                     let y = insets.top + extra_space.height
                           + (comp_size.height + self.vgap) * r;
 
-                    let i: usize = (r * n_cells.height + c).try_into().unwrap();
+                    let i: usize = (r * n_cells.width + c).try_into().unwrap();
                     if i < n_comps.try_into().unwrap() {
                         self.components[i].borrow_mut().set_bounds(
                             Rectangle {

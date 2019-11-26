@@ -1,4 +1,5 @@
 extern crate unicode_width;
+use unicode_width::UnicodeWidthChar;
 
 use crate::ctk::{
     Component,
@@ -13,7 +14,6 @@ use crate::ctk::dimension::{
 };
 use std::convert::TryInto;
 use std::cmp::{min, max};
-use unicode_width::UnicodeWidthChar;
 
 pub struct Graphics {
     /** The pad is initially non-existent. It is created when the area
@@ -86,8 +86,8 @@ impl Graphics {
             let scr     = root.get_size();
             let pminrow = max(-pos.y, 0);
             let pmincol = max(-pos.x, 0);
-            let sminrow = min(0, pos.y);
-            let smincol = min(0, pos.x);
+            let sminrow = max(0, pos.y);
+            let smincol = max(0, pos.x);
             let smaxrow = min(pos.y + self.size.height, scr.height);
             let smaxcol = min(pos.x + self.size.width, scr.width);
             check(
@@ -117,12 +117,13 @@ impl Graphics {
 
             if p.y == self.size.height-1 {
                 /* How many code points can we draw without reaching
-                 * the lower-right corner?
+                 * the lower-right corner? The last part of the string
+                 * possibly needs to be drawn with mvwinsnstr().
                  */
                 let mut cursor  = p.x;
                 let mut n_bytes = 0;
                 for ch in s.chars() {
-                    let width: i32 = ch.width().unwrap() // FIXME: Not really correct
+                    let width: i32 = ch.width().unwrap_or(1)
                         .try_into().unwrap();
                     if cursor + width >= self.size.width {
                         break;

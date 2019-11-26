@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 mod ctk;
 mod world;
 
@@ -14,8 +16,7 @@ use crate::ctk::{
     Component,
     HorizontalAlignment as HA
 };
-use crate::ctk::border::ButtonBorder;
-use crate::ctk::component::Label;
+use crate::ctk::component::{Button, Label};
 use crate::ctk::layout::GridLayout;
 
 fn opt_matches<'a>() -> ArgMatches<'a> {
@@ -35,8 +36,10 @@ fn main() {
 
     let title = Rc::new(RefCell::new(Label::new("A c i d   R a i n")));
     title.borrow_mut().set_horizontal_alignment(HA::Center);
-    title.borrow_mut().set_border(Box::new(ButtonBorder::default()));
     layout.borrow_mut().add(title);
+
+    let quit = Rc::new(RefCell::new(Button::new("Quit")));
+    layout.borrow_mut().add(quit);
 
     let mut tk = ctk::Ctk::initiate(layout).unwrap();
     tk.main();
