@@ -1,6 +1,3 @@
-extern crate unicode_width;
-use unicode_width::UnicodeWidthStr;
-
 use crate::ctk::{
     Border,
     Component,
@@ -9,12 +6,12 @@ use crate::ctk::{
     RootWindow,
     VerticalAlignment::{self, self as VA}
 };
+use crate::ctk::alignment::draw_aligned_text;
 use crate::ctk::border::ButtonBorder;
 use crate::ctk::dimension::{
     Point,
     Rectangle
 };
-use std::convert::TryInto;
 
 pub struct Button {
     graphics: Graphics,
@@ -56,13 +53,8 @@ impl Component for Button {
     }
 
     fn paint(&mut self) {
-        // FIXME: Eliminate the code duplicate with Label.
         if self.dirty {
             self.border.paint(&mut self.graphics);
-
-            // FIXME: Consider cases where word wrapping is needed, or
-            // labels are longer than the inner width and overwrite
-            // the border.
 
             let insets = self.get_insets();
             let inner  = Rectangle {
@@ -70,26 +62,12 @@ impl Component for Button {
                 size: self.get_size()
             }.shrink(insets);
 
-            let ltr = true; // THINKME: hard-coded for now
-            let pos = Point {
-                x: match self.h_align {
-                    HA::Left            => h_align_left(&self.label, inner),
-                    HA::Center          => h_align_center(&self.label, inner),
-                    HA::Right           => h_align_right(&self.label, inner),
-                    HA::Leading  if ltr => h_align_left(&self.label, inner),
-                    HA::Leading         => h_align_right(&self.label, inner),
-                    HA::Trailing if ltr => h_align_right(&self.label, inner),
-                    HA::Trailing        => h_align_left(&self.label, inner)
-                },
-                y: match self.v_align {
-                    VA::Top    => v_align_top(&self.label, inner),
-                    VA::Center => v_align_center(&self.label, inner),
-                    VA::Bottom => v_align_bottom(&self.label, inner),
-                }
-            };
-
             self.graphics.clear_rect(inner);
-            self.graphics.draw_string(&self.label, pos);
+
+            let ltr = true; // THINKME: hard-coded for now
+            draw_aligned_text(
+                &mut self.graphics, inner, ltr,
+                self.h_align, self.v_align, &self.label);
         }
         self.dirty = false;
     }
@@ -116,30 +94,4 @@ impl Component for Button {
     fn set_border(&mut self, b: Box<dyn Border>) {
         self.border = b;
     }
-}
-
-fn h_align_left(_t: &str, r: Rectangle) -> i32 {
-    r.pos.x
-}
-
-fn h_align_center(t: &str, r: Rectangle) -> i32 {
-    let w: i32 = t.width().try_into().unwrap();
-    r.pos.x + (r.size.width - w) / 2
-}
-
-fn h_align_right(t: &str, r: Rectangle) -> i32 {
-    let w: i32 = t.width().try_into().unwrap();
-    r.pos.x + r.size.width - w
-}
-
-fn v_align_top(_t: &str, r: Rectangle) -> i32 {
-    r.pos.y
-}
-
-fn v_align_center(_t: &str, r: Rectangle) -> i32 {
-    r.pos.y + (r.size.height - 1) / 2
-}
-
-fn v_align_bottom(_t: &str, r: Rectangle) -> i32 {
-    r.pos.y + r.size.height - 1
 }

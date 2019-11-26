@@ -2,7 +2,10 @@ extern crate libc;
 extern crate ncurses;
 
 pub mod alignment;
-pub use alignment::*;
+pub use alignment::{
+    HorizontalAlignment,
+    VerticalAlignment
+};
 
 pub mod border;
 pub use border::*;

@@ -7,7 +7,6 @@ use crate::ctk::{
 };
 use crate::ctk::border::NullBorder;
 use crate::ctk::dimension::{
-    Dimension,
     Point,
     Rectangle
 };

@@ -13,7 +13,6 @@ use clap::{Arg, ArgMatches};
 use std::cell::RefCell;
 use std::rc::Rc;
 use crate::ctk::{
-    Component,
     HorizontalAlignment as HA
 };
 use crate::ctk::component::{Button, Label, Panel};
