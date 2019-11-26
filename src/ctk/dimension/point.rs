@@ -1,5 +1,6 @@
 use crate::ctk::dimension::Rectangle;
 use std::convert::From;
+use std::ops::Add;
 
 /** A point representing a location in (x, y) coordinate space,
  * specified in integer precision.
@@ -17,6 +18,10 @@ impl Point {
             y: 0
         }
     }
+
+    pub fn is_zero(&self) -> bool {
+        self.x == 0 && self.y == 0
+    }
 }
 
 impl Default for Point {
@@ -28,5 +33,18 @@ impl Default for Point {
 impl From<Rectangle> for Point {
     fn from(rect: Rectangle) -> Self {
         rect.pos
+    }
+}
+
+/** Addition of two points is defined as component-wise.
+ */
+impl Add for Point {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self {
+        Point {
+            x: self.x + rhs.x,
+            y: self.y + rhs.y
+        }
     }
 }

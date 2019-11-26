@@ -56,6 +56,7 @@ impl Component for Button {
     }
 
     fn paint(&mut self) {
+        // FIXME: Eliminate the code duplicate with Label.
         if self.dirty {
             self.border.paint(&mut self.graphics);
 
@@ -93,8 +94,8 @@ impl Component for Button {
         self.dirty = false;
     }
 
-    fn refresh(&self, root: &RootWindow) {
-        self.graphics.refresh(self.get_location(), root);
+    fn refresh(&self, root: &RootWindow, offset: Point) {
+        self.graphics.refresh(root, self.get_location() + offset);
     }
 
     fn get_bounds(&self) -> Rectangle {

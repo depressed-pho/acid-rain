@@ -81,7 +81,7 @@ impl Graphics {
     /** Copy the content of the graphics context to the curses
      * screen.
      */
-    pub fn refresh(&self, pos: Point, root: &RootWindow) {
+    pub fn refresh(&self, root: &RootWindow, pos: Point) {
         if let Some(w) = self.pad {
             let scr     = root.get_size();
             let pminrow = max(-pos.y, 0);

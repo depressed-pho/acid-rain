@@ -16,7 +16,7 @@ use crate::ctk::{
     Component,
     HorizontalAlignment as HA
 };
-use crate::ctk::component::{Button, Label};
+use crate::ctk::component::{Button, Label, Panel};
 use crate::ctk::layout::GridLayout;
 
 fn opt_matches<'a>() -> ArgMatches<'a> {
@@ -38,8 +38,19 @@ fn main() {
     title.borrow_mut().set_horizontal_alignment(HA::Center);
     layout.borrow_mut().add(title);
 
-    let quit = Rc::new(RefCell::new(Button::new("Quit")));
-    layout.borrow_mut().add(quit);
+    let buttons = {
+        let layout = Rc::new(RefCell::new(GridLayout::new()));
+        layout.borrow_mut().set_cols(1);
+
+        let play = Rc::new(RefCell::new(Button::new("Play")));
+        layout.borrow_mut().add(play);
+
+        let quit = Rc::new(RefCell::new(Button::new("Quit")));
+        layout.borrow_mut().add(quit);
+
+        Rc::new(RefCell::new(Panel::new(layout)))
+    };
+    layout.borrow_mut().add(buttons);
 
     let mut tk = ctk::Ctk::initiate(layout).unwrap();
     tk.main();

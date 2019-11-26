@@ -93,8 +93,8 @@ impl Component for Label {
         self.dirty = false;
     }
 
-    fn refresh(&self, root: &RootWindow) {
-        self.graphics.refresh(self.get_location(), root);
+    fn refresh(&self, root: &RootWindow, offset: Point) {
+        self.graphics.refresh(root, self.get_location() + offset);
     }
 
     fn get_bounds(&self) -> Rectangle {

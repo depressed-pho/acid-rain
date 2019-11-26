@@ -2,7 +2,8 @@ use crate::ctk::{
     Border,
     Component,
     Graphics,
-    Layout
+    Layout,
+    RootWindow,
 };
 use crate::ctk::border::NullBorder;
 use crate::ctk::dimension::{
@@ -13,38 +14,19 @@ use crate::ctk::dimension::{
 use std::cell::RefCell;
 use std::rc::Rc;
 
-/** The root window is a special window which covers the entire
- * terminal screen. Its position is fixed to (0, 0), and its size can
- * only be changed by changing the terminal size itself.
- */
-pub struct RootWindow {
-    screen: ncurses::WINDOW,
+pub struct Panel {
     graphics: Graphics,
     bounds: Rectangle,
     layout: Rc<RefCell<dyn Layout>>,
-    /* We really want to do Box<dyn Border + Copy>> but Rust currently
-     * doesn't allow that: E0225 */
     border: Box<dyn Border>,
     dirty: bool
 }
 
-impl RootWindow {
-    pub(crate) fn new(screen: ncurses::WINDOW, layout: Rc<RefCell<dyn Layout>>) -> RootWindow {
-        let (mut width, mut height) = (0, 0);
-        ncurses::getmaxyx(screen, &mut height, &mut width);
-
-        let bounds = Rectangle {
-            pos: Point::zero(),
-            size: Dimension { width, height }
-        };
-
-        let mut graphics = Graphics::new();
-        graphics.set_size(bounds.size);
-
-        RootWindow {
-            screen,
-            graphics,
-            bounds,
+impl Panel {
+    pub fn new(layout: Rc<RefCell<dyn Layout>>) -> Panel {
+        Panel {
+            graphics: Graphics::new(),
+            bounds: Rectangle::default(),
             layout,
             border: Box::new(NullBorder {}),
             dirty: true
@@ -52,8 +34,8 @@ impl RootWindow {
     }
 }
 
-impl Component for RootWindow {
-    fn graphics_mut(&mut self) -> &mut Graphics {
+impl Component for Panel {
+        fn graphics_mut(&mut self) -> &mut Graphics {
         &mut self.graphics
     }
 
@@ -67,13 +49,11 @@ impl Component for RootWindow {
         }
     }
 
-    fn refresh(&self, root: &Self, offset: Point) {
-        // The root must be self, but how do we assert that?
-        assert!(offset.is_zero());
-
-        self.graphics.refresh(root, self.get_location());
+    fn refresh(&self, root: &RootWindow, offset: Point) {
+        let pos = self.get_location() + offset;
+        self.graphics.refresh(root, pos);
         for child in self.layout.borrow().children() {
-            child.borrow().refresh(root, offset);
+            child.borrow().refresh(root, pos);
         }
     }
 
@@ -85,8 +65,6 @@ impl Component for RootWindow {
         self.bounds
     }
 
-    /** For internal use only. User code must not invoke this.
-     */
     fn set_bounds(&mut self, b: Rectangle) {
         self.bounds = b;
         self.layout.borrow_mut().invalidate();

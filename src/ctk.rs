@@ -14,6 +14,7 @@ pub mod graphics;
 pub use graphics::*;
 
 pub mod dimension;
+use crate::ctk::dimension::Point;
 
 pub mod layout;
 pub use layout::*;
@@ -149,7 +150,7 @@ impl Ctk {
      * update the screen by actually writing data to the terminal. */
     fn update_graphics(&mut self) -> Result<(), ()> {
         self.root.paint();
-        self.root.refresh(&self.root);
+        self.root.refresh(&self.root, Point::zero());
         check(ncurses::doupdate())
     }
 }

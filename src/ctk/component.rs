@@ -4,6 +4,9 @@ pub use button::*;
 mod label;
 pub use label::*;
 
+mod panel;
+pub use panel::*;
+
 use crate::ctk::{
     Border,
     Graphics,
@@ -33,7 +36,7 @@ pub trait Component {
      * screen. This method must recursively do the copying if the
      * component is a container.
      */
-    fn refresh(&self, root: &RootWindow);
+    fn refresh(&self, root: &RootWindow, offset: Point);
 
     /** Validate sub-components if the component has any.
      *
