@@ -18,7 +18,9 @@ clap = "~2.33"
 lazy_static = "~1.4"
 libc = "~0.2"
 ncurses = "~5.99"
+num = "~0.2"
 unicode-width = "~0.1"
+weak-table = "~0.2"
 
 [features]
 default = ["unicode"]

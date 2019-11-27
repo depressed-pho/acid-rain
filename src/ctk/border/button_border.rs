@@ -9,6 +9,7 @@ use crate::ctk::dimension::{
     Insets,
     Point
 };
+use num::Zero;
 
 pub struct ButtonBorder {}
 

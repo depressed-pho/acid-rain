@@ -1,4 +1,5 @@
 use crate::ctk::dimension::Rectangle;
+use num::Zero;
 use std::convert::From;
 use std::ops::{Add, Sub, Mul, Div};
 
@@ -6,31 +7,32 @@ use std::ops::{Add, Sub, Mul, Div};
  * component (in integer precision) in a single struct.
  */
 #[derive(Eq, PartialEq, Clone, Copy, Hash, Debug)]
-pub struct Dimension {
-    pub width: i32,
-    pub height: i32
+pub struct Dimension<T = i32> {
+    pub width: T,
+    pub height: T
 }
 
-impl Dimension {
-    pub fn zero() -> Self {
+impl<T> Zero for Dimension<T> where T: Zero {
+    fn zero() -> Self {
         Dimension {
-            width: 0,
-            height: 0
+            width: T::zero(),
+            height: T::zero()
         }
     }
 
-    pub fn is_zero(&self) -> bool {
-        self.width <= 0 || self.height <= 0
+    fn is_zero(&self) -> bool {
+        // Intentionally || and not &&.
+        self.width.is_zero() || self.height.is_zero()
     }
 }
 
-impl From<Rectangle> for Dimension {
-    fn from(rect: Rectangle) -> Self {
+impl<T> From<Rectangle<T>> for Dimension<T> {
+    fn from(rect: Rectangle<T>) -> Self {
         rect.size
     }
 }
 
-impl Default for Dimension {
+impl<T> Default for Dimension<T> where T: Zero {
     fn default() -> Self {
         Self::zero()
     }
@@ -38,7 +40,7 @@ impl Default for Dimension {
 
 /** Addition of two dimensions is defined as component-wise.
  */
-impl Add for Dimension {
+impl<T> Add for Dimension<T> where T: Add<Output = T> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self {
@@ -52,20 +54,20 @@ impl Add for Dimension {
 /** Scalar multiplication. Not general at all. See also
  * https://github.com/rust-lang/rfcs/issues/2608
  */
-impl Mul<i32> for Dimension {
-    type Output = Dimension;
+impl<T> Mul<T> for Dimension<T> where T: Mul<Output = T> + Copy {
+    type Output = Self;
 
-    fn mul(self, rhs: i32) -> Dimension {
+    fn mul(self, rhs: T) -> Self {
         Dimension {
             width: self.width * rhs,
             height: self.height * rhs
         }
     }
 }
-impl Mul<Dimension> for i32 {
-    type Output = Dimension;
+impl Mul<Dimension<i32>> for i32 {
+    type Output = Dimension<i32>;
 
-    fn mul(self, rhs: Dimension) -> Dimension {
+    fn mul(self, rhs: Dimension<i32>) -> Dimension<i32> {
         rhs * self // Commutative
     }
 }
@@ -73,7 +75,7 @@ impl Mul<Dimension> for i32 {
 /** Multiplication of two dimensions is defined as
  * component-wise. It's not like a matrix.
  */
-impl Mul for Dimension {
+impl<T> Mul for Dimension<T> where T: Mul<Output = T> {
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self {
@@ -86,10 +88,10 @@ impl Mul for Dimension {
 
 /** Scalar subtraction.
  */
-impl Sub<i32> for Dimension {
+impl<T> Sub<T> for Dimension<T> where T: Sub<Output = T> + Copy {
     type Output = Self;
 
-    fn sub(self, rhs: i32) -> Self {
+    fn sub(self, rhs: T) -> Self {
         Dimension {
             width: self.width - rhs,
             height: self.height - rhs
@@ -98,7 +100,7 @@ impl Sub<i32> for Dimension {
 }
 
 /** Subtraction of two dimensions is defined as component-wise. */
-impl Sub for Dimension {
+impl<T> Sub for Dimension<T> where T: Sub<Output = T> {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self {
@@ -110,10 +112,10 @@ impl Sub for Dimension {
 }
 
 /** Scalar division. */
-impl Div<i32> for Dimension {
+impl<T> Div<T> for Dimension<T> where T: Div<Output = T> + Copy {
     type Output = Self;
 
-    fn div(self, rhs: i32) -> Self {
+    fn div(self, rhs: T) -> Self {
         Dimension {
             width: self.width / rhs,
             height: self.height / rhs
@@ -122,7 +124,7 @@ impl Div<i32> for Dimension {
 }
 
 /** Division of two dimensions is defined as component-wise. */
-impl Div for Dimension {
+impl<T> Div for Dimension<T> where T: Div<Output = T> {
     type Output = Self;
 
     fn div(self, rhs: Self) -> Self {

@@ -16,6 +16,7 @@ use crate::ctk::util::{
     smallest_area_to_draw_text,
     draw_aligned_text
 };
+use num::Zero;
 
 pub struct Label {
     graphics: Graphics,

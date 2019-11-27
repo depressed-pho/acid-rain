@@ -1,6 +1,7 @@
 extern crate libc;
 extern crate ncurses;
 extern crate unicode_width;
+extern crate weak_table;
 
 pub mod alignment;
 pub use alignment::{
@@ -32,6 +33,7 @@ use crate::ctk::util::{check, check_null};
 pub mod window;
 use crate::ctk::window::RootWindow;
 
+use num::Zero;
 use std::cell::RefCell;
 use std::ffi::{CString, CStr};
 use std::panic;

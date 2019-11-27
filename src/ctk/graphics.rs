@@ -9,6 +9,7 @@ use crate::ctk::dimension::{
     Point,
     Rectangle
 };
+use num::Zero;
 use std::convert::TryInto;
 use std::cmp::{min, max};
 use unicode_width::UnicodeWidthChar;

@@ -11,6 +11,7 @@ use crate::ctk::dimension::{
     Rectangle,
     SizeRequirements
 };
+use num::Zero;
 use std::cell::RefCell;
 use std::rc::Rc;
 

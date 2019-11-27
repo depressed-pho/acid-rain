@@ -1,4 +1,5 @@
 use crate::ctk::dimension::Rectangle;
+use num::Zero;
 use std::convert::From;
 use std::ops::Add;
 
@@ -6,39 +7,39 @@ use std::ops::Add;
  * specified in integer precision.
  */
 #[derive(Eq, PartialEq, Clone, Copy, Hash, Debug)]
-pub struct Point {
-    pub x: i32,
-    pub y: i32
+pub struct Point<T = i32> {
+    pub x: T,
+    pub y: T
 }
 
-impl Point {
-    pub fn zero() -> Self {
+impl<T> Zero for Point<T> where T: Zero {
+    fn zero() -> Self {
         Point {
-            x: 0,
-            y: 0
+            x: T::zero(),
+            y: T::zero()
         }
     }
 
-    pub fn is_zero(&self) -> bool {
-        self.x == 0 && self.y == 0
+    fn is_zero(&self) -> bool {
+        self.x.is_zero() && self.y.is_zero()
     }
 }
 
-impl Default for Point {
+impl<T> Default for Point<T> where T: Zero {
     fn default() -> Self {
         Self::zero()
     }
 }
 
-impl From<Rectangle> for Point {
-    fn from(rect: Rectangle) -> Self {
+impl<T> From<Rectangle<T>> for Point<T> {
+    fn from(rect: Rectangle<T>) -> Self {
         rect.pos
     }
 }
 
 /** Addition of two points is defined as component-wise.
  */
-impl Add for Point {
+impl<T> Add for Point<T> where T: Add<Output = T> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self {

@@ -1,5 +1,8 @@
 mod grid_layout;
-pub use grid_layout::*;
+pub use grid_layout::GridLayout;
+
+pub mod spring_layout;
+pub use spring_layout::SpringLayout;
 
 use std::cell::RefCell;
 use std::rc::Rc;
