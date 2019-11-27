@@ -6,16 +6,21 @@ use crate::ctk::{
     RootWindow,
     VerticalAlignment::{self, self as VA},
 };
-use crate::ctk::alignment::draw_aligned_text;
 use crate::ctk::border::NullBorder;
 use crate::ctk::dimension::{
     Point,
-    Rectangle
+    Rectangle,
+    SizeRequirements
+};
+use crate::ctk::util::{
+    smallest_area_to_draw_text,
+    draw_aligned_text
 };
 
 pub struct Label {
     graphics: Graphics,
     bounds: Rectangle,
+    size_req: SizeRequirements,
     border: Box<dyn Border>,
     dirty: bool,
     text: String,
@@ -25,12 +30,16 @@ pub struct Label {
 
 impl Label {
     pub fn new<T: Into<String>>(text: T) -> Label {
+        let text_    = text.into();
+        let size_req = SizeRequirements::at_least(
+            smallest_area_to_draw_text(&text_));
         Label {
             graphics: Graphics::new(),
             bounds: Rectangle::default(),
+            size_req,
             border: Box::new(NullBorder {}),
             dirty: true,
-            text: text.into(),
+            text: text_,
             h_align: HA::Leading,
             v_align: VA::Center
         }
@@ -85,6 +94,10 @@ impl Component for Label {
         if self.graphics.set_size(b.size) {
             self.dirty = true;
         }
+    }
+
+    fn get_size_requirements(&self) -> SizeRequirements {
+        self.size_req
     }
 
     fn get_border(&self) -> &Box<dyn Border> {

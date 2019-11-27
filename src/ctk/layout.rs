@@ -7,6 +7,7 @@ use std::rc::Rc;
 use crate::ctk::{
     Component
 };
+use crate::ctk::dimension::SizeRequirements;
 
 /** Layout manager is responsible for laying out sub-components in a
  * container component.
@@ -37,4 +38,6 @@ pub trait Layout {
     // We can't simply do "-> impl Iterator<...>" due to E0562:
     // https://github.com/rust-lang/rfcs/blob/master/text/1522-conservative-impl-trait.md
     fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Rc<RefCell<dyn Component>>> + 'a>;
+
+    fn get_size_requirements(&self) -> SizeRequirements;
 }

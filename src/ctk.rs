@@ -1,5 +1,6 @@
 extern crate libc;
 extern crate ncurses;
+extern crate unicode_width;
 
 pub mod alignment;
 pub use alignment::{

@@ -6,16 +6,21 @@ use crate::ctk::{
     RootWindow,
     VerticalAlignment::{self, self as VA}
 };
-use crate::ctk::alignment::draw_aligned_text;
 use crate::ctk::border::ButtonBorder;
 use crate::ctk::dimension::{
     Point,
-    Rectangle
+    Rectangle,
+    SizeRequirements
+};
+use crate::ctk::util::{
+    smallest_area_to_draw_text,
+    draw_aligned_text
 };
 
 pub struct Button {
     graphics: Graphics,
     bounds: Rectangle,
+    size_req: SizeRequirements,
     border: Box<dyn Border>,
     dirty: bool,
     label: String,
@@ -25,12 +30,16 @@ pub struct Button {
 
 impl Button {
     pub fn new<T: Into<String>>(label: T) -> Button {
+        let label_   = label.into();
+        let size_req = SizeRequirements::at_least(
+            smallest_area_to_draw_text(&label_));
         Button {
             graphics: Graphics::new(),
             bounds: Rectangle::default(),
+            size_req,
             border: Box::new(ButtonBorder {}),
             dirty: true,
-            label: label.into(),
+            label: label_,
             h_align: HA::Center,
             v_align: VA::Center
         }
@@ -85,6 +94,10 @@ impl Component for Button {
         if self.graphics.set_size(b.size) {
             self.dirty = true;
         }
+    }
+
+    fn get_size_requirements(&self) -> SizeRequirements {
+        self.size_req
     }
 
     fn get_border(&self) -> &Box<dyn Border> {

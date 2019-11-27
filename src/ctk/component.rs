@@ -16,7 +16,8 @@ use crate::ctk::dimension::{
     Dimension,
     Insets,
     Point,
-    Rectangle
+    Rectangle,
+    SizeRequirements
 };
 
 pub trait Component {
@@ -73,6 +74,12 @@ pub trait Component {
     fn get_size(&self) -> Dimension {
         Dimension::from(self.get_bounds())
     }
+
+    /** Get the size requirements of this component. They are hints
+     * for layout managers and they usually, but not always, honor
+     * them.
+     */
+    fn get_size_requirements(&self) -> SizeRequirements;
 
     /** Get the border of this component.
      */

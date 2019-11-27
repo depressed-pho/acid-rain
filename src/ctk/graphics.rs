@@ -1,6 +1,3 @@
-extern crate unicode_width;
-use unicode_width::UnicodeWidthChar;
-
 use crate::ctk::{
     Component,
     RootWindow,
@@ -14,6 +11,7 @@ use crate::ctk::dimension::{
 };
 use std::convert::TryInto;
 use std::cmp::{min, max};
+use unicode_width::UnicodeWidthChar;
 
 pub struct Graphics {
     /** The pad is initially non-existent. It is created when the area

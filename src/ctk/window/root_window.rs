@@ -8,7 +8,8 @@ use crate::ctk::border::NullBorder;
 use crate::ctk::dimension::{
     Dimension,
     Point,
-    Rectangle
+    Rectangle,
+    SizeRequirements
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -93,6 +94,10 @@ impl Component for RootWindow {
         if self.graphics.set_size(b.size) {
             self.dirty = true;
         }
+    }
+
+    fn get_size_requirements(&self) -> SizeRequirements {
+        SizeRequirements::exactly(self.get_size())
     }
 
     fn get_border(&self) -> &Box<dyn Border> {

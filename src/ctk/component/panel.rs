@@ -8,7 +8,8 @@ use crate::ctk::{
 use crate::ctk::border::NullBorder;
 use crate::ctk::dimension::{
     Point,
-    Rectangle
+    Rectangle,
+    SizeRequirements
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -34,7 +35,7 @@ impl Panel {
 }
 
 impl Component for Panel {
-        fn graphics_mut(&mut self) -> &mut Graphics {
+    fn graphics_mut(&mut self) -> &mut Graphics {
         &mut self.graphics
     }
 
@@ -70,6 +71,10 @@ impl Component for Panel {
         if self.graphics.set_size(b.size) {
             self.dirty = true;
         }
+    }
+
+    fn get_size_requirements(&self) -> SizeRequirements {
+        self.layout.borrow().get_size_requirements()
     }
 
     fn get_border(&self) -> &Box<dyn Border> {

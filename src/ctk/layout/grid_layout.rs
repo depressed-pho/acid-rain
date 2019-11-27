@@ -5,7 +5,8 @@ use crate::ctk::{
 use crate::ctk::dimension::{
     Dimension,
     Point,
-    Rectangle
+    Rectangle,
+    SizeRequirements
 };
 use std::cell::RefCell;
 use std::convert::TryInto;
@@ -168,5 +169,13 @@ impl Layout for GridLayout {
 
     fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Rc<RefCell<dyn Component>>> + 'a> {
         Box::new(self.components.iter())
+    }
+
+    fn get_size_requirements(&self) -> SizeRequirements {
+        self.components.iter().fold(
+            SizeRequirements::any(),
+            |acc, child| {
+                acc & child.borrow().get_size_requirements()
+            })
     }
 }

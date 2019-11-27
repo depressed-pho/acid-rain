@@ -9,3 +9,6 @@ pub use point::*;
 
 mod rectangle;
 pub use rectangle::*;
+
+mod requirements;
+pub use requirements::*;
