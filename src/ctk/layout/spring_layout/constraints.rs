@@ -79,7 +79,9 @@ impl Constraints {
         }
     }
 
-    fn push_spring(&mut self, edge: Edge, spring: Option<Spring>) {
+    fn push_spring(&mut self, edge: Edge) {
+        // Only retain the last two springs explicitly given for each
+        // axis.
         let history =
             if edge.is_horizontal() {
                 &mut self.h_history
@@ -87,36 +89,19 @@ impl Constraints {
             else {
                 &mut self.v_history
             };
-        let valid =
-            if let Some(_) = remove_item(history, &edge) {
-                false
+        let pushed_out =
+            if let e@Some(_) = remove_item(history, &edge) {
+                e
             }
-            else if history.len() == 2 && spring.is_some() {
-                history.remove(0);
-                false
+            else if history.len() >= 2 {
+                Some(history.remove(0))
             }
             else {
-                true
+                None
             };
-        if spring.is_some() {
-            history.push(edge);
-        }
-        if !valid {
-            let all =
-                if edge.is_horizontal() {
-                    &*ALL_HORIZONTAL
-                }
-                else {
-                    &*ALL_VERTICAL
-                };
-            // We can't safely hold a ref in this loop because we are
-            // mutating self.
-            let hist_ = history.clone();
-            for e in all {
-                if !hist_.contains(e) {
-                    self.set_spring(*e, None)
-                }
-            }
+        history.push(edge);
+        if let Some(e) = pushed_out {
+            self.set_spring(e, None)
         }
     }
 
@@ -131,7 +116,9 @@ impl Constraints {
             Edge::Width            => self.bounds.size.width  = spring.to_owned(),
             Edge::Height           => self.bounds.size.height = spring.to_owned()
         }
-        self.push_spring(edge, spring);
+        if spring.is_some() {
+            self.push_spring(edge);
+        }
     }
 
     fn get_explicit_spring(&self, edge: Edge) -> Option<Spring> {
