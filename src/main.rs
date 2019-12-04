@@ -17,6 +17,7 @@ use crate::ctk::{
 };
 use crate::ctk::component::{Button, Label, Panel};
 use crate::ctk::layout::GridLayout;
+use crate::ctk::layout::SpringLayout;
 
 fn opt_matches<'a>() -> ArgMatches<'a> {
     app_from_crate!()

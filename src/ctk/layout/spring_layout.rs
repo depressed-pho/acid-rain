@@ -14,8 +14,8 @@ use weak_table::PtrWeakKeyHashMap;
 
 pub struct SpringLayout {
     components: Vec<Rc<RefCell<dyn Component>>>,
-    constraints: PtrWeakKeyHashMap<Weak<RefCell<dyn Component>>, Constraints>,
-    parent_constr: Constraints,
+    constraints: PtrWeakKeyHashMap<Weak<RefCell<dyn Component>>, Rc<RefCell<Constraints>>>,
+    parent_constr: Rc<RefCell<Constraints>>,
     is_valid: bool
 }
 
@@ -24,7 +24,7 @@ impl SpringLayout {
         Self {
             components: Vec::new(),
             constraints: PtrWeakKeyHashMap::new(),
-            parent_constr: Constraints::new(),
+            parent_constr: Rc::new(RefCell::new(Constraints::new())),
             is_valid: true
         }
     }
