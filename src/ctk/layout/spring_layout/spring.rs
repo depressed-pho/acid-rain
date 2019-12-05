@@ -15,7 +15,7 @@ pub trait SpringT {
 impl Add for Spring {
     type Output = Self;
 
-    fn add(self, rhs: Self) -> Self {
+    fn add(self, _rhs: Self) -> Self {
         unimplemented!();
     }
 }
@@ -25,7 +25,7 @@ impl Add for Spring {
 impl Sub for Spring {
     type Output = Self;
 
-    fn sub(self, rhs: Self) -> Self {
+    fn sub(self, _rhs: Self) -> Self {
         unimplemented!();
     }
 }
@@ -36,7 +36,7 @@ impl Sub for Spring {
 impl<T> Mul<T> for Spring where T: Into<f64> {
     type Output = Self;
 
-    fn mul(self, rhs: T) -> Self {
+    fn mul(self, _rhs: T) -> Self {
         unimplemented!();
     }
 }
