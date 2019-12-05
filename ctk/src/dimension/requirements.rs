@@ -1,4 +1,4 @@
-use crate::ctk::dimension::Dimension;
+use crate::dimension::Dimension;
 use std::cmp::{min, max};
 use std::ops::BitAnd;
 

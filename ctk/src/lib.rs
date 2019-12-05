@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate lazy_static;
 extern crate libc;
 extern crate ncurses;
 extern crate unicode_width;
@@ -19,7 +21,7 @@ pub mod graphics;
 pub use graphics::*;
 
 pub mod dimension;
-use crate::ctk::dimension::Point;
+use crate::dimension::Point;
 
 pub mod layout;
 pub use layout::*;
@@ -28,10 +30,10 @@ pub mod symbol;
 pub use symbol::*;
 
 mod util;
-use crate::ctk::util::{check, check_null};
+use crate::util::{check, check_null};
 
 pub mod window;
-use crate::ctk::window::RootWindow;
+use crate::window::RootWindow;
 
 use num::Zero;
 use std::cell::RefCell;
@@ -69,7 +71,7 @@ impl Ctk {
     /** Create an instance of Ctk. At most one instance can
      * exist. Violating this would return an error.
      */
-    pub(crate) fn initiate(layout: Rc<RefCell<dyn Layout>>) -> Result<Ctk, ()> {
+    pub fn initiate(layout: Rc<RefCell<dyn Layout>>) -> Result<Ctk, ()> {
         {
             let mut initialized = INITIALIZED.lock().unwrap();
 

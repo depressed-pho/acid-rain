@@ -1,0 +1,31 @@
+[package]
+name = "ctk"
+version = "0.1.0"
+
+authors = ["PHO <pho at cielonegro dot org>"]
+edition = "2018"
+
+description = "CUI toolkit roughly resembling Swing"
+keywords = ["cui"]
+license = "CC0-1.0"
+
+homepage = "https://github.com/depressed-pho/acid-rain/ctk"
+repository = "https://github.com/depressed-pho/acid-rain.git"
+
+[dependencies]
+lazy_static = "~1.4"
+libc = "~0.2"
+ncurses = "~5.99"
+num = "~0.2"
+unicode-width = "~0.1"
+weak-table = "~0.2"
+
+[features]
+default = ["unicode"]
+
+# Try to use Unicode capability of the terminal if possible. Requires
+# libncursesw.
+unicode = ["ncurses/wide"]
+
+[badges]
+maintenance = { status = "experimental" }

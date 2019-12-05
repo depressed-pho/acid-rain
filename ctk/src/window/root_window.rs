@@ -1,11 +1,11 @@
-use crate::ctk::{
+use crate::{
     Border,
     Component,
     Graphics,
     Layout
 };
-use crate::ctk::border::NullBorder;
-use crate::ctk::dimension::{
+use crate::border::NullBorder;
+use crate::dimension::{
     Dimension,
     Point,
     Rectangle,

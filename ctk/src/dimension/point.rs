@@ -1,4 +1,4 @@
-use crate::ctk::dimension::Rectangle;
+use crate::dimension::Rectangle;
 use num::Zero;
 use std::convert::From;
 use std::ops::Add;

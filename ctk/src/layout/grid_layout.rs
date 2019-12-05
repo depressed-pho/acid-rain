@@ -1,8 +1,8 @@
-use crate::ctk::{
+use crate::{
     Component,
     Layout
 };
-use crate::ctk::dimension::{
+use crate::dimension::{
     Dimension,
     Point,
     Rectangle,

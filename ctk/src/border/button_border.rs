@@ -1,10 +1,10 @@
-use crate::ctk::{
+use crate::{
     Graphics,
     Symbol,
     is_utf8_locale
 };
-use crate::ctk::border::Border;
-use crate::ctk::dimension::{
+use crate::border::Border;
+use crate::dimension::{
     Dimension,
     Insets,
     Point

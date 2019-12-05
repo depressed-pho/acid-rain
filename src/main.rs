@@ -1,23 +1,19 @@
 #![allow(dead_code)]
 
-mod ctk;
 mod world;
 
 #[macro_use]
 extern crate clap;
 
-#[macro_use]
-extern crate lazy_static;
-
 use clap::{Arg, ArgMatches};
-use std::cell::RefCell;
-use std::rc::Rc;
-use crate::ctk::{
+use ctk::{
     HorizontalAlignment as HA
 };
-use crate::ctk::component::{Button, Label, Panel};
-use crate::ctk::layout::GridLayout;
-use crate::ctk::layout::SpringLayout;
+use ctk::component::{Button, Label, Panel};
+use ctk::layout::GridLayout;
+use ctk::layout::SpringLayout;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 fn opt_matches<'a>() -> ArgMatches<'a> {
     app_from_crate!()

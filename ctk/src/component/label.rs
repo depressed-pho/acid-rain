@@ -1,4 +1,4 @@
-use crate::ctk::{
+use crate::{
     Border,
     Component,
     Graphics,
@@ -6,13 +6,13 @@ use crate::ctk::{
     RootWindow,
     VerticalAlignment::{self, self as VA},
 };
-use crate::ctk::border::NullBorder;
-use crate::ctk::dimension::{
+use crate::border::NullBorder;
+use crate::dimension::{
     Point,
     Rectangle,
     SizeRequirements
 };
-use crate::ctk::util::{
+use crate::util::{
     smallest_area_to_draw_text,
     draw_aligned_text
 };

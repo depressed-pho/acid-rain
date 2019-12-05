@@ -1,10 +1,10 @@
-use crate::ctk::{
+use crate::{
     Component,
     RootWindow,
     Symbol
 };
-use crate::ctk::util::{check, check_null};
-use crate::ctk::dimension::{
+use crate::util::{check, check_null};
+use crate::dimension::{
     Dimension,
     Point,
     Rectangle

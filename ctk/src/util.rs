@@ -1,9 +1,9 @@
-use crate::ctk::{
+use crate::{
     Graphics,
     HorizontalAlignment::{self, self as HA},
     VerticalAlignment::{self, self as VA}
 };
-use crate::ctk::dimension::{
+use crate::dimension::{
     Dimension,
     Point,
     Rectangle

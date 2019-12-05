@@ -1,4 +1,4 @@
-use crate::ctk::dimension::{
+use crate::dimension::{
     Dimension,
     Insets,
     Point

@@ -7,12 +7,12 @@ pub use label::*;
 mod panel;
 pub use panel::*;
 
-use crate::ctk::{
+use crate::{
     Border,
     Graphics,
     RootWindow
 };
-use crate::ctk::dimension::{
+use crate::dimension::{
     Dimension,
     Insets,
     Point,

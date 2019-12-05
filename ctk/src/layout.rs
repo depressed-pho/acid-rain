@@ -7,10 +7,10 @@ pub use spring_layout::SpringLayout;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::ctk::{
+use crate::{
     Component
 };
-use crate::ctk::dimension::SizeRequirements;
+use crate::dimension::SizeRequirements;
 
 /** Layout manager is responsible for laying out sub-components in a
  * container component.

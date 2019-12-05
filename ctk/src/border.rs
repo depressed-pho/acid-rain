@@ -4,8 +4,8 @@ pub use button_border::*;
 mod null_border;
 pub use null_border::*;
 
-use crate::ctk::Graphics;
-use crate::ctk::dimension::Insets;
+use crate::Graphics;
+use crate::dimension::Insets;
 
 /** A trait describing an object capable of rendering a border around
  * the edges of a Ctk component.

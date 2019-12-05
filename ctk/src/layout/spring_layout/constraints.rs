@@ -1,9 +1,9 @@
-use crate::ctk::dimension::{
+use crate::dimension::{
     Dimension,
     Point,
     Rectangle
 };
-use crate::ctk::layout::spring_layout::Spring;
+use crate::layout::spring_layout::Spring;
 use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
 
