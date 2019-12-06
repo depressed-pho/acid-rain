@@ -4,10 +4,10 @@ use crate::dimension::{
     Rectangle
 };
 use crate::layout::spring_layout::Spring;
+use fixed_map::{Key, Map as FixedMap};
 use std::cell::{RefCell, RefMut};
-use std::collections::HashMap;
 
-#[derive(Eq, PartialEq, Clone, Copy, Hash, Debug)]
+#[derive(Eq, PartialEq, Clone, Copy, Key, Hash, Debug)]
 pub enum Edge {
     Bottom,
     Left,
@@ -29,9 +29,9 @@ impl Edge {
 }
 
 pub struct Constraints {
-    explicit:   HashMap<Edge, Spring>,
-    h_implicit: RefCell<HashMap<Edge, Option<Spring>>>,
-    v_implicit: RefCell<HashMap<Edge, Option<Spring>>>,
+    explicit:   FixedMap<Edge, Spring>,
+    h_implicit: RefCell<FixedMap<Edge, Option<Spring>>>,
+    v_implicit: RefCell<FixedMap<Edge, Option<Spring>>>,
     h_history:  Vec<Edge>,
     v_history:  Vec<Edge>
 }
@@ -41,9 +41,9 @@ impl Constraints {
      */
     pub(crate) fn new() -> Self {
         Constraints {
-            explicit:   HashMap::with_capacity(4),
-            h_implicit: RefCell::new(HashMap::with_capacity(3)),
-            v_implicit: RefCell::new(HashMap::with_capacity(3)),
+            explicit:   FixedMap::new(),
+            h_implicit: RefCell::new(FixedMap::new()),
+            v_implicit: RefCell::new(FixedMap::new()),
             h_history:  Vec::with_capacity(2),
             v_history:  Vec::with_capacity(2)
         }
@@ -58,7 +58,7 @@ impl Constraints {
         }
     }
 
-    fn implicit_mut(&self, edge: Edge) -> RefMut<HashMap<Edge, Option<Spring>>> {
+    fn implicit_mut(&self, edge: Edge) -> RefMut<FixedMap<Edge, Option<Spring>>> {
         if edge.is_horizontal() {
             self.h_implicit.borrow_mut()
         }
@@ -99,12 +99,12 @@ impl Constraints {
             self.push_spring(edge);
         }
         else {
-            self.explicit.remove(&edge);
+            self.explicit.remove(edge);
         }
     }
 
     fn get_explicit_spring(&self, edge: Edge) -> Option<Spring> {
-        self.explicit.get(&edge).cloned()
+        self.explicit.get(edge).cloned()
     }
 
     fn get_explicit_pair(&self, e1: Edge, e2: Edge) -> Option<(Spring, Spring)> {
@@ -198,7 +198,7 @@ impl Constraints {
                 // Interior mutability to cache the expensive
                 // computation of get_implicit_spring().
                 let mut cache = self.implicit_mut(edge);
-                if let Some(spring) = cache.get(&edge) {
+                if let Some(spring) = cache.get(edge) {
                     // The result was cached, either positively or
                     // negatively.
                     spring.to_owned()

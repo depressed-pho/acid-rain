@@ -13,6 +13,7 @@ homepage = "https://github.com/depressed-pho/acid-rain/ctk"
 repository = "https://github.com/depressed-pho/acid-rain.git"
 
 [dependencies]
+fixed-map = "~0.7"
 lazy_static = "~1.4"
 libc = "~0.2"
 ncurses = "~5.99"
