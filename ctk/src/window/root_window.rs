@@ -24,7 +24,7 @@ pub struct RootWindow {
     graphics: Graphics,
     bounds: Rectangle,
     layout: Rc<RefCell<dyn Layout>>,
-    /* We really want to do Box<dyn Border + Copy>> but Rust currently
+    /* We really want to do Box<dyn Border + Copy> but Rust currently
      * doesn't allow that: E0225 */
     border: Box<dyn Border>,
     dirty: bool
@@ -70,7 +70,7 @@ impl Component for RootWindow {
     }
 
     fn refresh(&self, root: &Self, offset: Point) {
-        // The root must be self, but how do we assert that?
+        assert!(self as *const Self == root as *const Self);
         assert!(offset.is_zero());
 
         self.graphics.refresh(root, self.get_location());

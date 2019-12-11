@@ -24,6 +24,11 @@ impl Edge {
 }
 
 pub struct Constraints {
+    /* Invariants:
+     * - As long as an edge is in a history, it has an explicit
+     *   spring.
+     * - There are at most 2 explicit springs for each axis.
+     */
     explicit:   FixedMap<Edge, Spring>,
     h_implicit: RefCell<FixedMap<Edge, Option<Spring>>>,
     v_implicit: RefCell<FixedMap<Edge, Option<Spring>>>,
@@ -62,30 +67,40 @@ impl Constraints {
         }
     }
 
-    fn push_spring(&mut self, edge: Edge) {
+    fn push_spring(&mut self, edge: Edge) -> &mut Self {
+        debug_assert!(self.explicit.get(edge).is_some());
+
         // Only retain the last two springs explicitly given for each
         // axis.
         let history    = self.history_mut(edge);
         let pushed_out =
-            if let Some(_) = remove_item(history, &edge) {
-                true
+            if let e@Some(_) = remove_item(history, &edge) {
+                e
             }
             else if history.len() >= 2 {
-                history.remove(0);
-                true
+                Some(history.remove(0))
             }
             else {
-                false
+                None
             };
         history.push(edge);
-
-        if pushed_out {
+        if let Some(e) = pushed_out {
             /* An old spring is being pushed out. This means there may
              * be some implicit springs in the cache which depend on
              * it. So we need to invalidate the cache.
              */
+            self.explicit.remove(e);
             self.implicit_mut(edge).clear();
         }
+        self
+    }
+
+    fn forget_spring(&mut self, edge: Edge) -> &mut Self {
+        debug_assert!(self.explicit.get(edge).is_none());
+
+        let history = self.history_mut(edge);
+        remove_item(history, &edge);
+        self
     }
 
     pub fn set_spring(&mut self, edge: Edge, spring: Option<Spring>) {
@@ -95,6 +110,7 @@ impl Constraints {
         }
         else {
             self.explicit.remove(edge);
+            self.forget_spring(edge);
         }
     }
 
