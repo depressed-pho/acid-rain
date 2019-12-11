@@ -42,5 +42,5 @@ pub trait Layout {
     // https://github.com/rust-lang/rfcs/blob/master/text/1522-conservative-impl-trait.md
     fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Rc<RefCell<dyn Component>>> + 'a>;
 
-    fn get_size_requirements(&self) -> SizeRequirements;
+    fn get_size_requirements(&self, parent: &dyn Component) -> SizeRequirements;
 }

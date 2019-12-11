@@ -74,7 +74,7 @@ impl Component for Panel {
     }
 
     fn get_size_requirements(&self) -> SizeRequirements {
-        self.layout.borrow().get_size_requirements()
+        self.layout.borrow().get_size_requirements(self)
     }
 
     fn get_border(&self) -> &Box<dyn Border> {

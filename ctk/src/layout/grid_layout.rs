@@ -67,7 +67,7 @@ impl GridLayout {
         self
     }
 
-    fn do_layout(&mut self, parent: &dyn Component) {
+    fn num_cells(&self) -> Dimension {
         assert!(
             self.rows > 0 || self.cols > 0,
             "Either rows or cols must be set to non-zero");
@@ -80,11 +80,7 @@ impl GridLayout {
         }
 
         let n_comps: i32 = self.components.len().try_into().unwrap();
-        if n_comps == 0 {
-            return;
-        }
-
-        let n_cells = if self.rows > 0 {
+        if self.rows > 0 {
             Dimension {
                 width: (n_comps + self.rows - 1) / self.rows,
                 height: self.rows
@@ -95,8 +91,16 @@ impl GridLayout {
                 width: self.cols,
                 height: (n_comps + self.cols - 1) / self.cols
             }
-        };
+        }
+    }
 
+    fn do_layout(&mut self, parent: &dyn Component) {
+        let n_comps: i32 = self.components.len().try_into().unwrap();
+        if n_comps == 0 {
+            return;
+        }
+
+        let n_cells     = self.num_cells();
         let gap         = Dimension { width: self.hgap, height: self.vgap };
         let total_gaps  = (n_cells - 1) * gap;
         let parent_size = parent.get_size();
@@ -171,11 +175,25 @@ impl Layout for GridLayout {
         Box::new(self.components.iter())
     }
 
-    fn get_size_requirements(&self) -> SizeRequirements {
-        self.components.iter().fold(
+    /** Determine the minimum, maximum, and the preferred size of the
+     * container.
+     *
+     * The minimum width of a grid layout is the largest minimum width
+     * of all of the components in the container times the number of
+     * columns, plus the left and right insets of the parent
+     * component. The remaining parts of the requirements are computed
+     * all similarly.
+     */
+    fn get_size_requirements(&self, parent: &dyn Component) -> SizeRequirements {
+        let n_cells   = self.num_cells();
+        let gap       = Dimension { width: self.hgap, height: self.vgap };
+        let insets    = parent.get_insets();
+        let cell_reqs = self.components.iter().fold(
             SizeRequirements::any(),
             |acc, child| {
                 acc & child.borrow().get_size_requirements()
-            })
+            });
+
+        cell_reqs * n_cells + gap * (n_cells - 1) + insets
     }
 }

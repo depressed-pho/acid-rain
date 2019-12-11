@@ -31,6 +31,9 @@ impl SpringLayout {
     }
 
     pub fn add(&mut self, c: Rc<RefCell<dyn Component>>) -> &mut Self {
+        /* This is the only strong reference we hold. Anything other
+         * than this are weak.
+         */
         self.components.push(c.clone());
 
         /* The rules for default springs are as follows:
@@ -60,7 +63,10 @@ impl SpringLayout {
     }
 
     pub fn remove(&mut self, c: Rc<RefCell<dyn Component>>) -> &mut Self {
-        unimplemented!();
+        self.components.retain(|c_| !Rc::ptr_eq(&c, &c_));
+        self.constraints.remove(&c);
+        self.invalidate();
+        self
     }
 }
 
@@ -74,10 +80,10 @@ impl Layout for SpringLayout {
     }
 
     fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Rc<RefCell<dyn Component>>> + 'a> {
-        unimplemented!();
+        Box::new(self.components.iter())
     }
 
-    fn get_size_requirements(&self) -> SizeRequirements {
+    fn get_size_requirements(&self, parent: &dyn Component) -> SizeRequirements {
         unimplemented!();
     }
 }

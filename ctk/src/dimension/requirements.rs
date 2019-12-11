@@ -1,38 +1,39 @@
-use crate::dimension::Dimension;
+use crate::dimension::{Dimension, Insets};
+use num::{Bounded, Zero};
 use std::cmp::{min, max};
-use std::ops::BitAnd;
+use std::ops::{BitAnd, Add, Mul};
 
 #[derive(Eq, PartialEq, Clone, Copy, Hash, Debug)]
-pub struct LengthRequirements {
-    pub minimum: i32,
-    pub preferred: i32,
-    pub maximum: i32
+pub struct LengthRequirements<T = i32> {
+    pub minimum: T,
+    pub preferred: T,
+    pub maximum: T
 }
 
 #[derive(Eq, PartialEq, Clone, Copy, Hash, Debug)]
-pub struct SizeRequirements {
-    pub width: LengthRequirements,
-    pub height: LengthRequirements
+pub struct SizeRequirements<T = i32> {
+    pub width: LengthRequirements<T>,
+    pub height: LengthRequirements<T>
 }
 
-impl LengthRequirements {
+impl<T: Bounded + Zero + Copy> LengthRequirements<T> {
     pub fn any() -> Self {
         LengthRequirements {
-            minimum: 0,
-            preferred: 0,
-            maximum: i32::max_value()
+            minimum: T::zero(),
+            preferred: T::zero(),
+            maximum: T::max_value()
         }
     }
 
-    pub fn at_least(len: i32) -> Self {
+    pub fn at_least(len: T) -> Self {
         LengthRequirements {
             minimum: len,
             preferred: len,
-            maximum: i32::max_value()
+            maximum: T::max_value()
         }
     }
 
-    pub fn exactly(len: i32) -> Self {
+    pub fn exactly(len: T) -> Self {
         LengthRequirements {
             minimum: len,
             preferred: len,
@@ -41,7 +42,7 @@ impl LengthRequirements {
     }
 }
 
-impl SizeRequirements {
+impl<T: Bounded + Zero + Copy> SizeRequirements<T> {
     pub fn any() -> Self {
         SizeRequirements {
             width: LengthRequirements::any(),
@@ -49,14 +50,14 @@ impl SizeRequirements {
         }
     }
 
-    pub fn at_least(size: Dimension) -> Self {
+    pub fn at_least(size: Dimension<T>) -> Self {
         SizeRequirements {
             width: LengthRequirements::at_least(size.width),
             height: LengthRequirements::at_least(size.height)
         }
     }
 
-    pub fn exactly(size: Dimension) -> Self {
+    pub fn exactly(size: Dimension<T>) -> Self {
         SizeRequirements {
             width: LengthRequirements::exactly(size.width),
             height: LengthRequirements::exactly(size.height)
@@ -68,7 +69,7 @@ impl SizeRequirements {
  *
  * ∀r:LengthRequirements. any() & r == r & any() == r
  */
-impl BitAnd for LengthRequirements {
+impl<T: Ord> BitAnd for LengthRequirements<T> {
     type Output = Self;
 
     fn bitand(self, rhs: Self) -> Self {
@@ -80,13 +81,87 @@ impl BitAnd for LengthRequirements {
     }
 }
 
-impl BitAnd for SizeRequirements {
+impl<T> BitAnd for SizeRequirements<T>
+where LengthRequirements<T>: BitAnd<Output = LengthRequirements<T>> {
     type Output = Self;
 
     fn bitand(self, rhs: Self) -> Self {
         SizeRequirements {
             width: self.width & rhs.width,
             height: self.height & rhs.height
+        }
+    }
+}
+
+/** Scalar addition.
+ */
+impl<T> Add<T> for LengthRequirements<T> where T: Add<Output = T> + Copy {
+    type Output = Self;
+
+    fn add(self, rhs: T) -> Self {
+        LengthRequirements {
+            minimum: self.minimum + rhs,
+            maximum: self.maximum + rhs,
+            preferred: self.preferred + rhs
+        }
+    }
+}
+
+/** Scalar multiplication.
+ */
+impl<T> Mul<T> for LengthRequirements<T> where T: Mul<Output = T> + Copy {
+    type Output = Self;
+
+    fn mul(self, rhs: T) -> Self {
+        LengthRequirements {
+            minimum: self.minimum * rhs,
+            maximum: self.maximum * rhs,
+            preferred: self.preferred * rhs
+        }
+    }
+}
+
+/** Addition of SizeRequirements and Dimension is defined as
+ * component-wise.
+ */
+impl<T> Add<Dimension<T>> for SizeRequirements<T>
+where LengthRequirements<T>: Add<T, Output = LengthRequirements<T>> {
+    type Output = Self;
+
+    fn add(self, rhs: Dimension<T>) -> Self {
+        SizeRequirements {
+            width: self.width + rhs.width,
+            height: self.height + rhs.height
+        }
+    }
+}
+
+/** Addition of SizeRequirements and Insets is defined as
+ * component-wise.
+ */
+impl<T> Add<Insets<T>> for SizeRequirements<T>
+where LengthRequirements<T>: Add<T, Output = LengthRequirements<T>> {
+    type Output = Self;
+
+    fn add(self, rhs: Insets<T>) -> Self {
+        SizeRequirements {
+            width: self.width + rhs.left + rhs.right,
+            height: self.height + rhs.top + rhs.bottom
+        }
+    }
+}
+
+/** Multiplication of SizeRequirements and Dimension is defined as
+ * component-wise. It's not like a matrix.
+ */
+impl<T> Mul<Dimension<T>> for SizeRequirements<T>
+where LengthRequirements<T>: Mul<T, Output = LengthRequirements<T>> {
+    type Output = Self;
+
+    fn mul(self, rhs: Dimension<T>) -> Self {
+        SizeRequirements {
+            width: self.width * rhs.width,
+            height: self.height * rhs.height
         }
     }
 }
