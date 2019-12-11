@@ -1,8 +1,3 @@
-use crate::dimension::{
-    Dimension,
-    Point,
-    Rectangle
-};
 use crate::layout::spring_layout::Spring;
 use fixed_map::{Key, Map as FixedMap};
 use std::cell::{RefCell, RefMut};

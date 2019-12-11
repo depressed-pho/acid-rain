@@ -75,6 +75,23 @@ pub trait Component {
         Dimension::from(self.get_bounds())
     }
 
+    /** Set the size of this component.
+     */
+    fn set_size(&mut self, size: Dimension) {
+        self.set_bounds(
+            Rectangle {
+                size,
+                ..self.get_bounds()
+            });
+    }
+
+    /** Update the size of this component by applying a function to
+     * the current value.
+     */
+    fn update_size(&mut self, f: &dyn Fn(Dimension) -> Dimension) {
+        self.set_size(f(self.get_size()));
+    }
+
     /** Get the size requirements of this component. They are hints
      * for layout managers and they usually, but not always, honor
      * them.

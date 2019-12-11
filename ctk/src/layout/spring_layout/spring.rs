@@ -1,13 +1,36 @@
+mod implementation;
+pub use implementation::*;
+
+use crate::dimension::LengthRequirements;
 use std::cell::RefCell;
 use std::ops::{Add, Mul, Sub};
 use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct Spring {
-    rc: Rc<RefCell<dyn SpringT>>
+    rc: Rc<RefCell<dyn SpringImpl>>
 }
 
-pub trait SpringT {
+impl Spring {
+    pub fn wrap<T: SpringImpl + 'static>(s_impl: T) -> Self {
+        Self {
+            rc: Rc::new(RefCell::new(s_impl))
+        }
+    }
+}
+
+pub trait SpringImpl {
+    /** Return the requirements for the value of this spring.
+     */
+    fn get_requirements(&self) -> LengthRequirements;
+
+    /** Return the current value of this spring.
+     */
+    fn get_value(&self) -> i32;
+
+    /** Set the current value of this spring.
+     */
+    fn set_value(&mut self, value: i32);
 }
 
 /** Addition of two springs.
