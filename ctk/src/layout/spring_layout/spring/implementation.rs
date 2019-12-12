@@ -7,6 +7,33 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use super::{Spring, SpringImpl};
 
+/** A spring whose requirements and values are all fixed. Its method
+ * set_value() discards the new value and does nothing.
+ */
+pub struct StaticSpring {
+    length: i32
+}
+
+impl StaticSpring {
+    pub fn new(length: i32) -> Spring {
+        Spring::wrap(Self { length })
+    }
+}
+
+impl SpringImpl for StaticSpring {
+    fn get_requirements(&self) -> LengthRequirements {
+        LengthRequirements::exactly(self.length)
+    }
+
+    fn get_value(&self) -> i32 {
+        self.length
+    }
+
+    fn set_value(&mut self, _: i32) {
+        // Do nothing.
+    }
+}
+
 /** A spring whose requirements and value are defined by that of a
  * supplied component. The spring keeps track of changes in the
  * component.

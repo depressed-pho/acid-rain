@@ -23,7 +23,7 @@ impl Edge {
     }
 }
 
-pub struct Constraints {
+pub(crate) struct Constraints {
     /* Invariants:
      * - As long as an edge is in a history, it has an explicit
      *   spring.

@@ -14,6 +14,9 @@ use std::rc::{Rc, Weak};
 use weak_table::PtrWeakKeyHashMap;
 
 pub struct SpringLayout {
+    /* Invariant: Springs are all acyclic, including proxies and
+     * implicit ones. This invariant is VERY hard to validate.
+     */
     components: Vec<Rc<RefCell<dyn Component>>>,
     constraints: PtrWeakKeyHashMap<Weak<RefCell<dyn Component>>, Rc<RefCell<Constraints>>>,
     parent_constr: Rc<RefCell<Constraints>>,
@@ -22,18 +25,18 @@ pub struct SpringLayout {
 
 impl SpringLayout {
     pub fn new() -> Self {
+        let mut con = Constraints::new();
+        con.set_spring(Edge::Left, Some(StaticSpring::new(0)));
+        con.set_spring(Edge::Top , Some(StaticSpring::new(0)));
         Self {
             components: Vec::new(),
             constraints: PtrWeakKeyHashMap::new(),
-            parent_constr: Rc::new(RefCell::new(Constraints::new())),
+            parent_constr: Rc::new(RefCell::new(con)),
             is_valid: true
         }
     }
 
     pub fn add(&mut self, c: Rc<RefCell<dyn Component>>) -> &mut Self {
-        /* This is the only strong reference we hold. Anything other
-         * than this are weak.
-         */
         self.components.push(c.clone());
 
         /* The rules for default springs are as follows:
@@ -67,6 +70,17 @@ impl SpringLayout {
         self.constraints.remove(&c);
         self.invalidate();
         self
+    }
+
+    /** Return the Constraints object associated with a given
+     * Component, or None if no such Component has been added to this
+     * SpringLayout.
+     *
+     * This method is unsafe because callers can accidentally create
+     * cycles in springs.
+     */
+    unsafe fn get_constraints(&self, c: Rc<RefCell<dyn Component>>) -> Option<Rc<RefCell<Constraints>>> {
+        self.constraints.get(&c).cloned()
     }
 }
 
