@@ -5,11 +5,12 @@ use crate::dimension::{
 };
 use std::cell::RefCell;
 use std::rc::Rc;
-use super::{Spring, SpringImpl};
+use super::{Spring, SpringImpl, SpringSet};
 
 /** A spring whose requirements and values are all fixed. Its method
  * set_value() discards the new value and does nothing.
  */
+#[derive(Clone, Debug)]
 pub struct StaticSpring {
     length: i32
 }
@@ -32,12 +33,17 @@ impl SpringImpl for StaticSpring {
     fn set_value(&mut self, _: i32) {
         // Do nothing.
     }
+
+    fn is_cyclic(&self, seen: SpringSet) -> bool {
+        false
+    }
 }
 
 /** A spring whose requirements and value are defined by that of a
  * supplied component. The spring keeps track of changes in the
  * component.
  */
+#[derive(Clone, Debug)]
 pub struct WidthSpring {
     component: Rc<RefCell<dyn Component>>
 }
@@ -65,12 +71,17 @@ impl SpringImpl for WidthSpring {
                     ..dim
                 }});
     }
+
+    fn is_cyclic(&self, seen: SpringSet) -> bool {
+        false
+    }
 }
 
 /** A spring whose requirements and value are defined by that of a
  * supplied component. The spring keeps track of changes in the
  * component.
  */
+#[derive(Clone, Debug)]
 pub struct HeightSpring {
     component: Rc<RefCell<dyn Component>>
 }
@@ -97,5 +108,9 @@ impl SpringImpl for HeightSpring {
                     height,
                     ..dim
                 }});
+    }
+
+    fn is_cyclic(&self, seen: SpringSet) -> bool {
+        false
     }
 }

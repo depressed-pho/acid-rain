@@ -11,6 +11,7 @@ use crate::dimension::{
 };
 use num::Zero;
 
+#[derive(Debug)]
 pub struct ButtonBorder {}
 
 impl Default for ButtonBorder {

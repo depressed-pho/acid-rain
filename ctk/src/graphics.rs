@@ -14,6 +14,7 @@ use std::convert::TryInto;
 use std::cmp::{min, max};
 use unicode_width::UnicodeWidthChar;
 
+#[derive(Debug)]
 pub struct Graphics {
     /** The pad is initially non-existent. It is created when the area
      * of the graphics context becomes non-zero.

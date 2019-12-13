@@ -34,19 +34,26 @@ fn main() {
     title.borrow_mut().set_horizontal_alignment(HA::Center);
     layout.borrow_mut().add(title);
 
-    let buttons = {
-        let layout = Rc::new(RefCell::new(GridLayout::new()));
-        layout.borrow_mut().set_cols(1);
+    let buttons_outer = {
+        let layout  = Rc::new(RefCell::new(SpringLayout::new()));
 
-        let play = Rc::new(RefCell::new(Button::new("Play")));
-        layout.borrow_mut().add(play);
+        let buttons = {
+            let layout = Rc::new(RefCell::new(GridLayout::new()));
+            layout.borrow_mut().set_cols(1).set_vgap(1);
 
-        let quit = Rc::new(RefCell::new(Button::new("Quit")));
-        layout.borrow_mut().add(quit);
+            let play = Rc::new(RefCell::new(Button::new("Play")));
+            layout.borrow_mut().add(play);
+
+            let quit = Rc::new(RefCell::new(Button::new("Quit")));
+            layout.borrow_mut().add(quit);
+
+            Rc::new(RefCell::new(Panel::new(layout)))
+        };
+        layout.borrow_mut().add(buttons);
 
         Rc::new(RefCell::new(Panel::new(layout)))
     };
-    layout.borrow_mut().add(buttons);
+    layout.borrow_mut().add(buttons_outer);
 
     let mut tk = ctk::Ctk::initiate(layout).unwrap();
     tk.main();

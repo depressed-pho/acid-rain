@@ -13,6 +13,7 @@ use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 use weak_table::PtrWeakKeyHashMap;
 
+#[derive(Debug)]
 pub struct SpringLayout {
     /* Invariant: Springs are all acyclic, including proxies and
      * implicit ones. This invariant is VERY hard to validate.
@@ -82,6 +83,36 @@ impl SpringLayout {
     unsafe fn get_constraints(&self, c: Rc<RefCell<dyn Component>>) -> Option<Rc<RefCell<Constraints>>> {
         self.constraints.get(&c).cloned()
     }
+
+    /** Return the Constraint object associated with the parent
+     * container.
+     *
+     * This method is unsafe because callers can accidentally create
+     * cycles in springs.
+     */
+    unsafe fn get_parent_constraints(&self) -> Rc<RefCell<Constraints>> {
+        self.parent_constr.clone()
+    }
+
+    /** Set a spring controlling the specified edge of a child
+     * component, or a lack thereof. This function panics if setting
+     * the given spring would create a cycle.
+     */
+    pub fn set_spring(&mut self, edge: Edge, c: Rc<RefCell<dyn Component>>, spring: Option<Spring>) {
+        let pc = unsafe {
+            self.get_constraints(c.clone())
+                .unwrap_or_else(|| panic!("No such child exists: {:#?}", c))
+        };
+        pc.borrow_mut().set_spring(edge, spring.clone());
+        if let Some(s) = spring {
+            if s.is_cyclic(SpringSet::new()) {
+                // We don't want to enter into an infinite loop by
+                // debug-formatting the spring.
+                pc.borrow_mut().set_spring(edge, None);
+                panic!("A cycle has been detected in spring: {:#?}", s);
+            }
+        }
+    }
 }
 
 impl Layout for SpringLayout {
@@ -98,6 +129,15 @@ impl Layout for SpringLayout {
     }
 
     fn get_size_requirements(&self, parent: &dyn Component) -> SizeRequirements {
-        unimplemented!();
+        let pc  = unsafe { self.get_parent_constraints() };
+        let w   = pc.borrow().get_spring(Edge::Width)
+                    .unwrap_or_else(|| panic!("No springs for the parent width"));
+        let h   = pc.borrow().get_spring(Edge::Height)
+                    .unwrap_or_else(|| panic!("No springs for the parent height"));
+        let req = SizeRequirements {
+            width: w.get_requirements(),
+            height: h.get_requirements()
+        };
+        req + parent.get_insets()
     }
 }

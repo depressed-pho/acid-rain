@@ -3,6 +3,7 @@ use crate::border::Border;
 use crate::dimension::Insets;
 use num::Zero;
 
+#[derive(Debug)]
 pub struct NullBorder {}
 
 impl Default for NullBorder {

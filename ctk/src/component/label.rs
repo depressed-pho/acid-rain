@@ -18,6 +18,7 @@ use crate::util::{
 };
 use num::Zero;
 
+#[derive(Debug)]
 pub struct Label {
     graphics: Graphics,
     bounds: Rectangle,

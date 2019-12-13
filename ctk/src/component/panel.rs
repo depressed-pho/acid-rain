@@ -14,6 +14,7 @@ use crate::dimension::{
 use std::cell::RefCell;
 use std::rc::Rc;
 
+#[derive(Debug)]
 pub struct Panel {
     graphics: Graphics,
     bounds: Rectangle,

@@ -19,6 +19,7 @@ use std::rc::Rc;
  * terminal screen. Its position is fixed to (0, 0), and its size can
  * only be changed by changing the terminal size itself.
  */
+#[derive(Debug)]
 pub struct RootWindow {
     screen: ncurses::WINDOW,
     graphics: Graphics,

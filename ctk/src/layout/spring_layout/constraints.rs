@@ -23,6 +23,7 @@ impl Edge {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct Constraints {
     /* Invariants:
      * - As long as an edge is in a history, it has an explicit
@@ -126,7 +127,7 @@ impl Constraints {
             })
     }
 
-    pub fn get_implicit_spring(&self, edge: Edge) -> Option<Spring> {
+    fn get_implicit_spring(&self, edge: Edge) -> Option<Spring> {
         match edge {
             Edge::Bottom =>
                 self.get_spring(Edge::Top)

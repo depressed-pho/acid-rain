@@ -8,15 +8,15 @@ use crate::dimension::{
     Rectangle,
     SizeRequirements
 };
+use num::Zero;
 use std::cell::RefCell;
 use std::convert::TryInto;
 use std::rc::Rc;
 
+#[derive(Debug)]
 pub struct GridLayout {
-    rows: i32,
-    cols: i32,
-    hgap: i32,
-    vgap: i32,
+    cells: Dimension,
+    gap: Dimension,
     components: Vec<Rc<RefCell<dyn Component>>>,
     is_valid: bool
 }
@@ -28,10 +28,8 @@ impl GridLayout {
      */
     pub fn new() -> GridLayout {
         GridLayout {
-            rows: 0,
-            cols: 0,
-            hgap: 0,
-            vgap: 0,
+            cells: Dimension::zero(),
+            gap: Dimension::zero(),
             components: Vec::new(),
             is_valid: true
         }
@@ -44,52 +42,54 @@ impl GridLayout {
     }
 
     pub fn set_rows(&mut self, rows: i32) -> &mut Self {
-        self.rows = rows;
+        self.cells.height = rows;
         self.invalidate();
         self
     }
 
     pub fn set_cols(&mut self, cols: i32) -> &mut Self {
-        self.cols = cols;
+        self.cells.width = cols;
         self.invalidate();
         self
     }
 
     pub fn set_hgap(&mut self, hgap: i32) -> &mut Self {
-        self.hgap = hgap;
+        self.gap.width = hgap;
         self.invalidate();
         self
     }
 
     pub fn set_vgap(&mut self, vgap: i32) -> &mut Self {
-        self.vgap = vgap;
+        self.gap.height = vgap;
         self.invalidate();
         self
     }
 
     fn num_cells(&self) -> Dimension {
         assert!(
-            self.rows > 0 || self.cols > 0,
+            !self.cells.is_zero(),
             "Either rows or cols must be set to non-zero");
 
-        if self.rows > 0 && self.cols > 0 {
+        if self.cells.width > 0 && self.cells.height > 0 {
             assert!(
-                self.components.len() <= (self.rows * self.cols).try_into().unwrap(),
+                self.components.len() <= self.cells.area().try_into().unwrap(),
                 "Too many sub-components; at most {} can be added",
-                self.rows * self.cols);
+                self.cells.area());
         }
 
         let n_comps: i32 = self.components.len().try_into().unwrap();
-        if self.rows > 0 {
+        if self.cells.height > 0 {
+            let rows = self.cells.height;
             Dimension {
-                width: (n_comps + self.rows - 1) / self.rows,
-                height: self.rows
+                width: (n_comps + rows - 1) / rows,
+                height: rows
             }
         }
         else {
+            let cols = self.cells.width;
             Dimension {
-                width: self.cols,
-                height: (n_comps + self.cols - 1) / self.cols
+                width: cols,
+                height: (n_comps + cols - 1) / cols
             }
         }
     }
@@ -101,8 +101,7 @@ impl GridLayout {
         }
 
         let n_cells     = self.num_cells();
-        let gap         = Dimension { width: self.hgap, height: self.vgap };
-        let total_gaps  = (n_cells - 1) * gap;
+        let total_gaps  = (n_cells - 1) * self.gap;
         let parent_size = parent.get_size();
         let insets      = parent.get_insets();
         let inner_space = Dimension {
@@ -116,11 +115,11 @@ impl GridLayout {
         if ltr {
             for c in 0 .. n_cells.width {
                 let x = insets.left + extra_space.width
-                      + (comp_size.width + self.hgap) * c;
+                      + (comp_size.width + self.gap.width) * c;
 
                 for r in 0 .. n_cells.height {
                     let y = insets.top + extra_space.height
-                          + (comp_size.height + self.vgap) * r;
+                          + (comp_size.height + self.gap.height) * r;
 
                     let i: usize = (r * n_cells.width + c).try_into().unwrap();
                     if i < n_comps.try_into().unwrap() {
@@ -136,11 +135,11 @@ impl GridLayout {
         else {
             for c in 0 .. n_cells.width {
                 let x = parent_size.width - insets.right - comp_size.width - extra_space.width
-                      - (comp_size.width + self.hgap) * c;
+                      - (comp_size.width + self.gap.width) * c;
 
                 for r in 0 .. n_cells.height {
                     let y = insets.top + extra_space.height
-                          + (comp_size.height + self.vgap) * r;
+                          + (comp_size.height + self.gap.height) * r;
 
                     let i: usize = (r * n_cells.width + c).try_into().unwrap();
                     if i < n_comps.try_into().unwrap() {
@@ -186,7 +185,6 @@ impl Layout for GridLayout {
      */
     fn get_size_requirements(&self, parent: &dyn Component) -> SizeRequirements {
         let n_cells   = self.num_cells();
-        let gap       = Dimension { width: self.hgap, height: self.vgap };
         let insets    = parent.get_insets();
         let cell_reqs = self.components.iter().fold(
             SizeRequirements::any(),
@@ -194,6 +192,6 @@ impl Layout for GridLayout {
                 acc & child.borrow().get_size_requirements()
             });
 
-        cell_reqs * n_cells + gap * (n_cells - 1) + insets
+        cell_reqs * n_cells + self.gap * (n_cells - 1) + insets
     }
 }

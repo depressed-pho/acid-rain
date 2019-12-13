@@ -12,6 +12,12 @@ pub struct Dimension<T = i32> {
     pub height: T
 }
 
+impl<T> Dimension<T> where T: Mul<Output = T> + Copy {
+    pub fn area(&self) -> T {
+        self.width * self.height
+    }
+}
+
 impl<T> Zero for Dimension<T> where T: Zero {
     fn zero() -> Self {
         Dimension {

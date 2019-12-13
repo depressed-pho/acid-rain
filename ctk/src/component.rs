@@ -19,8 +19,9 @@ use crate::dimension::{
     Rectangle,
     SizeRequirements
 };
+use std::fmt::Debug;
 
-pub trait Component {
+pub trait Component: Debug {
     /** Mut-borrow the graphics context associated to this
      * component. Every component must own one.
      */

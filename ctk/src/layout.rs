@@ -5,6 +5,7 @@ pub mod spring_layout;
 pub use spring_layout::SpringLayout;
 
 use std::cell::RefCell;
+use std::fmt::Debug;
 use std::rc::Rc;
 
 use crate::{
@@ -18,7 +19,7 @@ use crate::dimension::SizeRequirements;
  * Note that layout managers cannot be safely shared by multiple
  * components.
  */
-pub trait Layout {
+pub trait Layout: Debug {
     /** Do laying out sub-components if the layout manager is invalid.
      *
      * The argument c is the parent component which owns this layout
