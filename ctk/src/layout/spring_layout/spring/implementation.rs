@@ -7,31 +7,35 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use super::{Spring, SpringImpl, SpringSet};
 
-/** A spring whose requirements and values are all fixed. Its method
- * set_value() discards the new value and does nothing.
+/** A spring whose requirements are fixed at the instantiation time.
  */
 #[derive(Clone, Debug)]
 pub struct StaticSpring {
+    reqs: LengthRequirements,
     length: i32
 }
 
 impl StaticSpring {
-    pub fn new(length: i32) -> Spring {
-        Spring::wrap(Self { length })
+    pub fn new(reqs: LengthRequirements) -> Spring {
+        Spring::wrap(
+            Self {
+                reqs,
+                length: reqs.preferred
+            })
     }
 }
 
 impl SpringImpl for StaticSpring {
     fn get_requirements(&self) -> LengthRequirements {
-        LengthRequirements::exactly(self.length)
+        self.reqs
     }
 
-    fn get_value(&self) -> i32 {
+    fn get_length(&self) -> i32 {
         self.length
     }
 
-    fn set_value(&mut self, _: i32) {
-        // Do nothing.
+    fn set_length(&mut self, length: i32) {
+        self.length = length;
     }
 
     fn is_cyclic(&self, seen: SpringSet) -> bool {
@@ -39,7 +43,7 @@ impl SpringImpl for StaticSpring {
     }
 }
 
-/** A spring whose requirements and value are defined by that of a
+/** A spring whose requirements and length are defined by that of a
  * supplied component. The spring keeps track of changes in the
  * component.
  */
@@ -59,11 +63,11 @@ impl SpringImpl for WidthSpring {
         self.component.borrow().get_size_requirements().width
     }
 
-    fn get_value(&self) -> i32 {
+    fn get_length(&self) -> i32 {
         self.component.borrow().get_size().width
     }
 
-    fn set_value(&mut self, width: i32) {
+    fn set_length(&mut self, width: i32) {
         self.component.borrow_mut()
             .update_size(&|dim| {
                 Dimension {
@@ -77,7 +81,7 @@ impl SpringImpl for WidthSpring {
     }
 }
 
-/** A spring whose requirements and value are defined by that of a
+/** A spring whose requirements and length are defined by that of a
  * supplied component. The spring keeps track of changes in the
  * component.
  */
@@ -97,17 +101,48 @@ impl SpringImpl for HeightSpring {
         self.component.borrow().get_size_requirements().height
     }
 
-    fn get_value(&self) -> i32 {
+    fn get_length(&self) -> i32 {
         self.component.borrow().get_size().height
     }
 
-    fn set_value(&mut self, height: i32) {
+    fn set_length(&mut self, height: i32) {
         self.component.borrow_mut()
             .update_size(&|dim| {
                 Dimension {
                     height,
                     ..dim
                 }});
+    }
+
+    fn is_cyclic(&self, seen: SpringSet) -> bool {
+        false
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct SumSpring {
+    a: Spring,
+    b: Spring
+}
+
+impl SumSpring {
+    pub fn new(a: Spring, b: Spring) -> Spring {
+        Spring::wrap(Self {a, b})
+    }
+}
+
+impl SpringImpl for SumSpring {
+    fn get_requirements(&self) -> LengthRequirements {
+        self.a.get_requirements() + self.b.get_requirements()
+    }
+
+    fn get_length(&self) -> i32 {
+        self.a.get_length() + self.b.get_length()
+    }
+
+    fn set_length(&mut self, length: i32) {
+        self.a.set_strain(self.get_strain());
+        self.b.set_length(length - self.a.get_length());
     }
 
     fn is_cyclic(&self, seen: SpringSet) -> bool {

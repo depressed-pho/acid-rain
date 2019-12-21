@@ -10,8 +10,14 @@ use ctk::{
     HorizontalAlignment as HA
 };
 use ctk::component::{Button, Label, Panel};
+use ctk::dimension::LengthRequirements;
 use ctk::layout::GridLayout;
-use ctk::layout::SpringLayout;
+use ctk::layout::spring_layout::{
+    Edge,
+    EdgesOf,
+    SpringLayout,
+    StaticSpring
+};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -49,8 +55,23 @@ fn main() {
 
             Rc::new(RefCell::new(Panel::new(layout)))
         };
-        layout.borrow_mut().add(buttons);
+        {
+            let mut l    = layout.borrow_mut();
+            let gap      = StaticSpring::new(LengthRequirements::any().preferred(0));
 
+            let p_left   = l.get_spring(Edge::Left  , EdgesOf::Parent);
+            let p_top    = l.get_spring(Edge::Top   , EdgesOf::Parent);
+
+            l.add(buttons.clone())
+             .set_spring(Edge::Left, EdgesOf::Child(buttons.clone()), p_left + gap.clone())
+             .set_spring(Edge::Top , EdgesOf::Child(buttons.clone()), p_top  + gap.clone());
+
+            let b_right  = l.get_spring(Edge::Right , EdgesOf::Child(buttons.clone()));
+            let b_bottom = l.get_spring(Edge::Bottom, EdgesOf::Child(buttons.clone()));
+
+            l.set_spring(Edge::Right , EdgesOf::Parent, b_right  + gap.clone())
+             .set_spring(Edge::Bottom, EdgesOf::Parent, b_bottom + gap.clone());
+        }
         Rc::new(RefCell::new(Panel::new(layout)))
     };
     layout.borrow_mut().add(buttons_outer);

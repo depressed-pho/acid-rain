@@ -67,7 +67,7 @@ impl GridLayout {
 
     fn num_cells(&self) -> Dimension {
         assert!(
-            !self.cells.is_zero(),
+            self.cells.width > 0 || self.cells.height > 0,
             "Either rows or cols must be set to non-zero");
 
         if self.cells.width > 0 && self.cells.height > 0 {

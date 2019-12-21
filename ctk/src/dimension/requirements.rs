@@ -40,6 +40,13 @@ impl<T: Bounded + Zero + Copy> LengthRequirements<T> {
             maximum: len
         }
     }
+
+    pub fn preferred(self, len: T) -> Self {
+        LengthRequirements {
+            preferred: len,
+            ..self
+        }
+    }
 }
 
 impl<T: Bounded + Zero + Copy> SizeRequirements<T> {
@@ -103,6 +110,21 @@ impl<T> Add<T> for LengthRequirements<T> where T: Add<Output = T> + Copy {
             minimum: self.minimum + rhs,
             maximum: self.maximum + rhs,
             preferred: self.preferred + rhs
+        }
+    }
+}
+
+/** Addition of two LengthRequirements is defined as
+ * component-wise.
+ */
+impl<T> Add for LengthRequirements<T> where T: Add<Output = T> + Copy {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self {
+        LengthRequirements {
+            minimum: self.minimum + rhs.minimum,
+            maximum: self.maximum + rhs.maximum,
+            preferred: self.preferred + rhs.preferred
         }
     }
 }
