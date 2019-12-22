@@ -64,7 +64,7 @@ fn main() {
 
             l.add(buttons.clone())
              .set_spring(Edge::Left, EdgesOf::Child(buttons.clone()), p_left + gap(5))
-             .set_spring(Edge::Top , EdgesOf::Child(buttons.clone()), p_top  + gap(3));
+             .set_spring(Edge::Top , EdgesOf::Child(buttons.clone()), p_top  + gap(5));
 
             let b_right  = l.get_spring(Edge::Right , EdgesOf::Child(buttons.clone()));
             let b_bottom = l.get_spring(Edge::Bottom, EdgesOf::Child(buttons.clone()));

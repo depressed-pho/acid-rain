@@ -44,10 +44,18 @@ impl Border for ButtonBorder {
                 /* Special case for buttons whose height is 1, which
                  * is actually the most usual case.
                  */
-                let l_sym = "["; // FIXME: Try U+27E6 and U+27E7.
-                let r_sym = "]";
-                g.draw_string(l_sym, Point::zero());
-                g.draw_string(r_sym, Point { x: w-1, y: 0 });
+                if is_utf8_locale() {
+                    let l_sym = "⟦"; // U+27E6 MATHEMATICAL LEFT WHITE SQUARE BRACKET
+                    let r_sym = "⟧"; // U+27E7 MATHEMATICAL RIGHT WHITE SQUARE BRACKET
+                    g.draw_string(l_sym, Point::zero());
+                    g.draw_string(r_sym, Point { x: w-1, y: 0 });
+                }
+                else {
+                    let l_sym = "[";
+                    let r_sym = "]";
+                    g.draw_string(l_sym, Point::zero());
+                    g.draw_string(r_sym, Point { x: w-1, y: 0 });
+                }
             },
             Dimension { width: w, height: h } => {
                 if is_utf8_locale() {
