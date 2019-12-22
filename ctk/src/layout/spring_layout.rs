@@ -16,6 +16,7 @@ use crate::dimension::{
     SizeRequirements
 };
 use std::cell::RefCell;
+use std::fmt::{self, Debug};
 use std::rc::{Rc, Weak};
 use weak_table::PtrWeakKeyHashMap;
 
@@ -109,8 +110,8 @@ impl SpringLayout {
      * rebound.
      */
     pub fn get_spring(&self, edge: Edge, of: EdgesOf) -> Spring {
-        let cc = unsafe { self.get_constraints(of) };
-        SpringProxy::new(edge, cc)
+        let cc = unsafe { self.get_constraints(of.clone()) };
+        SpringProxy::new(edge, of, cc)
     }
 
     /** Set a spring controlling the specified edge of a child
@@ -118,13 +119,13 @@ impl SpringLayout {
      * create a cycle.
      */
     pub fn set_spring(&mut self, edge: Edge, of: EdgesOf, s: Spring) -> &mut Self {
-        let cc = unsafe { self.get_constraints(of) };
+        let cc = unsafe { self.get_constraints(of.clone()) };
         cc.borrow_mut().set_spring(edge, Some(s.clone()));
-        if s.is_cyclic(SpringSet::new()) {
+        if s.is_cyclic(&mut SpringSet::new()) {
             // Remove it. We don't want to enter into an infinite
             // loop by debug-formatting the cyclic spring.
             cc.borrow_mut().set_spring(edge, None);
-            panic!("A cycle has been detected in spring: {:#?}", s);
+            panic!("A cycle has been detected in spring on {:?} of {:?}: {:#?}", edge, of, s);
         }
         self
     }
@@ -148,29 +149,29 @@ impl SpringLayout {
             .set_length(size.height - insets.top - insets.bottom);
 
         for (c, cc) in self.constraints.iter() {
-            c.borrow_mut().set_bounds(
-                Rectangle {
-                    pos: Point {
-                        x: cc.borrow()
-                            .get_spring(Edge::Left)
-                            .unwrap_or_else(|| panic!("No springs for the left edge of the component: {:#?}", c))
-                            .get_length(),
-                        y: cc.borrow()
-                            .get_spring(Edge::Top)
-                            .unwrap_or_else(|| panic!("No springs for the top edge of the component: {:#?}", c))
-                            .get_length()
-                    },
-                    size: Dimension {
-                        width: cc.borrow()
-                            .get_spring(Edge::Width)
-                            .unwrap_or_else(|| panic!("No springs for the width of the component: {:#?}", c))
-                            .get_length(),
-                        height: cc.borrow()
-                            .get_spring(Edge::Height)
-                            .unwrap_or_else(|| panic!("No springs for the height of the component: {:#?}", c))
-                            .get_length()
-                    }
-                });
+            let bounds = Rectangle {
+                pos: Point {
+                    x: cc.borrow()
+                        .get_spring(Edge::Left)
+                        .unwrap_or_else(|| panic!("No springs for the left edge of the component: {:#?}", c))
+                        .get_length(),
+                    y: cc.borrow()
+                        .get_spring(Edge::Top)
+                        .unwrap_or_else(|| panic!("No springs for the top edge of the component: {:#?}", c))
+                        .get_length()
+                },
+                size: Dimension {
+                    width: cc.borrow()
+                        .get_spring(Edge::Width)
+                        .unwrap_or_else(|| panic!("No springs for the width of the component: {:#?}", c))
+                        .get_length(),
+                    height: cc.borrow()
+                        .get_spring(Edge::Height)
+                        .unwrap_or_else(|| panic!("No springs for the height of the component: {:#?}", c))
+                        .get_length()
+                }
+            };
+            c.borrow_mut().set_bounds(bounds);
         }
     }
 }
@@ -209,7 +210,7 @@ impl Layout for SpringLayout {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum EdgesOf {
     Parent,
     Child(Rc<RefCell<dyn Component>>)
@@ -218,15 +219,24 @@ pub enum EdgesOf {
      */
 }
 
-#[derive(Debug)]
+impl Debug for EdgesOf {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Parent    => fmt.write_str("Parent"),
+            Self::Child(rc) => rc.borrow().fmt(fmt)
+        }
+    }
+}
+
 struct SpringProxy {
     edge: Edge,
+    of: EdgesOf,
     constraints: Rc<RefCell<Constraints>>
 }
 
 impl SpringProxy {
-    pub fn new(edge: Edge, constraints: Rc<RefCell<Constraints>>) -> Spring {
-        Spring::wrap(Self { edge, constraints })
+    pub fn new(edge: Edge, of: EdgesOf, constraints: Rc<RefCell<Constraints>>) -> Spring {
+        Spring::wrap(Self { edge, of, constraints })
     }
 
     fn deref(&self) -> Spring {
@@ -236,6 +246,16 @@ impl SpringProxy {
             .unwrap_or_else(|| {
                 panic!("The referenced edge of the proxy has no spring: {:?}", self.edge)
             })
+    }
+}
+
+impl Debug for SpringProxy {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("SpringProxy")
+            .field("edge", &self.edge)
+            .field("of", &self.of)
+            .field("proxying", &self.deref())
+            .finish()
     }
 }
 
@@ -252,7 +272,7 @@ impl SpringImpl for SpringProxy {
         self.deref().set_length(width)
     }
 
-    fn is_cyclic(&self, seen: SpringSet) -> bool {
+    fn is_cyclic(&self, seen: &mut SpringSet) -> bool {
         self.deref().is_cyclic(seen)
     }
 }

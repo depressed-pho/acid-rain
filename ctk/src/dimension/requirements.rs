@@ -1,7 +1,14 @@
 use crate::dimension::{Dimension, Insets};
-use num::{Bounded, Zero};
+use num::{
+    Bounded,
+    Signed,
+    Zero,
+    CheckedAdd,
+    CheckedSub,
+    CheckedMul
+};
 use std::cmp::{min, max};
-use std::ops::{BitAnd, Add, Mul};
+use std::ops::{BitAnd, Add, Mul, Neg};
 
 #[derive(Eq, PartialEq, Clone, Copy, Hash, Debug)]
 pub struct LengthRequirements<T = i32> {
@@ -72,6 +79,47 @@ impl<T: Bounded + Zero + Copy> SizeRequirements<T> {
     }
 }
 
+pub(crate) fn checked_add<T: Bounded + CheckedAdd>(a: T, b: T) -> T {
+    if let Some(c) = a.checked_add(&b) {
+        c
+    }
+    else {
+        T::max_value()
+    }
+}
+
+pub(crate) fn checked_sub<T: Bounded + CheckedSub>(a: T, b: T) -> T {
+    if let Some(c) = a.checked_sub(&b) {
+        c
+    }
+    else {
+        T::min_value()
+    }
+}
+
+pub(crate) fn checked_mul<T: Signed + Bounded + CheckedMul>(a: T, b: T) -> T {
+    if let Some(c) = a.checked_mul(&b) {
+        c
+    }
+    else {
+        if a.is_positive() {
+            if b.is_positive() { T::max_value() }
+            else               { T::min_value() }
+        }
+        else {
+            if b.is_positive() { T::min_value() }
+            else               { T::max_value() }
+        }
+    }
+}
+
+pub(crate) fn checked_neg<T>(a: T) -> T
+where T: PartialEq + Bounded + Neg<Output = T> {
+    if      a == T::max_value() { T::min_value() }
+    else if a == T::min_value() { T::max_value() }
+    else                        { -a             }
+}
+
 /** Combine two requirements. It follows the following law:
  *
  * ∀r:LengthRequirements. any() & r == r & any() == r
@@ -102,14 +150,15 @@ where LengthRequirements<T>: BitAnd<Output = LengthRequirements<T>> {
 
 /** Scalar addition.
  */
-impl<T> Add<T> for LengthRequirements<T> where T: Add<Output = T> + Copy {
+impl<T> Add<T> for LengthRequirements<T>
+where T: Add<Output = T> + Signed + Bounded + CheckedAdd + Copy {
     type Output = Self;
 
     fn add(self, rhs: T) -> Self {
         LengthRequirements {
-            minimum: self.minimum + rhs,
-            maximum: self.maximum + rhs,
-            preferred: self.preferred + rhs
+            minimum: checked_add(self.minimum, rhs),
+            maximum: checked_add(self.maximum, rhs),
+            preferred: checked_add(self.preferred, rhs)
         }
     }
 }
@@ -117,28 +166,46 @@ impl<T> Add<T> for LengthRequirements<T> where T: Add<Output = T> + Copy {
 /** Addition of two LengthRequirements is defined as
  * component-wise.
  */
-impl<T> Add for LengthRequirements<T> where T: Add<Output = T> + Copy {
+impl<T> Add for LengthRequirements<T>
+where T: Add<Output = T> + Signed + Bounded + CheckedAdd + Copy {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self {
         LengthRequirements {
-            minimum: self.minimum + rhs.minimum,
-            maximum: self.maximum + rhs.maximum,
-            preferred: self.preferred + rhs.preferred
+            minimum: checked_add(self.minimum, rhs.minimum),
+            maximum: checked_add(self.maximum, rhs.maximum),
+            preferred: checked_add(self.preferred, rhs.preferred)
         }
     }
 }
 
 /** Scalar multiplication.
  */
-impl<T> Mul<T> for LengthRequirements<T> where T: Mul<Output = T> + Copy {
+impl<T> Mul<T> for LengthRequirements<T>
+where T: Mul<Output = T> + Signed + Bounded + CheckedMul + Copy {
     type Output = Self;
 
     fn mul(self, rhs: T) -> Self {
         LengthRequirements {
-            minimum: self.minimum * rhs,
-            maximum: self.maximum * rhs,
-            preferred: self.preferred * rhs
+            minimum: checked_mul(self.minimum, rhs),
+            maximum: checked_mul(self.maximum, rhs),
+            preferred: checked_mul(self.preferred, rhs)
+        }
+    }
+}
+
+/** A LengthRequirements can be seen as a pair of intervals with a
+ * single common point: the preferred length. The negation of an
+ * interval [a, b] can be defined as [-b, -a] because a <= b.
+ */
+impl<T> Neg for LengthRequirements<T> where T: Neg<Output = T> {
+    type Output = Self;
+
+    fn neg(self) -> Self {
+        LengthRequirements {
+            minimum: -self.maximum,
+            maximum: -self.minimum,
+            preferred: -self.preferred
         }
     }
 }

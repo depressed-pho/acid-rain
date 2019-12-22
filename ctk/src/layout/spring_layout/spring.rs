@@ -2,9 +2,10 @@ mod implementation;
 pub use implementation::*;
 
 use crate::dimension::LengthRequirements;
+use std::any::Any;
 use std::cell::RefCell;
-use std::fmt::Debug;
-use std::ops::{Add, Mul, Sub};
+use std::fmt::{self, Debug};
+use std::ops::{Add, Mul, Sub, Neg};
 use std::rc::{Rc, Weak};
 use weak_table::PtrWeakHashSet;
 
@@ -28,16 +29,30 @@ use weak_table::PtrWeakHashSet;
  * arithmetic traits such as Add can not be directly implemented for
  * Rc<RefCell<dyn SpringImpl>>.
  */
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Spring {
     rc: Rc<RefCell<dyn SpringImpl>>
 }
 
 impl Spring {
-    pub fn wrap<T: SpringImpl + 'static>(s_impl: T) -> Self {
+    pub fn wrap<T: SpringImpl + Any + 'static>(s_impl: T) -> Self {
+        assert!(
+            !(&s_impl as &dyn Any).is::<Spring>(),
+            "Wrapping a Spring into another Spring does not make sense");
         Self {
             rc: Rc::new(RefCell::new(s_impl))
         }
+    }
+
+    pub(crate) fn unwrap(&self) -> &Rc<RefCell<dyn SpringImpl>> {
+        &self.rc
+    }
+}
+
+impl Debug for Spring {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        /* Format the wrapper spring as if nothing were wrapped. */
+        self.rc.borrow().fmt(fmt)
     }
 }
 
@@ -57,7 +72,7 @@ pub trait SpringImpl: Debug {
     /** Return true iff the spring depends on any of springs in a
      * given set.
      */
-    fn is_cyclic(&self, seen: SpringSet) -> bool;
+    fn is_cyclic(&self, seen: &mut SpringSet) -> bool;
 
     fn range(&self, contract: bool) -> i32 {
         let reqs = self.get_requirements();
@@ -96,20 +111,42 @@ impl SpringImpl for Spring {
         self.rc.borrow_mut().set_length(v);
     }
 
-    fn is_cyclic(&self, seen: SpringSet) -> bool {
+    fn is_cyclic(&self, seen: &mut SpringSet) -> bool {
         self.rc.borrow().is_cyclic(seen)
     }
 }
 
+#[derive(Debug)]
 pub struct SpringSet {
-    s: PtrWeakHashSet<Weak<RefCell<dyn SpringImpl>>>
+    set: PtrWeakHashSet<Weak<RefCell<dyn SpringImpl>>>,
+    has_cycle: bool
 }
 
 impl SpringSet {
     pub fn new() -> Self {
         Self {
-            s: PtrWeakHashSet::new()
+            set: PtrWeakHashSet::new(),
+            has_cycle: false
         }
+    }
+
+    pub fn add(&mut self, s: &Spring) -> &mut Self {
+        /* Once we find a single cycle, we don't need to check for any
+         * others. */
+        if !self.has_cycle {
+            self.has_cycle = self.set.insert(s.unwrap().clone());
+
+            /* Do we still have no cycles? Then recurse into the
+             * supplied spring. */
+            if !self.has_cycle {
+                s.is_cyclic(self);
+            }
+        }
+        self
+    }
+
+    pub fn is_cyclic(&self) -> bool {
+        self.has_cycle
     }
 }
 
@@ -119,7 +156,7 @@ impl Add for Spring {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self {
-        Spring::wrap(SumSpring::new(self, rhs))
+        SumSpring::new(self, rhs)
     }
 }
 
@@ -128,8 +165,18 @@ impl Add for Spring {
 impl Sub for Spring {
     type Output = Self;
 
-    fn sub(self, _rhs: Self) -> Self {
-        unimplemented!();
+    fn sub(self, rhs: Self) -> Self {
+        self + -rhs
+    }
+}
+
+/** Negation of a spring.
+ */
+impl Neg for Spring {
+    type Output = Self;
+
+    fn neg(self) -> Self {
+        NegativeSpring::new(self)
     }
 }
 
