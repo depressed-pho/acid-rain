@@ -99,7 +99,7 @@ impl Component for Label {
     }
 
     fn get_size_requirements(&self) -> SizeRequirements {
-        self.size_req
+        self.size_req + self.get_insets()
     }
 
     fn get_border(&self) -> &Box<dyn Border> {

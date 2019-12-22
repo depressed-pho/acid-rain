@@ -88,15 +88,6 @@ pub(crate) fn checked_add<T: Bounded + CheckedAdd>(a: T, b: T) -> T {
     }
 }
 
-pub(crate) fn checked_sub<T: Bounded + CheckedSub>(a: T, b: T) -> T {
-    if let Some(c) = a.checked_sub(&b) {
-        c
-    }
-    else {
-        T::min_value()
-    }
-}
-
 pub(crate) fn checked_mul<T: Signed + Bounded + CheckedMul>(a: T, b: T) -> T {
     if let Some(c) = a.checked_mul(&b) {
         c
@@ -111,13 +102,6 @@ pub(crate) fn checked_mul<T: Signed + Bounded + CheckedMul>(a: T, b: T) -> T {
             else               { T::max_value() }
         }
     }
-}
-
-pub(crate) fn checked_neg<T>(a: T) -> T
-where T: PartialEq + Bounded + Neg<Output = T> {
-    if      a == T::max_value() { T::min_value() }
-    else if a == T::min_value() { T::max_value() }
-    else                        { -a             }
 }
 
 /** Combine two requirements. It follows the following law:

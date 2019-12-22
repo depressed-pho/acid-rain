@@ -268,8 +268,8 @@ impl SpringImpl for SpringProxy {
         self.deref().get_length()
     }
 
-    fn set_length(&mut self, width: i32) {
-        self.deref().set_length(width)
+    fn set_length(&mut self, length: i32) {
+        self.deref().set_length(length)
     }
 
     fn is_cyclic(&self, seen: &mut SpringSet) -> bool {

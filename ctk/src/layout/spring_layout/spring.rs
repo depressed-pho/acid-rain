@@ -84,17 +84,22 @@ pub trait SpringImpl: Debug {
         }
     }
 
-    fn get_strain(&self) -> f64 {
-        let reqs   = self.get_requirements();
-        let length = self.get_length();
-        let delta  = length - reqs.preferred;
-        delta as f64 / self.range(length < reqs.preferred) as f64
+    fn get_strain(&self, length: i32) -> f64 {
+        let reqs  = self.get_requirements();
+        let delta = length - reqs.preferred;
+        let range = self.range(length < reqs.preferred);
+        if range == 0 {
+            0.0
+        }
+        else {
+            delta as f64 / range as f64
+        }
     }
 
     fn set_strain(&mut self, strain: f64) {
         self.set_length(
             self.get_requirements().preferred +
-                (strain * self.range(strain < 0.0) as f64).trunc() as i32);
+                (strain * self.range(strain < 0.0) as f64).round() as i32);
     }
 }
 

@@ -2,8 +2,6 @@ use crate::Component;
 use crate::dimension::{
     Dimension,
     LengthRequirements,
-    checked_sub,
-    checked_neg
 };
 use std::cell::RefCell;
 use std::fmt::{self, Debug};
@@ -52,12 +50,13 @@ impl SpringImpl for StaticSpring {
  */
 #[derive(Clone)]
 pub struct WidthSpring {
-    of: Rc<RefCell<dyn Component>>
+    of: Rc<RefCell<dyn Component>>,
+    length: Option<i32>
 }
 
 impl WidthSpring {
     pub fn new(of: Rc<RefCell<dyn Component>>) -> Spring {
-        Spring::wrap(Self { of })
+        Spring::wrap(Self { of, length: None })
     }
 }
 
@@ -65,6 +64,7 @@ impl Debug for WidthSpring {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("WidthSpring")
             .field("of", &self.of.borrow())
+            .field("length", &self.length)
             .finish()
     }
 }
@@ -75,16 +75,13 @@ impl SpringImpl for WidthSpring {
     }
 
     fn get_length(&self) -> i32 {
-        self.of.borrow().get_size().width
+        self.length.unwrap_or_else(|| {
+            self.get_requirements().preferred
+        })
     }
 
     fn set_length(&mut self, width: i32) {
-        self.of.borrow_mut()
-            .update_size(&|dim| {
-                Dimension {
-                    width,
-                    ..dim
-                }});
+        self.length = Some(width);
     }
 
     fn is_cyclic(&self, _seen: &mut SpringSet) -> bool {
@@ -98,12 +95,13 @@ impl SpringImpl for WidthSpring {
  */
 #[derive(Clone)]
 pub struct HeightSpring {
-    of: Rc<RefCell<dyn Component>>
+    of: Rc<RefCell<dyn Component>>,
+    length: Option<i32>
 }
 
 impl HeightSpring {
     pub fn new(of: Rc<RefCell<dyn Component>>) -> Spring {
-        Spring::wrap(Self { of })
+        Spring::wrap(Self { of, length: None })
     }
 }
 
@@ -111,6 +109,7 @@ impl Debug for HeightSpring {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("HeightSpring")
             .field("of", &self.of.borrow())
+            .field("length", &self.length)
             .finish()
     }
 }
@@ -121,16 +120,13 @@ impl SpringImpl for HeightSpring {
     }
 
     fn get_length(&self) -> i32 {
-        self.of.borrow().get_size().height
+        self.length.unwrap_or_else(|| {
+            self.get_requirements().preferred
+        })
     }
 
     fn set_length(&mut self, height: i32) {
-        self.of.borrow_mut()
-            .update_size(&|dim| {
-                Dimension {
-                    height,
-                    ..dim
-                }});
+        self.length = Some(height);
     }
 
     fn is_cyclic(&self, _seen: &mut SpringSet) -> bool {
@@ -160,8 +156,8 @@ impl SpringImpl for SumSpring {
     }
 
     fn set_length(&mut self, length: i32) {
-        self.a.set_strain(self.get_strain());
-        self.b.set_length(checked_sub(length, self.a.get_length()));
+        self.a.set_strain(self.get_strain(length));
+        self.b.set_length(length - self.a.get_length());
     }
 
     fn is_cyclic(&self, seen: &mut SpringSet) -> bool {
@@ -190,7 +186,7 @@ impl SpringImpl for NegativeSpring {
     }
 
     fn set_length(&mut self, length: i32) {
-        self.s.set_length(checked_neg(length));
+        self.s.set_length(-length);
     }
 
     fn is_cyclic(&self, seen: &mut SpringSet) -> bool {
