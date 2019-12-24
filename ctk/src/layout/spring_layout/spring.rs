@@ -89,6 +89,10 @@ pub trait SpringImpl: Debug {
         let delta = length - reqs.preferred;
         let range = self.range(length < reqs.preferred);
         if range == 0 {
+            /* The range being 0 means that the spring is rigid, and
+             * its length should always be its preferred length. This
+             * is a special case to avoid causing division by zero.
+             */
             0.0
         }
         else {

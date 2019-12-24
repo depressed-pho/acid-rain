@@ -1,12 +1,22 @@
 use crate::Component;
 use crate::dimension::{
-    Dimension,
-    LengthRequirements,
+    LengthRequirements
 };
 use std::cell::RefCell;
 use std::fmt::{self, Debug};
 use std::rc::Rc;
 use super::{Spring, SpringImpl, SpringSet};
+
+lazy_static! {
+    /* In order to evenly distribute extra spaces, it is crucial to
+     * clamp the maximum length of non-compositing springs to
+     * somewhere under the i32::max_value(). Otherwise the important
+     * invariant s1.range() + s2.range() = (s1 + s2).range() will not
+     * hold.
+     */
+    static ref MAX: LengthRequirements =
+        LengthRequirements::at_most(i16::max_value() as i32);
+}
 
 /** A spring whose requirements are fixed at the instantiation time.
  */
@@ -20,7 +30,7 @@ impl StaticSpring {
     pub fn new(reqs: LengthRequirements) -> Spring {
         Spring::wrap(
             Self {
-                reqs,
+                reqs: reqs & *MAX,
                 length: reqs.preferred
             })
     }
@@ -71,7 +81,7 @@ impl Debug for WidthSpring {
 
 impl SpringImpl for WidthSpring {
     fn get_requirements(&self) -> LengthRequirements {
-        self.of.borrow().get_size_requirements().width
+        self.of.borrow().get_size_requirements().width & *MAX
     }
 
     fn get_length(&self) -> i32 {
@@ -116,7 +126,7 @@ impl Debug for HeightSpring {
 
 impl SpringImpl for HeightSpring {
     fn get_requirements(&self) -> LengthRequirements {
-        self.of.borrow().get_size_requirements().height
+        self.of.borrow().get_size_requirements().height & *MAX
     }
 
     fn get_length(&self) -> i32 {

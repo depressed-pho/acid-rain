@@ -4,7 +4,6 @@ use num::{
     Signed,
     Zero,
     CheckedAdd,
-    CheckedSub,
     CheckedMul
 };
 use std::cmp::{min, max};
@@ -37,6 +36,14 @@ impl<T: Bounded + Zero + Copy> LengthRequirements<T> {
             minimum: len,
             preferred: len,
             maximum: T::max_value()
+        }
+    }
+
+    pub fn at_most(len: T) -> Self {
+        LengthRequirements {
+            minimum: T::zero(),
+            preferred: T::zero(),
+            maximum: len
         }
     }
 

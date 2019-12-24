@@ -23,8 +23,8 @@ impl Default for ButtonBorder {
 impl Border for ButtonBorder {
     fn get_insets(&self) -> Insets {
         Insets {
-            left: 1,
-            right: 1,
+            left: 2,
+            right: 2,
             top: 0,
             bottom: 0
         }

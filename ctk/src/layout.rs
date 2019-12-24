@@ -1,6 +1,9 @@
 mod grid_layout;
 pub use grid_layout::GridLayout;
 
+pub mod group_layout;
+pub use group_layout::GroupLayout;
+
 pub mod spring_layout;
 pub use spring_layout::SpringLayout;
 
