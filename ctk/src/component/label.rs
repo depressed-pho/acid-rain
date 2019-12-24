@@ -33,7 +33,7 @@ pub struct Label {
 impl Label {
     pub fn new<T: Into<String>>(text: T) -> Label {
         let text_    = text.into();
-        let size_req = SizeRequirements::at_least(
+        let size_req = SizeRequirements::exactly(
             smallest_area_to_draw_text(&text_));
         Label {
             graphics: Graphics::new(),

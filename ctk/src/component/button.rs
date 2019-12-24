@@ -33,7 +33,7 @@ pub struct Button {
 impl Button {
     pub fn new<T: Into<String>>(label: T) -> Button {
         let label_   = label.into();
-        let size_req = SizeRequirements::at_least(
+        let size_req = SizeRequirements::exactly(
             smallest_area_to_draw_text(&label_));
         Button {
             graphics: Graphics::new(),
