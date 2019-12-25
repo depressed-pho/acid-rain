@@ -130,6 +130,14 @@ impl SpringLayout {
         self
     }
 
+    pub fn take<'a>(&'a mut self, edge: Edge, of: EdgesOf) -> SpringLinker<'a> {
+        let s = self.get_spring(edge, of);
+        SpringLinker {
+            layout: self,
+            spring: s
+        }
+    }
+
     fn do_layout(&mut self, parent: &dyn Component) {
         let pc_    = unsafe { self.get_constraints(EdgesOf::Parent) };
         let pc     = pc_.borrow();
@@ -225,6 +233,25 @@ impl Debug for EdgesOf {
             Self::Parent    => fmt.write_str("Parent"),
             Self::Child(rc) => rc.borrow().fmt(fmt)
         }
+    }
+}
+
+pub struct SpringLinker<'a> {
+    layout: &'a mut SpringLayout,
+    spring: Spring
+}
+
+impl<'a> SpringLinker<'a> {
+    pub fn modify<F: FnOnce(Spring) -> Spring>(self, f: F) -> Self {
+        SpringLinker {
+            spring: f(self.spring),
+            ..self
+        }
+    }
+
+    pub fn hook(self, edge: Edge, of: EdgesOf) -> &'a mut SpringLayout {
+        self.layout.set_spring(edge, of, self.spring);
+        self.layout
     }
 }
 

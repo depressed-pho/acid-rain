@@ -59,18 +59,23 @@ fn main() {
             let mut l    = layout.borrow_mut();
             let gap      = || StaticSpring::new(LengthRequirements::any().preferred(0));
 
-            let p_left   = l.get_spring(Edge::Left  , EdgesOf::Parent);
-            let p_top    = l.get_spring(Edge::Top   , EdgesOf::Parent);
-
             l.add(buttons.clone())
-             .set_spring(Edge::Left, EdgesOf::Child(buttons.clone()), p_left + gap())
-             .set_spring(Edge::Top , EdgesOf::Child(buttons.clone()), p_top  + gap());
 
-            let b_right  = l.get_spring(Edge::Right , EdgesOf::Child(buttons.clone()));
-            let b_bottom = l.get_spring(Edge::Bottom, EdgesOf::Child(buttons.clone()));
+             .take(Edge::Left, EdgesOf::Parent)
+                .modify(|s| s + gap())
+                .hook(Edge::Left, EdgesOf::Child(buttons.clone()))
 
-            l.set_spring(Edge::Right , EdgesOf::Parent, b_right  + gap())
-             .set_spring(Edge::Bottom, EdgesOf::Parent, b_bottom + gap());
+             .take(Edge::Top, EdgesOf::Parent)
+                .modify(|s| s + gap())
+                .hook(Edge::Top, EdgesOf::Child(buttons.clone()))
+
+             .take(Edge::Right, EdgesOf::Child(buttons.clone()))
+                .modify(|s| s + gap())
+                .hook(Edge::Right, EdgesOf::Parent)
+
+             .take(Edge::Bottom, EdgesOf::Child(buttons.clone()))
+                .modify(|s| s + gap())
+                .hook(Edge::Bottom, EdgesOf::Parent);
         }
         Rc::new(RefCell::new(Panel::new(layout)))
     };
