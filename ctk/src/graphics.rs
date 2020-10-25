@@ -158,6 +158,11 @@ impl Graphics {
              * returns ERR in that case.
              */
             check(ncurses::mvwaddchnstr(w, p.y, p.x, &[s.into()], 1)).unwrap();
+            /* FIXME: Unicode-capable terminals tend to hate ACS
+             * symbols (for a quite understandable reason). Use
+             * Unicode symbols when crate::is_utf8_locale() returns
+             * true. Or convince ncurses to translate them for us.
+             */
         }
     }
 }
