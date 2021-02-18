@@ -2,10 +2,7 @@
 
 mod world;
 
-#[macro_use]
-extern crate clap;
-
-use clap::{Arg, ArgMatches};
+use clap::{Arg, ArgMatches, *};
 use ctk::{
     HorizontalAlignment as HA
 };

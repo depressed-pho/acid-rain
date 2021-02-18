@@ -2,6 +2,7 @@ use crate::Component;
 use crate::dimension::{
     LengthRequirements
 };
+use lazy_static::lazy_static;
 use std::cell::RefCell;
 use std::fmt::{self, Debug};
 use std::rc::Rc;

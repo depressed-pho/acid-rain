@@ -16,6 +16,7 @@ readme = "README.md"
 [dependencies]
 clap = "~2.33"
 ctk = { path = "ctk" }
+lazy_static = "~1.4"
 
 [workspace]
 members = ["ctk"]

@@ -1,4 +1,5 @@
-mod chunk;
+pub mod chunk;
+pub mod tile;
 
 pub struct World {
 }

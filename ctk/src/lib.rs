@@ -1,10 +1,3 @@
-#[macro_use]
-extern crate lazy_static;
-extern crate libc;
-extern crate ncurses;
-extern crate unicode_width;
-extern crate weak_table;
-
 pub mod alignment;
 pub use alignment::{
     HorizontalAlignment,
@@ -35,6 +28,7 @@ use crate::util::{check, check_null};
 pub mod window;
 use crate::window::RootWindow;
 
+use lazy_static::lazy_static;
 use num::Zero;
 use std::cell::RefCell;
 use std::ffi::{CString, CStr};
