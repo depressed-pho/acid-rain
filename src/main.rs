@@ -1,6 +1,11 @@
 #![allow(dead_code)]
 
-mod world;
+pub mod builtin;
+pub mod module;
+pub mod world;
+
+use crate::module::loader::TileLoader;
+use crate::world::tile::TileRegistrar;
 
 use clap::{Arg, ArgMatches, *};
 use ctk::{
@@ -30,6 +35,13 @@ fn main() {
 
     //let w = world::World::new();
 
+    let btl = builtin::loaders::tile::BuiltinTileLoader::new();
+    btl.load(TileRegistrar::new("acid-rain"));
+
+    // ctk_main();
+}
+
+fn ctk_main() {
     let layout = Rc::new(RefCell::new(GridLayout::new()));
     layout.borrow_mut().set_cols(1);
 
