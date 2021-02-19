@@ -1,11 +1,11 @@
 use crate::module::loader::TileLoader;
-use crate::world::tile::{ID, Tile, TileRegistrar};
+use crate::world::tile::{ID, Tile, get_tile_registry_mut};
 
 #[derive(Debug)]
 struct Dirt {}
 impl Tile for Dirt {
     fn id(&self) -> ID {
-        return "dirt";
+        return "acid-rain:dirt".to_string();
     }
 }
 
@@ -16,7 +16,9 @@ impl BuiltinTileLoader {
     }
 }
 impl TileLoader for BuiltinTileLoader {
-    fn load(&self, reg: TileRegistrar) {
-        reg.register(Box::new(Dirt {}));
+    fn load(&mut self) {
+        let mut reg = get_tile_registry_mut();
+
+        (*reg).register(Box::new(Dirt {})).unwrap();
     }
 }

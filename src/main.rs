@@ -5,7 +5,6 @@ pub mod module;
 pub mod world;
 
 use crate::module::loader::TileLoader;
-use crate::world::tile::TileRegistrar;
 
 use clap::{Arg, ArgMatches, *};
 use ctk::{
@@ -35,10 +34,10 @@ fn main() {
 
     //let w = world::World::new();
 
-    let btl = builtin::loaders::tile::BuiltinTileLoader::new();
-    btl.load(TileRegistrar::new("acid-rain"));
+    let mut btl = builtin::loaders::tile::BuiltinTileLoader::new();
+    btl.load();
 
-    // ctk_main();
+    //ctk_main();
 }
 
 fn ctk_main() {

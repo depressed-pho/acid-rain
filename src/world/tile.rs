@@ -3,10 +3,10 @@ pub use registry::*;
 
 use std::fmt::Debug;
 
-pub type ID = &'static str;
+pub type ID = String;
 
 pub trait Tile: Debug + Send + Sync {
-    /** Return the tile ID such as "dirt" in a certain module.
+    /** Return the tile ID such as "acid-rain:dirt".
      */
     fn id(&self) -> ID;
 }
