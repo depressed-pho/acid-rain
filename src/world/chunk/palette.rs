@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::collections::{HashMap, BTreeMap};
 use std::sync::Arc;
 
@@ -30,9 +31,9 @@ impl ChunkPalette {
     /** Insert a tile ID to the palette. Inserting the same ID twice
      * is not an error. It's just ignored.
      */
-    pub fn insert<Q>(&mut self, id: &str) {
-        if !self.index_of.contains_key(id) {
-            let arc_id = Arc::from(id);
+    pub fn insert<K: Borrow<str>>(&mut self, id: &K) {
+        if !self.index_of.contains_key(id.borrow()) {
+            let arc_id = Arc::from(id.borrow());
             let new_index = {
                 // BTreeMap.last_entry() is experimental. See
                 // https://github.com/rust-lang/rust/issues/62924

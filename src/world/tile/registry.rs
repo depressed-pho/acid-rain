@@ -4,7 +4,6 @@ use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
-use std::hash::Hash;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 lazy_static! {
@@ -46,11 +45,8 @@ impl TileRegistry {
         }
     }
 
-    pub fn get<Q>(&self, id: &Q) -> Option<&Arc<dyn Tile>>
-    where Arc<str>: Borrow<Q>,
-          Q: Hash + Eq {
-
-        self.tiles.get(id)
+    pub fn get<K: Borrow<str>>(&self, id: &K) -> Option<&Arc<dyn Tile>> {
+        self.tiles.get(id.borrow())
     }
 }
 
