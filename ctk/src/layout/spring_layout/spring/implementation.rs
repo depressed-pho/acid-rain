@@ -200,7 +200,7 @@ impl SpringImpl for NegativeSpring {
         self.s.set_length(-length);
     }
 
-    fn is_cyclic(&self, seen: &mut SpringSet) -> bool {
+    fn is_cyclic(&self, _seen: &mut SpringSet) -> bool {
         unimplemented!();
     }
 }

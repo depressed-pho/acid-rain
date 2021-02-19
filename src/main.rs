@@ -6,7 +6,7 @@ pub mod world;
 
 use crate::module::loader::ModuleLoader;
 
-use clap::{Arg, ArgMatches, *};
+use clap::{/*Arg, */ArgMatches, *}; // "*" because its macros don't support the use syntax yet.
 use ctk::{
     HorizontalAlignment as HA
 };
@@ -30,7 +30,7 @@ fn opt_matches<'a>() -> ArgMatches<'a> {
 fn main() {
     ctk::install_default_panic_hook();
 
-    let matches = opt_matches();
+    let _matches = opt_matches();
 
     //let w = world::World::new();
 

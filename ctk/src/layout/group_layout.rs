@@ -42,7 +42,7 @@ impl GroupLayout {
         self
     }
 
-    fn do_layout(&mut self, parent: &dyn Component) {
+    fn do_layout(&mut self, _parent: &dyn Component) {
         unimplemented!();
     }
 }
@@ -69,7 +69,7 @@ impl Layout for GroupLayout {
         unimplemented!();
     }
 
-    fn get_size_requirements(&self, parent: &dyn Component) -> SizeRequirements {
+    fn get_size_requirements(&self, _parent: &dyn Component) -> SizeRequirements {
         unimplemented!();
     }
 }
