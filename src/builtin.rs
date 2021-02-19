@@ -1,1 +1,1 @@
-pub mod loaders;
+pub mod loader;

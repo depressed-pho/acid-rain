@@ -4,7 +4,7 @@ pub mod builtin;
 pub mod module;
 pub mod world;
 
-use crate::module::loader::TileLoader;
+use crate::module::loader::ModuleLoader;
 
 use clap::{Arg, ArgMatches, *};
 use ctk::{
@@ -34,8 +34,8 @@ fn main() {
 
     //let w = world::World::new();
 
-    let mut btl = builtin::loaders::tile::BuiltinTileLoader::new();
-    btl.load();
+    let mut btl = builtin::loader::BuiltinModuleLoader::new();
+    btl.load_tiles();
 
     //ctk_main();
 }

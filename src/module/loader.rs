@@ -1,2 +1,3 @@
-pub mod tile;
-pub use tile::*;
+pub trait ModuleLoader {
+    fn load_tiles(&mut self);
+}
