@@ -1,3 +1,5 @@
+mod palette;
+
 pub struct Chunk {
 }
 

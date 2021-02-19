@@ -1,9 +1,11 @@
 use crate::world::tile::*;
 use lazy_static::lazy_static;
+use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
-use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::hash::Hash;
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 lazy_static! {
     static ref REGISTRY: RwLock<TileRegistry> = RwLock::new(TileRegistry::new());
@@ -22,7 +24,7 @@ pub fn get_tile_registry_mut<'a>() -> RwLockWriteGuard<'a, TileRegistry> {
  */
 #[derive(Debug)]
 pub struct TileRegistry {
-    tiles: HashMap<ID, Box<dyn Tile>>
+    tiles: HashMap<Arc<str>, Arc<dyn Tile>>
 }
 
 impl TileRegistry {
@@ -32,21 +34,30 @@ impl TileRegistry {
         }
     }
 
-    pub fn register(&mut self, tile: Box<dyn Tile>) -> Result<(), ConflictingTileIDError> {
-        let id = tile.id();
-        if let None = self.tiles.insert(id.clone(), tile) {
-            Ok(())
-        }
-        else {
+    pub fn register(&mut self, tile: Arc<dyn Tile>) -> Result<(), ConflictingTileIDError> {
+        let id = Arc::from(tile.id());
+
+        if self.tiles.contains_key(tile.id()) {
             Err(ConflictingTileIDError { id })
         }
+        else {
+            self.tiles.insert(id, tile);
+            Ok(())
+        }
+    }
+
+    pub fn get<Q>(&self, id: &Q) -> Option<&Arc<dyn Tile>>
+    where Arc<str>: Borrow<Q>,
+          Q: Hash + Eq {
+
+        self.tiles.get(id)
     }
 }
 
 // Error objects
 #[derive(Debug)]
 pub struct ConflictingTileIDError {
-    pub id: ID
+    pub id: Arc<str>
 }
 
 impl Error for ConflictingTileIDError {}
