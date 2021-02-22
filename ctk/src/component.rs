@@ -25,7 +25,7 @@ pub trait Component: Debug {
     /** Mut-borrow the graphics context associated to this
      * component. Every component must own one.
      */
-    fn graphics_mut(&mut self) -> &mut Graphics;
+    fn graphics_mut(&mut self) -> &mut Graphics; // FIXME: Is this really needed?
 
     /** Paint the content of the graphics context if it might not have
      * the desired content. This method must recursively repaint

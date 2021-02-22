@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 pub mod builtin;
+pub mod gui;
 pub mod module;
 pub mod world;
 
@@ -8,6 +9,7 @@ use crate::module::loader::ModuleLoader;
 use crate::world::chunk::Chunk;
 use crate::world::chunk::palette::ChunkPalette;
 use crate::world::tile::{ArcTile, get_tile_registry};
+use crate::gui::view::world::WorldView;
 
 use clap::{/*Arg, */ArgMatches, *}; // "*" because its macros don't support the use syntax yet.
 use ctk::{
@@ -35,7 +37,7 @@ fn main() {
 
     let _matches = opt_matches();
 
-    //let w = world::World::new();
+    let _w = world::World::new();
 
     let mut btl = builtin::loader::BuiltinModuleLoader::new();
     btl.load_tiles();
@@ -48,10 +50,21 @@ fn main() {
     let arc_palette = std::sync::Arc::new(palette);
     let _chunk = Chunk::new(&arc_palette, &dirt_ts);
 
-    //ctk_main();
+    ctk_main();
 }
 
 fn ctk_main() {
+    let layout = Rc::new(RefCell::new(GridLayout::new()));
+    layout.borrow_mut().set_cols(1);
+
+    let view = Rc::new(RefCell::new(WorldView::new()));
+    layout.borrow_mut().add(view);
+
+    let mut tk = ctk::Ctk::initiate(layout).unwrap();
+    tk.main();
+}
+
+fn ctk_title() {
     let layout = Rc::new(RefCell::new(GridLayout::new()));
     layout.borrow_mut().set_cols(1);
 

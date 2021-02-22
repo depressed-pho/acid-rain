@@ -26,7 +26,7 @@ mod util;
 use crate::util::{check, check_null};
 
 pub mod window;
-use crate::window::RootWindow;
+pub use crate::window::RootWindow;
 
 use lazy_static::lazy_static;
 use num::Zero;
