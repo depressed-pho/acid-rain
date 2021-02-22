@@ -45,7 +45,7 @@ impl TileRegistry {
         }
     }
 
-    pub fn get<K: Borrow<str>>(&self, id: &K) -> Option<&Arc<dyn Tile>> {
+    pub fn get<K: Borrow<str>>(&self, id: K) -> Option<&Arc<dyn Tile>> {
         self.tiles.get(id.borrow())
     }
 }

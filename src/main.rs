@@ -5,6 +5,9 @@ pub mod module;
 pub mod world;
 
 use crate::module::loader::ModuleLoader;
+use crate::world::chunk::Chunk;
+use crate::world::chunk::palette::ChunkPalette;
+use crate::world::tile::{ArcTile, get_tile_registry};
 
 use clap::{/*Arg, */ArgMatches, *}; // "*" because its macros don't support the use syntax yet.
 use ctk::{
@@ -36,6 +39,14 @@ fn main() {
 
     let mut btl = builtin::loader::BuiltinModuleLoader::new();
     btl.load_tiles();
+
+    let mut palette = ChunkPalette::new();
+    let reg = get_tile_registry();
+    let dirt = reg.get("acid-rain:dirt").unwrap();
+    let dirt_ts = dirt.default_state();
+    palette.insert(dirt.id());
+    let arc_palette = std::sync::Arc::new(palette);
+    let _chunk = Chunk::new(&arc_palette, &dirt_ts);
 
     //ctk_main();
 }
