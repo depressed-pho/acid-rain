@@ -51,10 +51,11 @@ fn main() {
     let _chunk = Chunk::new(&arc_palette, &dirt_ts);
 
     ctk_main();
+    //ctk_title();
 }
 
 fn ctk_main() {
-    let layout = Rc::new(RefCell::new(GridLayout::new()));
+    let layout = RefCell::new(Box::new(GridLayout::new()));
     layout.borrow_mut().set_cols(1);
 
     let view = Rc::new(RefCell::new(WorldView::new()));
@@ -65,7 +66,7 @@ fn ctk_main() {
 }
 
 fn ctk_title() {
-    let layout = Rc::new(RefCell::new(GridLayout::new()));
+    let layout = RefCell::new(Box::new(GridLayout::new()));
     layout.borrow_mut().set_cols(1);
 
     let title = Rc::new(RefCell::new(Label::new("A c i d   R a i n")));
@@ -73,10 +74,10 @@ fn ctk_title() {
     layout.borrow_mut().add(title);
 
     let buttons_outer = {
-        let layout  = Rc::new(RefCell::new(SpringLayout::new()));
+        let layout  = RefCell::new(Box::new(SpringLayout::new()));
 
         let buttons = {
-            let layout = Rc::new(RefCell::new(GridLayout::new()));
+            let layout = RefCell::new(Box::new(GridLayout::new()));
             layout.borrow_mut().set_cols(1).set_vgap(1);
 
             let play = Rc::new(RefCell::new(Button::new("Play")));

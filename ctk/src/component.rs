@@ -23,8 +23,7 @@ use std::fmt::Debug;
 pub trait Component: Debug {
     /** Paint the content of the graphics context if it might not have
      * the desired content. This method must recursively repaint
-     * sub-components if the component is a container. It is for
-     * internal use.
+     * sub-components if the component is a container.
      */
     fn paint(&mut self);
 

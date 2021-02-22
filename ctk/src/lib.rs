@@ -34,7 +34,6 @@ use std::cell::RefCell;
 use std::ffi::{CString, CStr};
 use std::panic;
 use std::sync::Mutex;
-use std::rc::Rc;
 
 lazy_static! {
     static ref INITIALIZED: Mutex<bool> = Mutex::new(false);
@@ -65,7 +64,7 @@ impl Ctk {
     /** Create an instance of Ctk. At most one instance can
      * exist. Violating this would return an error.
      */
-    pub fn initiate(layout: Rc<RefCell<dyn Layout>>) -> Result<Ctk, ()> {
+    pub fn initiate(layout: RefCell<Box<dyn Layout>>) -> Result<Ctk, ()> {
         {
             let mut initialized = INITIALIZED.lock().unwrap();
 

@@ -19,14 +19,15 @@ use crate::dimension::SizeRequirements;
 /** Layout manager is responsible for laying out sub-components in a
  * container component.
  *
- * Note that layout managers cannot be safely shared by multiple
- * components.
+ * Note that layout managers generally cannot be safely shared by
+ * multiple components. It is therefore not a good idea to wrap them
+ * in cloneable smart pointers such as Rc.
  */
 pub trait Layout: Debug {
     /** Do laying out sub-components if the layout manager is invalid.
      *
-     * The argument c is the parent component which owns this layout
-     * manager.
+     * The argument "parent" is the parent component which owns this
+     * layout manager.
      *
      * A layout manager is said to be invalid if it has any
      * sub-component which needs to be moved or resized. Adding or
