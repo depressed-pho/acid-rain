@@ -36,10 +36,6 @@ impl Panel {
 }
 
 impl Component for Panel {
-    fn graphics_mut(&mut self) -> &mut Graphics {
-        &mut self.graphics
-    }
-
     fn paint(&mut self) {
         if self.dirty {
             self.border.paint(&mut self.graphics);

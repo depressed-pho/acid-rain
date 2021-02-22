@@ -9,7 +9,6 @@ pub use panel::*;
 
 use crate::{
     Border,
-    Graphics,
     RootWindow
 };
 use crate::dimension::{
@@ -22,11 +21,6 @@ use crate::dimension::{
 use std::fmt::Debug;
 
 pub trait Component: Debug {
-    /** Mut-borrow the graphics context associated to this
-     * component. Every component must own one.
-     */
-    fn graphics_mut(&mut self) -> &mut Graphics; // FIXME: Is this really needed?
-
     /** Paint the content of the graphics context if it might not have
      * the desired content. This method must recursively repaint
      * sub-components if the component is a container. It is for
