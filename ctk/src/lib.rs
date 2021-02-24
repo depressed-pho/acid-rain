@@ -80,7 +80,11 @@ impl Ctk {
              */
             if cfg!(feature = "unicode") {
                 /* THINKME: ncurses::setlocale() seems to be
-                 * malfunctioning but I have no idea why. */
+                 * malfunctioning but I have no idea why. Its code
+                 * looks just good but doesn't actually have any
+                 * effect.
+                 */
+                // ncurses::setlocale(ncurses::LcCategory::all, "");
                 let empty = CString::new("").unwrap();
                 unsafe {
                     libc::setlocale(libc::LC_ALL, empty.as_ptr());

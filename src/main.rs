@@ -50,8 +50,8 @@ fn main() {
     let arc_palette = std::sync::Arc::new(palette);
     let _chunk = Chunk::new(&arc_palette, &dirt_ts);
 
-    ctk_main();
-    //ctk_title();
+    //ctk_main();
+    ctk_title();
 }
 
 fn ctk_main() {

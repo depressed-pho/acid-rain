@@ -1,3 +1,5 @@
+pub mod manager;
+
 pub mod palette;
 use palette::{ChunkPalette, TileIndex};
 
