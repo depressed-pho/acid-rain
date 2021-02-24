@@ -34,9 +34,13 @@ use std::cell::RefCell;
 use std::ffi::{CString, CStr};
 use std::panic;
 use std::sync::Mutex;
+use tokio::select;
+use tokio::task;
+use tokio::io::unix::AsyncFd;
 
 lazy_static! {
-    static ref INITIALIZED: Mutex<bool> = Mutex::new(false);
+    static ref INITIALIZED: Mutex<bool> =
+        Mutex::new(false);
 
     static ref IS_UTF8_LOCALE: bool = {
         if cfg!(feature = "unicode") {
@@ -119,6 +123,9 @@ impl Ctk {
         check(ncurses::raw())?;
         check(ncurses::cbreak())?;
 
+        /* We don't want ncurses::getch() to block. */
+        check(ncurses::nodelay(stdscr, true))?;
+
         /* We don't want ncurses to treat RET specially. */
         check(ncurses::nonl())?;
 
@@ -142,29 +149,56 @@ impl Ctk {
         check(ncurses::endwin())
     }
 
-    /** The main loop. */
-    pub fn main(&mut self) {
+    /** Ctk provides no main loop. Users are expected to call step()
+     * in their own loop which asynchronously updates the terminal
+     * and handles input events.
+     */
+    pub async fn step(&mut self) {
         self.root.validate();
-        self.update_graphics().unwrap();
-
-        // FIXME
-        ncurses::getch();
-    }
-
-    /** Refresh the content of the off-screen buffer curscr, and then
-     * update the screen by actually writing data to the terminal. */
-    fn update_graphics(&mut self) -> Result<(), ()> {
         self.root.paint();
         self.root.refresh(&self.root, Point::zero());
-        check(ncurses::doupdate())
+
+        // ncurses::doupdate() may block if stdout is blocked.
+        task::spawn_blocking(|| {
+            check(ncurses::doupdate()).unwrap()
+        }).await.unwrap();
+
+        /* ncurses::getch() by default performs a blocking read on
+         * stdin. In order to integrate it with our asynchronous
+         * world, we poll stdin until they get any inputs, then call
+         * getch() in a non-blocking mode.
+         *
+         * Note that currently we can't poll SIGWINCH because
+         * tokio::signal can't do it without replacing the signal
+         * handler installed by ncurses, and ncurses doesn't have a
+         * public API to manually invoke the handler.
+         *
+         * THINKME: Maybe we should copy the logic of
+         * _nc_get_screensize() here? Or perhaps save the old handler
+         * and invoke it afterwards?
+         */
+        let stdin = AsyncFd::new(std::io::stdin()).unwrap();
+
+        select! {
+            stdin_ready = stdin.readable() => {
+                self.read_keys().await;
+                stdin_ready.unwrap().clear_ready();
+            }
+        }
+    }
+
+    async fn read_keys(&mut self) {
+        while let Some(_) = ncurses::get_wch() {
+            // FIXME
+        }
     }
 }
 
 impl Drop for Ctk {
     fn drop(&mut self) {
-        let mut initialized = INITIALIZED.lock().unwrap();
-
         self.end().unwrap();
+
+        let mut initialized = INITIALIZED.lock().unwrap();
         *initialized = false;
     }
 }

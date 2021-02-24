@@ -54,7 +54,8 @@ fn main() {
     ctk_title();
 }
 
-fn ctk_main() {
+#[tokio::main]
+async fn ctk_main() {
     let layout = RefCell::new(Box::new(GridLayout::new()));
     layout.borrow_mut().set_cols(1);
 
@@ -62,10 +63,11 @@ fn ctk_main() {
     layout.borrow_mut().add(view);
 
     let mut tk = ctk::Ctk::initiate(layout).unwrap();
-    tk.main();
+    tk.step().await;
 }
 
-fn ctk_title() {
+#[tokio::main]
+async fn ctk_title() {
     let layout = RefCell::new(Box::new(GridLayout::new()));
     layout.borrow_mut().set_cols(1);
 
@@ -115,5 +117,5 @@ fn ctk_title() {
     layout.borrow_mut().add(buttons_outer);
 
     let mut tk = ctk::Ctk::initiate(layout).unwrap();
-    tk.main();
+    tk.step().await;
 }
