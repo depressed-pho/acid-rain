@@ -37,6 +37,7 @@ use std::sync::Mutex;
 use tokio::select;
 use tokio::task;
 use tokio::io::unix::AsyncFd;
+use tokio::signal::unix::{signal, SignalKind};
 
 lazy_static! {
     static ref INITIALIZED: Mutex<bool> =
@@ -165,31 +166,35 @@ impl Ctk {
 
         /* ncurses::getch() by default performs a blocking read on
          * stdin. In order to integrate it with our asynchronous
-         * world, we poll stdin until they get any inputs, then call
-         * getch() in a non-blocking mode.
-         *
-         * Note that currently we can't poll SIGWINCH because
-         * tokio::signal can't do it without replacing the signal
-         * handler installed by ncurses, and ncurses doesn't have a
-         * public API to manually invoke the handler.
-         *
-         * THINKME: Maybe we should copy the logic of
-         * _nc_get_screensize() here? Or perhaps save the old handler
-         * and invoke it afterwards?
+         * world, we poll stdin and SIGWINCH until they get any
+         * inputs, then call getch() in a non-blocking mode.
          */
-        let stdin = AsyncFd::new(std::io::stdin()).unwrap();
+        let stdin        = AsyncFd::new(std::io::stdin()).unwrap();
+        let mut sigwinch = signal(SignalKind::window_change()).unwrap();
 
         select! {
             stdin_ready = stdin.readable() => {
                 self.read_keys().await;
                 stdin_ready.unwrap().clear_ready();
             }
+            sigwinch_ready = sigwinch.recv() => {
+                if sigwinch_ready.is_some() {
+                    self.read_keys().await;
+                }
+            }
         }
     }
 
     async fn read_keys(&mut self) {
-        while let Some(_) = ncurses::get_wch() {
-            // FIXME
+        while let Some(wch) = ncurses::get_wch() {
+            match wch {
+                ncurses::WchResult::KeyCode(ncurses::KEY_RESIZE) => {
+                    panic!("FIXME: Window resized but I dunno what to do!");
+                }
+                _ => {
+                    // FIXME
+                }
+            }
         }
     }
 }
