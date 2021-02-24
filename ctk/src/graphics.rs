@@ -68,7 +68,7 @@ impl Graphics {
             }
         }
 
-        old == new
+        old != new
     }
 
     fn drop_pad(&mut self) {

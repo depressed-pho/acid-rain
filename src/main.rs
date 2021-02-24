@@ -118,4 +118,5 @@ async fn ctk_title() {
 
     let mut tk = ctk::Ctk::initiate(layout).unwrap();
     tk.step().await;
+    tk.step().await;
 }

@@ -155,14 +155,7 @@ impl Ctk {
      * and handles input events.
      */
     pub async fn step(&mut self) {
-        self.root.validate();
-        self.root.paint();
-        self.root.refresh(&self.root, Point::zero());
-
-        // ncurses::doupdate() may block if stdout is blocked.
-        task::spawn_blocking(|| {
-            check(ncurses::doupdate()).unwrap()
-        }).await.unwrap();
+        self.update_graphics().await;
 
         /* ncurses::getch() by default performs a blocking read on
          * stdin. In order to integrate it with our asynchronous
@@ -185,11 +178,25 @@ impl Ctk {
         }
     }
 
+    async fn update_graphics(&mut self) {
+        self.root.validate();
+        self.root.paint();
+        self.root.refresh(&self.root, Point::zero());
+
+        // ncurses::doupdate() may block if stdout is blocked.
+        task::spawn_blocking(|| {
+            check(ncurses::doupdate()).unwrap()
+        }).await.unwrap();
+    }
+
     async fn read_keys(&mut self) {
         while let Some(wch) = ncurses::get_wch() {
             match wch {
                 ncurses::WchResult::KeyCode(ncurses::KEY_RESIZE) => {
-                    panic!("FIXME: Window resized but I dunno what to do!");
+                    // Recursively resize all the windows by resizing
+                    // the root window.
+                    self.root.resize();
+                    self.update_graphics().await;
                 }
                 _ => {
                     // FIXME

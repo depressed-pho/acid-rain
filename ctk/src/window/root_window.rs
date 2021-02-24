@@ -32,13 +32,7 @@ pub struct RootWindow {
 
 impl RootWindow {
     pub(crate) fn new(screen: ncurses::WINDOW, layout: RefCell<Box<dyn Layout>>) -> RootWindow {
-        let (mut width, mut height) = (0, 0);
-        ncurses::getmaxyx(screen, &mut height, &mut width);
-
-        let bounds = Rectangle {
-            pos: Point::zero(),
-            size: Dimension { width, height }
-        };
+        let bounds = Self::bounds_from_screen(screen);
 
         let mut graphics = Graphics::new();
         graphics.set_size(bounds.size);
@@ -50,6 +44,21 @@ impl RootWindow {
             layout,
             border: Box::new(NullBorder {}),
             dirty: true
+        }
+    }
+
+    pub(crate) fn resize(&mut self) {
+        self.set_bounds(
+            Self::bounds_from_screen(self.screen));
+    }
+
+    fn bounds_from_screen(screen: ncurses::WINDOW) -> Rectangle {
+        let (mut width, mut height) = (0, 0);
+        ncurses::getmaxyx(screen, &mut height, &mut width);
+
+        Rectangle {
+            pos: Point::zero(),
+            size: Dimension { width, height }
         }
     }
 }
