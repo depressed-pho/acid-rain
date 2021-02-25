@@ -19,8 +19,7 @@ lazy_static! {
         LengthRequirements::at_most(i16::max_value() as i32);
 }
 
-/** A spring whose requirements are fixed at the instantiation time.
- */
+/// A spring whose requirements are fixed at the instantiation time.
 #[derive(Clone, Debug)]
 pub struct StaticSpring {
     reqs: LengthRequirements,
@@ -55,10 +54,9 @@ impl SpringImpl for StaticSpring {
     }
 }
 
-/** A spring whose requirements and length are defined by that of a
- * supplied component. The spring keeps track of changes in the
- * component.
- */
+/// A spring whose requirements and length are defined by that of a
+/// supplied component. The spring keeps track of changes in the
+/// component.
 #[derive(Clone)]
 pub struct WidthSpring {
     of: Rc<RefCell<dyn Component>>,
@@ -100,10 +98,9 @@ impl SpringImpl for WidthSpring {
     }
 }
 
-/** A spring whose requirements and length are defined by that of a
- * supplied component. The spring keeps track of changes in the
- * component.
- */
+/// A spring whose requirements and length are defined by that of a
+/// supplied component. The spring keeps track of changes in the
+/// component.
 #[derive(Clone)]
 pub struct HeightSpring {
     of: Rc<RefCell<dyn Component>>,

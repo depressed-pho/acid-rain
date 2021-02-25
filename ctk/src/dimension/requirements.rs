@@ -111,10 +111,9 @@ pub(crate) fn checked_mul<T: Signed + Bounded + CheckedMul>(a: T, b: T) -> T {
     }
 }
 
-/** Combine two requirements. It follows the following law:
- *
- * ∀r:LengthRequirements. any() & r == r & any() == r
- */
+/// Combine two requirements. It follows the following law:
+///
+/// ∀r:LengthRequirements. any() & r == r & any() == r
 impl<T: Ord> BitAnd for LengthRequirements<T> {
     type Output = Self;
 
@@ -139,8 +138,7 @@ where LengthRequirements<T>: BitAnd<Output = LengthRequirements<T>> {
     }
 }
 
-/** Scalar addition.
- */
+/// Scalar addition.
 impl<T> Add<T> for LengthRequirements<T>
 where T: Add<Output = T> + Signed + Bounded + CheckedAdd + Copy {
     type Output = Self;
@@ -154,9 +152,8 @@ where T: Add<Output = T> + Signed + Bounded + CheckedAdd + Copy {
     }
 }
 
-/** Addition of two LengthRequirements is defined as
- * component-wise.
- */
+/// Addition of two LengthRequirements is defined as
+/// component-wise.
 impl<T> Add for LengthRequirements<T>
 where T: Add<Output = T> + Signed + Bounded + CheckedAdd + Copy {
     type Output = Self;
@@ -170,8 +167,7 @@ where T: Add<Output = T> + Signed + Bounded + CheckedAdd + Copy {
     }
 }
 
-/** Scalar multiplication.
- */
+/// Scalar multiplication.
 impl<T> Mul<T> for LengthRequirements<T>
 where T: Mul<Output = T> + Signed + Bounded + CheckedMul + Copy {
     type Output = Self;
@@ -185,10 +181,9 @@ where T: Mul<Output = T> + Signed + Bounded + CheckedMul + Copy {
     }
 }
 
-/** A LengthRequirements can be seen as a pair of intervals with a
- * single common point: the preferred length. The negation of an
- * interval [a, b] can be defined as [-b, -a] because a <= b.
- */
+/// A LengthRequirements can be seen as a pair of intervals with a
+/// single common point: the preferred length. The negation of an
+/// interval [a, b] can be defined as [-b, -a] because a <= b.
 impl<T> Neg for LengthRequirements<T> where T: Neg<Output = T> {
     type Output = Self;
 
@@ -201,9 +196,8 @@ impl<T> Neg for LengthRequirements<T> where T: Neg<Output = T> {
     }
 }
 
-/** Addition of SizeRequirements and Dimension is defined as
- * component-wise.
- */
+/// Addition of SizeRequirements and Dimension is defined as
+/// component-wise.
 impl<T> Add<Dimension<T>> for SizeRequirements<T>
 where LengthRequirements<T>: Add<T, Output = LengthRequirements<T>> {
     type Output = Self;
@@ -216,9 +210,8 @@ where LengthRequirements<T>: Add<T, Output = LengthRequirements<T>> {
     }
 }
 
-/** Addition of SizeRequirements and Insets is defined as
- * component-wise.
- */
+/// Addition of SizeRequirements and Insets is defined as
+/// component-wise.
 impl<T> Add<Insets<T>> for SizeRequirements<T>
 where LengthRequirements<T>: Add<T, Output = LengthRequirements<T>> {
     type Output = Self;
@@ -231,9 +224,8 @@ where LengthRequirements<T>: Add<T, Output = LengthRequirements<T>> {
     }
 }
 
-/** Multiplication of SizeRequirements and Dimension is defined as
- * component-wise. It's not like a matrix.
- */
+/// Multiplication of SizeRequirements and Dimension is defined as
+/// component-wise. It's not like a matrix.
 impl<T> Mul<Dimension<T>> for SizeRequirements<T>
 where LengthRequirements<T>: Mul<T, Output = LengthRequirements<T>> {
     type Output = Self;

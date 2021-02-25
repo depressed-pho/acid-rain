@@ -1,4 +1,4 @@
-mod grid_layout;
+pub mod grid_layout;
 pub use grid_layout::GridLayout;
 
 pub mod group_layout;
@@ -16,30 +16,29 @@ use crate::{
 };
 use crate::dimension::SizeRequirements;
 
-/** Layout manager is responsible for laying out sub-components in a
- * container component.
- *
- * Note that layout managers generally cannot be safely shared by
- * multiple components. It is therefore not a good idea to wrap them
- * in cloneable smart pointers such as Rc.
- */
+/// Layout manager is responsible for laying out sub-components in a
+/// container component.
+///
+/// Note that layout managers generally cannot be safely shared by
+/// multiple components. It is therefore not a good idea to wrap them
+/// in cloneable smart pointers such as Rc.
 pub trait Layout: Debug {
-    /** Do laying out sub-components if the layout manager is invalid.
-     *
-     * The argument "parent" is the parent component which owns this
-     * layout manager.
-     *
-     * A layout manager is said to be invalid if it has any
-     * sub-component which needs to be moved or resized. Adding or
-     * removing a sub-component must always invalidate the layout
-     * manager, and also it must become invalid if the method
-     * invalidate() is invoked. The latter case typically happens when
-     * the parent component is somehow resized.
-     *
-     * Note that sub-components may also be containers themselves so
-     * layout managers must call validate() on each of them,
-     * regardless of whether the layout manager is itself invalid.
-     */
+    /// Do laying out sub-components if the layout manager is invalid.
+    ///
+    /// The argument `parent` is the parent component which owns this
+    /// layout manager.
+    ///
+    /// A layout manager is said to be invalid if it has any
+    /// sub-component which needs to be moved or resized. Adding or
+    /// removing a sub-component must always invalidate the layout
+    /// manager, and also it must become invalid if the method
+    /// [Layout::invalidate()] is invoked. The latter case typically
+    /// happens when the parent component is somehow resized.
+    ///
+    /// Note that sub-components may also be containers themselves so
+    /// layout managers must call [Component::validate()] on each of
+    /// them, regardless of whether the layout manager is itself
+    /// invalid.
     fn validate(&mut self, parent: &dyn Component);
     fn invalidate(&mut self);
 

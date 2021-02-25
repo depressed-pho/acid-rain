@@ -14,10 +14,9 @@ use crate::dimension::{
 use num::Zero;
 use std::cell::RefCell;
 
-/** The root window is a special window which covers the entire
- * terminal screen. Its position is fixed to (0, 0), and its size can
- * only be changed by changing the terminal size itself.
- */
+/// The root window is a special window which covers the entire
+/// terminal screen. Its position is fixed to (0, 0), and its size can
+/// only be changed by changing the terminal size itself.
 #[derive(Debug)]
 pub struct RootWindow {
     screen: ncurses::WINDOW,
@@ -92,8 +91,7 @@ impl Component for RootWindow {
         self.bounds
     }
 
-    /** For internal use only. User code must not invoke this.
-     */
+    /// For internal use only. User code must not invoke this.
     fn set_bounds(&mut self, b: Rectangle) {
         self.bounds = b;
         self.layout.borrow_mut().invalidate();

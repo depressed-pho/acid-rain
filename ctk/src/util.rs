@@ -12,9 +12,8 @@ use std::convert::TryInto;
 use std::io;
 use unicode_width::UnicodeWidthStr;
 
-/** Check if a result code from pancurses functions indicates a
- * success or a failure.
- */
+/// Check if a result code from ncurses functions indicates a success
+/// or a failure.
 pub(crate) fn check(r: i32) -> Result<(), ()> {
     if r == ncurses::ERR {
         Err(())

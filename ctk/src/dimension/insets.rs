@@ -1,15 +1,14 @@
 use num::Zero;
 use std::ops::Add;
 
-/** An Insets object is a representation of the borders of a
- * container. It specifies the space that a container must leave at
- * each of its edges. The space can be a border, a blank space, or a
- * title.
- *
- * Insets are like "padding" in CSS. That is, the space reserved for
- * insets is included in the size of the component. There is no CSS
- * "margin" equivalent in Ctk.
- */
+/// An Insets object is a representation of the borders of a
+/// container. It specifies the space that a container must leave at
+/// each of its edges. The space can be a border, a blank space, or a
+/// title.
+///
+/// Insets are like `padding` in CSS. That is, the space reserved for
+/// insets is included in the size of the component. There is no CSS
+/// `margin` equivalent in Ctk.
 #[derive(Eq, PartialEq, Clone, Copy, Hash, Debug)]
 pub struct Insets<T = i32> {
     pub bottom: T,
@@ -42,8 +41,7 @@ impl<T> Default for Insets<T> where T: Zero {
     }
 }
 
-/** Addition of two insets is defined as component-wise.
- */
+/// Addition of two insets is defined as component-wise.
 impl<T> Add for Insets<T> where T: Add<Output = T> {
     type Output = Self;
 

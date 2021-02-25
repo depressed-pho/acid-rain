@@ -6,10 +6,9 @@ use crate::dimension::{
 use num::Zero;
 use std::ops::{Add, Sub};
 
-/** A Rectangle specifies an area in a coordinate space that is
- * enclosed by the Rectangle object's upper-left point (x,y) in the
- * coordinate space, its width, and its height.
- */
+/// A Rectangle specifies an area in a coordinate space that is
+/// enclosed by the Rectangle object's upper-left point (x,y) in the
+/// coordinate space, its width, and its height.
 #[derive(Eq, PartialEq, Clone, Copy, Hash, Debug)]
 pub struct Rectangle<T = i32> {
     pub pos: Point<T>,

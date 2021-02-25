@@ -88,13 +88,12 @@ impl SpringLayout {
         self
     }
 
-    /** Return the Constraints object associated with a given
-     * Component, or panics if no such Component has been added to this
-     * SpringLayout.
-     *
-     * This method is unsafe because callers can accidentally create
-     * cycles in springs.
-     */
+    /// Return the Constraints object associated with a given
+    /// Component, or panics if no such Component has been added to this
+    /// SpringLayout.
+    ///
+    /// This method is unsafe because callers can accidentally create
+    /// cycles in springs.
     unsafe fn get_constraints(&self, of: EdgesOf) -> Rc<RefCell<Constraints>> {
         match &of {
             EdgesOf::Parent   => Some(self.parent_constr.clone()),
@@ -103,21 +102,19 @@ impl SpringLayout {
         .unwrap_or_else(|| panic!("No such component exists: {:#?}", of))
     }
 
-    /** Return the spring controlling the specified edge of a
-     * component. This method, instead of returning the current
-     * binding for the edge, returns a proxy that tracks the
-     * characteristics of the edge even if the edge is subsequently
-     * rebound.
-     */
+    /// Return the spring controlling the specified edge of a
+    /// component. This method, instead of returning the current
+    /// binding for the edge, returns a proxy that tracks the
+    /// characteristics of the edge even if the edge is subsequently
+    /// rebound.
     pub fn get_spring(&self, edge: Edge, of: EdgesOf) -> Spring {
         let cc = unsafe { self.get_constraints(of.clone()) };
         SpringProxy::new(edge, of, cc)
     }
 
-    /** Set a spring controlling the specified edge of a child
-     * component. This method panics if setting the given spring would
-     * create a cycle.
-     */
+    /// Set a spring controlling the specified edge of a child
+    /// component. This method panics if setting the given spring would
+    /// create a cycle.
     pub fn set_spring(&mut self, edge: Edge, of: EdgesOf, s: Spring) -> &mut Self {
         let cc = unsafe { self.get_constraints(of.clone()) };
         cc.borrow_mut().set_spring(edge, Some(s.clone()));

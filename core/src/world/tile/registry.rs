@@ -18,9 +18,8 @@ pub fn get_tile_registry_mut<'a>() -> RwLockWriteGuard<'a, TileRegistry> {
     REGISTRY.write().unwrap()
 }
 
-/** The tile registry is a singleton that contains immutable Tile
- * objects.
- */
+/// The tile registry is a singleton that contains immutable Tile
+/// objects.
 #[derive(Debug)]
 pub struct TileRegistry {
     tiles: HashMap<Arc<str>, Arc<dyn Tile>>

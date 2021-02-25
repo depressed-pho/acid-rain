@@ -22,10 +22,9 @@ pub struct GridLayout {
 }
 
 impl GridLayout {
-    /** Construct a GridLayout object with all parameters set to
-     * zero. At least one of rows and cols has to be set to non-zero
-     * before using. hgap and vgap are both optional.
-     */
+    /// Construct a GridLayout object with all parameters set to
+    /// zero. At least one of rows and cols has to be set to non-zero
+    /// before using. hgap and vgap are both optional.
     pub fn new() -> GridLayout {
         GridLayout {
             cells: Dimension::zero(),
@@ -174,15 +173,14 @@ impl Layout for GridLayout {
         Box::new(self.components.iter())
     }
 
-    /** Determine the minimum, maximum, and the preferred size of the
-     * container.
-     *
-     * The minimum width of a grid layout is the largest minimum width
-     * of all of the components in the container times the number of
-     * columns, plus the left and right insets of the parent
-     * component. The remaining parts of the requirements are computed
-     * all similarly.
-     */
+    /// Determine the minimum, maximum, and the preferred size of the
+    /// container.
+    ///
+    /// The minimum width of a grid layout is the largest minimum width
+    /// of all of the components in the container times the number of
+    /// columns, plus the left and right insets of the parent
+    /// component. The remaining parts of the requirements are computed
+    /// all similarly.
     fn get_size_requirements(&self, parent: &dyn Component) -> SizeRequirements {
         let n_cells   = self.num_cells();
         let insets    = parent.get_insets();

@@ -38,8 +38,7 @@ pub(crate) struct Constraints {
 }
 
 impl Constraints {
-    /** Create an empty constraints object.
-     */
+    /// Create an empty constraints object.
     pub(crate) fn new() -> Self {
         Constraints {
             explicit:   FixedMap::new(),

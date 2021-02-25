@@ -66,9 +66,8 @@ pub struct Ctk {
 }
 
 impl Ctk {
-    /** Create an instance of Ctk. At most one instance can
-     * exist. Violating this would return an error.
-     */
+    /// Create an instance of Ctk. At most one instance can
+    /// exist. Violating this would return an error.
     pub fn initiate(layout: RefCell<Box<dyn Layout>>) -> Result<Ctk, ()> {
         {
             let mut initialized = INITIALIZED.lock().unwrap();
@@ -144,16 +143,15 @@ impl Ctk {
         Ok(tk)
     }
 
-    /** endwin(3) does not shutdown ncurses, which is why this method
-     * borrows self instead of taking ownership. */
+    /// endwin(3) does not shutdown ncurses, which is why this method
+    /// borrows self instead of taking ownership. */
     pub(crate) fn end(&mut self) -> Result<(), ()> {
         check(ncurses::endwin())
     }
 
-    /** Ctk provides no main loop. Users are expected to call step()
-     * in their own loop which asynchronously updates the terminal
-     * and handles input events.
-     */
+    /// Ctk provides no main loop. Users are expected to call step()
+    /// in their own loop which asynchronously updates the terminal
+    /// and handles input events.
     pub async fn step(&mut self) {
         self.update_graphics().await;
 

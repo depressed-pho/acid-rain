@@ -8,8 +8,7 @@ use crate::dimension::{
 use std::cell::RefCell;
 use std::rc::Rc;
 
-/** This layout manager is not finished, and will probably never be.
- */
+/// This layout manager is not finished, and will probably never be.
 #[derive(Debug)]
 pub struct GroupLayout {
     auto_create_gaps: bool,

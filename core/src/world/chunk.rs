@@ -10,9 +10,8 @@ use palette::{ChunkPalette, TileIndex};
 use crate::world::tile::state::{TileState, TileStateValue};
 use std::sync::Arc;
 
-/** Unlike Minecraft our chunks are only two blocks tall so we can use
- * a larger chunk size than 16*16.
- */
+/// Unlike Minecraft our chunks are only two blocks tall so we can use
+/// a larger chunk size than 16*16.
 pub const CHUNK_SIZE: usize = 32;
 pub const CHUNK_HEIGHT: usize = 2;
 
@@ -22,9 +21,8 @@ pub struct Chunk {
 }
 
 impl Chunk {
-    /** Create a chunk filled with a single specific tile which is
-     * usually acid-rain:air.
-     */
+    /// Create a chunk filled with a single specific tile which is
+    /// usually `acid-rain:air`.
     pub fn new(palette: &Arc<ChunkPalette>, fill: &TileState) -> Chunk {
         let its = IndexedTileState::from_ts(palette, fill);
         Chunk {
@@ -34,10 +32,9 @@ impl Chunk {
     }
 }
 
-/** This is a variant of TileState which has TileIndex instead of Tile
- * itself. This representation is used both on disk and in memory
- * chunk data to save space.
- */
+/// This is a variant of TileState which has TileIndex instead of Tile
+/// itself. This representation is used both on disk and in memory
+/// chunk data to save space.
 #[derive(Copy, Clone, Debug)]
 struct IndexedTileState {
     index: TileIndex,

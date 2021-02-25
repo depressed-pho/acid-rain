@@ -16,9 +16,8 @@ use unicode_width::UnicodeWidthChar;
 
 #[derive(Debug)]
 pub struct Graphics {
-    /** The pad is initially non-existent. It is created when the area
-     * of the graphics context becomes non-zero.
-     */
+    /// The pad is initially non-existent. It is created when the area
+    /// of the graphics context becomes non-zero.
     pad: Option<ncurses::WINDOW>,
     size: Dimension
 }
@@ -38,9 +37,8 @@ impl Graphics {
         self.size
     }
 
-    /** Resize the graphics context. Returns true iff the size has
-     * changed from the previous state.
-     */
+    /// Resize the graphics context. Returns true iff the size has
+    /// changed from the previous state.
     pub fn set_size(&mut self, new: Dimension) -> bool {
         let old = self.size;
         self.size = new;
@@ -78,9 +76,8 @@ impl Graphics {
         }
     }
 
-    /** Copy the content of the graphics context to the curses
-     * screen.
-     */
+    /// Copy the content of the graphics context to the curses
+    /// screen.
     pub fn refresh(&self, root: &RootWindow, pos: Point) {
         if let Some(w) = self.pad {
             let scr     = root.get_size();

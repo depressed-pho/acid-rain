@@ -3,9 +3,8 @@ use num::Zero;
 use std::convert::From;
 use std::ops::{Add, Sub, Mul, Div};
 
-/** The Dimension class encapsulates the width and height of a
- * component (in integer precision) in a single struct.
- */
+/// The Dimension class encapsulates the width and height of a
+/// component (in integer precision) in a single struct.
 #[derive(Eq, PartialEq, Clone, Copy, Hash, Debug)]
 pub struct Dimension<T = i32> {
     pub width: T,
@@ -44,8 +43,7 @@ impl<T> Default for Dimension<T> where T: Zero {
     }
 }
 
-/** Addition of two dimensions is defined as component-wise.
- */
+/// Addition of two dimensions is defined as component-wise.
 impl<T> Add for Dimension<T> where T: Add<Output = T> {
     type Output = Self;
 
@@ -57,9 +55,8 @@ impl<T> Add for Dimension<T> where T: Add<Output = T> {
     }
 }
 
-/** Scalar multiplication. Not general at all. See also
- * https://github.com/rust-lang/rfcs/issues/2608
- */
+/// Scalar multiplication. Not general at all. See also
+/// https://github.com/rust-lang/rfcs/issues/2608
 impl<T> Mul<T> for Dimension<T> where T: Mul<Output = T> + Copy {
     type Output = Self;
 
@@ -78,9 +75,8 @@ impl Mul<Dimension<i32>> for i32 {
     }
 }
 
-/** Multiplication of two dimensions is defined as
- * component-wise. It's not like a matrix.
- */
+/// Multiplication of two dimensions is defined as
+/// component-wise. It's not like a matrix.
 impl<T> Mul for Dimension<T> where T: Mul<Output = T> {
     type Output = Self;
 
@@ -92,8 +88,7 @@ impl<T> Mul for Dimension<T> where T: Mul<Output = T> {
     }
 }
 
-/** Scalar subtraction.
- */
+/// Scalar subtraction.
 impl<T> Sub<T> for Dimension<T> where T: Sub<Output = T> + Copy {
     type Output = Self;
 
@@ -105,7 +100,7 @@ impl<T> Sub<T> for Dimension<T> where T: Sub<Output = T> + Copy {
     }
 }
 
-/** Subtraction of two dimensions is defined as component-wise. */
+/// Subtraction of two dimensions is defined as component-wise.
 impl<T> Sub for Dimension<T> where T: Sub<Output = T> {
     type Output = Self;
 
@@ -117,7 +112,7 @@ impl<T> Sub for Dimension<T> where T: Sub<Output = T> {
     }
 }
 
-/** Scalar division. */
+/// Scalar division.
 impl<T> Div<T> for Dimension<T> where T: Div<Output = T> + Copy {
     type Output = Self;
 
@@ -129,7 +124,7 @@ impl<T> Div<T> for Dimension<T> where T: Div<Output = T> + Copy {
     }
 }
 
-/** Division of two dimensions is defined as component-wise. */
+/// Division of two dimensions is defined as component-wise.
 impl<T> Div for Dimension<T> where T: Div<Output = T> {
     type Output = Self;
 

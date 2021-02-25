@@ -4,17 +4,16 @@ use std::sync::Arc;
 
 pub type TileIndex = u32;
 
-/** A chunk palette is a bidirectional map between tile ID from/to
- * numerical tile index. It
- * is used for compressing chunk data both in memory and on disk. The
- * same palette is shared between all the chunks in a world.
- *
- * A palette saved on disk may contain tiles that no longer
- * exist. When we load a palette and find some tiles are missing, we
- * display a warning about that. And when we load a chunk which
- * contains missing tiles, we replace them with acid-rain:air or
- * something equivalently convincing.
- */
+/// A chunk palette is a bidirectional map between tile ID from/to
+/// numerical tile index. It
+/// is used for compressing chunk data both in memory and on disk. The
+/// same palette is shared between all the chunks in a world.
+///
+/// A palette saved on disk may contain tiles that no longer
+/// exist. When we load a palette and find some tiles are missing, we
+/// display a warning about that. And when we load a chunk which
+/// contains missing tiles, we replace them with acid-rain:air or
+/// something equivalently convincing.
 #[derive(Debug)]
 pub struct ChunkPalette {
     index_of_: HashMap<Arc<str>, TileIndex>,
@@ -29,9 +28,8 @@ impl ChunkPalette {
         }
     }
 
-    /** Insert a tile ID to the palette. Inserting the same ID twice
-     * is not an error. It's just ignored.
-     */
+    /// Insert a tile ID to the palette. Inserting the same ID twice
+    /// is not an error. It's just ignored.
     pub fn insert<K: Borrow<str>>(&mut self, id: K) {
         if !self.index_of_.contains_key(id.borrow()) {
             let arc_id = Arc::from(id.borrow());

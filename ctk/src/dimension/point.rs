@@ -3,9 +3,8 @@ use num::Zero;
 use std::convert::From;
 use std::ops::Add;
 
-/** A point representing a location in (x, y) coordinate space,
- * specified in integer precision.
- */
+/// A point representing a location in (x, y) coordinate space,
+/// specified in integer precision.
 #[derive(Eq, PartialEq, Clone, Copy, Hash, Debug)]
 pub struct Point<T = i32> {
     pub x: T,
@@ -37,8 +36,7 @@ impl<T> From<Rectangle<T>> for Point<T> {
     }
 }
 
-/** Addition of two points is defined as component-wise.
- */
+/// Addition of two points is defined as component-wise.
 impl<T> Add for Point<T> where T: Add<Output = T> {
     type Output = Self;
 
