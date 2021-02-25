@@ -1,4 +1,4 @@
-use rain_core::world::tile::{Tile, get_tile_registry_mut};
+use rain_core::world::tile::{Tile, TileRegistry};
 use std::sync::Arc;
 
 #[derive(Debug)]
@@ -9,8 +9,6 @@ impl Tile for Dirt {
     }
 }
 
-pub fn load_tiles() {
-    let mut reg = get_tile_registry_mut();
-
-    (*reg).register(Arc::new(Dirt {})).unwrap();
+pub fn load_tiles(reg: &mut TileRegistry) {
+    reg.register(Arc::new(Dirt {})).unwrap();
 }

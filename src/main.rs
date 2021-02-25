@@ -1,10 +1,6 @@
 #![allow(dead_code)]
 
-use rain_builtin::loader::BuiltinModuleLoader;
-use rain_core::module::loader::ModuleLoader;
-use rain_core::world::chunk::{ChunkManager, ChunkPos};
 use rain_client::tui::view::world::WorldView;
-use rain_server::world::chunk::manager::ServerChunkManager;
 
 use clap::{/*Arg, */ArgMatches, *}; // "*" because its macros don't support the use syntax yet.
 use ctk::{
@@ -33,13 +29,7 @@ async fn main() {
 
     let _matches = opt_matches();
 
-    let _w = rain_core::world::World::new();
-
-    let mut btl = BuiltinModuleLoader::new();
-    btl.load_tiles();
-
-    let scm = ServerChunkManager::new();
-    let _chunk = scm.get(ChunkPos::default()).await;
+    let _w = rain_server::world::LocalWorld::new();
 
     //ctk_main().await;
     ctk_title().await;

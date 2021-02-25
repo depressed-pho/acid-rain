@@ -1,32 +1,19 @@
 use crate::world::tile::*;
-use lazy_static::lazy_static;
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-lazy_static! {
-    static ref REGISTRY: RwLock<TileRegistry> = RwLock::new(TileRegistry::new());
-}
-
-pub fn get_tile_registry<'a>() -> RwLockReadGuard<'a, TileRegistry> {
-    REGISTRY.read().unwrap()
-}
-
-pub fn get_tile_registry_mut<'a>() -> RwLockWriteGuard<'a, TileRegistry> {
-    REGISTRY.write().unwrap()
-}
-
-/// The tile registry is a singleton that contains immutable Tile
-/// objects.
+/// The tile registry is struct that contains immutable Tile
+/// objects. It is constructed while loading a world, and becomes
+/// immutable afterwards.
 #[derive(Debug)]
 pub struct TileRegistry {
     tiles: HashMap<Arc<str>, Arc<dyn Tile>>
 }
 
 impl TileRegistry {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             tiles: HashMap::new()
         }

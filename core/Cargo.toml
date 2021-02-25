@@ -14,7 +14,6 @@ repository = "https://github.com/depressed-pho/acid-rain.git"
 
 [dependencies]
 async-trait = "^0.1"
-lazy_static = "^1.4"
 num = "^0.2"
 
 [badges]

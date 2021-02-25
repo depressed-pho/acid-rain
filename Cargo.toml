@@ -16,7 +16,6 @@ readme = "README.md"
 [dependencies]
 clap = "^2.33"
 ctk = { path = "ctk" }
-rain_builtin = { path = "builtin", package = "acid-rain-builtin" }
 rain_client = { path = "client", package = "acid-rain-client" }
 rain_core = { path = "core", package = "acid-rain-core" }
 rain_server = { path = "server", package = "acid-rain-server" }

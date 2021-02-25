@@ -14,6 +14,7 @@ repository = "https://github.com/depressed-pho/acid-rain.git"
 
 [dependencies]
 async-trait = "^0.1"
+rain_builtin = { path = "../builtin", package = "acid-rain-builtin" }
 rain-core = { path = "../core", package = "acid-rain-core" }
 
 [badges]

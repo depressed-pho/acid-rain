@@ -14,6 +14,9 @@ pub type TileIndex = u32;
 /// display a warning about that. And when we load a chunk which
 /// contains missing tiles, we replace them with acid-rain:air or
 /// something equivalently convincing.
+///
+/// A palette is constructed while loading a world, and becomes
+/// immutable afterwards.
 #[derive(Debug)]
 pub struct ChunkPalette {
     index_of_: HashMap<Arc<str>, TileIndex>,
