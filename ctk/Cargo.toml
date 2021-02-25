@@ -5,8 +5,8 @@ version = "0.1.0"
 authors = ["PHO <pho at cielonegro dot org>"]
 edition = "2018"
 
-description = "CUI toolkit roughly resembling Swing"
-keywords = ["cui"]
+description = "TUI toolkit roughly resembling Swing"
+keywords = ["tui"]
 license = "CC0-1.0"
 
 homepage = "https://github.com/depressed-pho/acid-rain/ctk"

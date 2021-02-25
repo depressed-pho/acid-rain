@@ -1,15 +1,11 @@
 #![allow(dead_code)]
 
-pub mod builtin;
-pub mod gui;
-pub mod module;
-pub mod world;
-
-use crate::module::loader::ModuleLoader;
-use crate::world::chunk::Chunk;
-use crate::world::chunk::palette::ChunkPalette;
-use crate::world::tile::{ArcTile, get_tile_registry};
-use crate::gui::view::world::WorldView;
+use builtin::loader::BuiltinModuleLoader;
+use core::module::loader::ModuleLoader;
+use core::world::chunk::Chunk;
+use core::world::chunk::palette::ChunkPalette;
+use core::world::tile::{ArcTile, get_tile_registry};
+use client::tui::view::world::WorldView;
 
 use clap::{/*Arg, */ArgMatches, *}; // "*" because its macros don't support the use syntax yet.
 use ctk::{
@@ -37,9 +33,9 @@ fn main() {
 
     let _matches = opt_matches();
 
-    let _w = world::World::new();
+    let _w = core::world::World::new();
 
-    let mut btl = builtin::loader::BuiltinModuleLoader::new();
+    let mut btl = BuiltinModuleLoader::new();
     btl.load_tiles();
 
     let mut palette = ChunkPalette::new();

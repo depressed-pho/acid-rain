@@ -1,7 +1,7 @@
 mod tile;
 use tile::load_tiles;
 
-use crate::module::loader::ModuleLoader;
+use core::module::loader::ModuleLoader;
 
 pub struct BuiltinModuleLoader {}
 

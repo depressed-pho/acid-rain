@@ -4,10 +4,33 @@
 name = "acid-rain"
 version = "0.1.0"
 dependencies = [
+ "acid-rain-builtin 0.1.0",
+ "acid-rain-client 0.1.0",
+ "acid-rain-core 0.1.0",
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ctk 0.1.0",
- "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "acid-rain-builtin"
+version = "0.1.0"
+dependencies = [
+ "acid-rain-core 0.1.0",
+]
+
+[[package]]
+name = "acid-rain-client"
+version = "0.1.0"
+dependencies = [
+ "ctk 0.1.0",
+]
+
+[[package]]
+name = "acid-rain-core"
+version = "0.1.0"
+dependencies = [
+ "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

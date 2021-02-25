@@ -1,0 +1,19 @@
+[package]
+name = "acid-rain-builtin"
+version = "0.1.0"
+
+authors = ["PHO <pho at cielonegro dot org>"]
+edition = "2018"
+
+description = "Built-in assets of Acid Rain"
+keywords = ["game"]
+license = "CC0-1.0"
+
+homepage = "https://github.com/depressed-pho/acid-rain"
+repository = "https://github.com/depressed-pho/acid-rain.git"
+
+[dependencies]
+core = { path = "../core", package = "acid-rain-core" }
+
+[badges]
+maintenance = { status = "experimental" }

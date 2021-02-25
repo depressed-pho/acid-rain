@@ -1,4 +1,4 @@
-use crate::world::tile::{Tile, get_tile_registry_mut};
+use core::world::tile::{Tile, get_tile_registry_mut};
 use std::sync::Arc;
 
 #[derive(Debug)]

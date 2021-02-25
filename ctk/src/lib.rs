@@ -161,6 +161,11 @@ impl Ctk {
          * stdin. In order to integrate it with our asynchronous
          * world, we poll stdin and SIGWINCH until they get any
          * inputs, then call getch() in a non-blocking mode.
+         *
+         * Note that tokio::signal replaces the signal handler
+         * installed by ncurses. This is okay because its backend
+         * signal-hook-registry retains the old handler ahd invokes it
+         * for us when a signal arrives.
          */
         let stdin        = AsyncFd::new(std::io::stdin()).unwrap();
         let mut sigwinch = signal(SignalKind::window_change()).unwrap();
