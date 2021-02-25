@@ -13,7 +13,7 @@ homepage = "https://github.com/depressed-pho/acid-rain"
 repository = "https://github.com/depressed-pho/acid-rain.git"
 
 [dependencies]
-core = { path = "../core", package = "acid-rain-core" }
+rain_core = { path = "../core", package = "acid-rain-core" }
 
 [badges]
 maintenance = { status = "experimental" }

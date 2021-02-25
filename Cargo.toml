@@ -14,12 +14,13 @@ repository = "https://github.com/depressed-pho/acid-rain.git"
 readme = "README.md"
 
 [dependencies]
-builtin = { path = "builtin", package = "acid-rain-builtin" }
-client = { path = "client", package = "acid-rain-client" }
-core = { path = "core", package = "acid-rain-core" }
-clap = "~2.33"
+clap = "^2.33"
 ctk = { path = "ctk" }
-tokio = { version = "~1.2", features = ["macros", "rt-multi-thread"] }
+rain_builtin = { path = "builtin", package = "acid-rain-builtin" }
+rain_client = { path = "client", package = "acid-rain-client" }
+rain_core = { path = "core", package = "acid-rain-core" }
+rain_server = { path = "server", package = "acid-rain-server" }
+tokio = { version = "^1.2", features = ["macros", "rt-multi-thread"] }
 
 [workspace]
 members = ["builtin", "client", "ctk", "core"]

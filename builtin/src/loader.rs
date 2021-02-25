@@ -1,7 +1,7 @@
 mod tile;
 use tile::load_tiles;
 
-use core::module::loader::ModuleLoader;
+use rain_core::module::loader::ModuleLoader;
 
 pub struct BuiltinModuleLoader {}
 

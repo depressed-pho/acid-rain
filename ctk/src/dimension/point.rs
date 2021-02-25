@@ -14,7 +14,7 @@ pub struct Point<T = i32> {
 
 impl<T> Zero for Point<T> where T: Zero {
     fn zero() -> Self {
-        Point {
+        Self {
             x: T::zero(),
             y: T::zero()
         }

@@ -1,11 +1,10 @@
 #![allow(dead_code)]
 
-use builtin::loader::BuiltinModuleLoader;
-use core::module::loader::ModuleLoader;
-use core::world::chunk::Chunk;
-use core::world::chunk::palette::ChunkPalette;
-use core::world::tile::{ArcTile, get_tile_registry};
-use client::tui::view::world::WorldView;
+use rain_builtin::loader::BuiltinModuleLoader;
+use rain_core::module::loader::ModuleLoader;
+use rain_core::world::chunk::{ChunkManager, ChunkPos};
+use rain_client::tui::view::world::WorldView;
+use rain_server::world::chunk::manager::ServerChunkManager;
 
 use clap::{/*Arg, */ArgMatches, *}; // "*" because its macros don't support the use syntax yet.
 use ctk::{
@@ -28,29 +27,24 @@ fn opt_matches<'a>() -> ArgMatches<'a> {
         .get_matches()
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     ctk::install_default_panic_hook();
 
     let _matches = opt_matches();
 
-    let _w = core::world::World::new();
+    let _w = rain_core::world::World::new();
 
     let mut btl = BuiltinModuleLoader::new();
     btl.load_tiles();
 
-    let mut palette = ChunkPalette::new();
-    let reg = get_tile_registry();
-    let dirt = reg.get("acid-rain:dirt").unwrap();
-    let dirt_ts = dirt.default_state();
-    palette.insert(dirt.id());
-    let arc_palette = std::sync::Arc::new(palette);
-    let _chunk = Chunk::new(&arc_palette, &dirt_ts);
+    let scm = ServerChunkManager::new();
+    let _chunk = scm.get(ChunkPos::default()).await;
 
-    //ctk_main();
-    ctk_title();
+    //ctk_main().await;
+    ctk_title().await;
 }
 
-#[tokio::main]
 async fn ctk_main() {
     let layout = RefCell::new(Box::new(GridLayout::new()));
     layout.borrow_mut().set_cols(1);
@@ -62,7 +56,6 @@ async fn ctk_main() {
     tk.step().await;
 }
 
-#[tokio::main]
 async fn ctk_title() {
     let layout = RefCell::new(Box::new(GridLayout::new()));
     layout.borrow_mut().set_cols(1);

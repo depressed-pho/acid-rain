@@ -1,4 +1,8 @@
-pub mod manager;
+mod manager;
+pub use manager::*;
+
+mod position;
+pub use position::*;
 
 pub mod palette;
 use palette::{ChunkPalette, TileIndex};
@@ -9,8 +13,8 @@ use std::sync::Arc;
 /** Unlike Minecraft our chunks are only two blocks tall so we can use
  * a larger chunk size than 16*16.
  */
-const CHUNK_SIZE: usize = 32;
-const CHUNK_HEIGHT: usize = 2;
+pub const CHUNK_SIZE: usize = 32;
+pub const CHUNK_HEIGHT: usize = 2;
 
 pub struct Chunk {
     palette: Arc<ChunkPalette>,
