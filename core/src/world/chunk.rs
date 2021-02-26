@@ -8,6 +8,7 @@ pub mod palette;
 use palette::{ChunkPalette, TileIndex};
 
 use crate::world::tile::state::{TileState, TileStateValue};
+use std::fmt as fmt;
 use std::sync::Arc;
 
 /// Unlike Minecraft our chunks are only two blocks tall so we can use
@@ -29,6 +30,13 @@ impl Chunk {
             palette: palette.clone(),
             tiles: [its; CHUNK_SIZE * CHUNK_SIZE * CHUNK_HEIGHT]
         }
+    }
+}
+
+impl fmt::Debug for Chunk {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Chunk")
+         .finish()
     }
 }
 

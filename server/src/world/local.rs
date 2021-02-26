@@ -3,7 +3,6 @@ use rain_builtin::loader::BuiltinModuleLoader;
 use rain_core::module::loader::ModuleLoader;
 use rain_core::world::World;
 use rain_core::world::tile::TileRegistry;
-use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct LocalWorld {
@@ -18,7 +17,7 @@ impl LocalWorld {
         btl.load_tiles(&mut tiles);
 
         Self {
-            chunks: LocalChunkManager::new(Arc::new(tiles))
+            chunks: LocalChunkManager::new(tiles)
         }
     }
 }
