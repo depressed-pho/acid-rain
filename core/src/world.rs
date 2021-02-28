@@ -1,5 +1,7 @@
 pub mod chunk;
 pub mod tile;
+pub mod player;
+pub mod position;
 
 use std::fmt::Debug;
 

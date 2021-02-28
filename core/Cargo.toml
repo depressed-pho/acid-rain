@@ -15,6 +15,7 @@ repository = "https://github.com/depressed-pho/acid-rain.git"
 [dependencies]
 async-trait = "^0.1"
 num = "^0.2"
+uuid = { version = "^0.8", features = ["v4"] }
 
 [badges]
 maintenance = { status = "experimental" }
