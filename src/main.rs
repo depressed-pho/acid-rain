@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use rain_client::tui::view::world::WorldView;
+use rain_core::world::World;
 
 use clap::{/*Arg, */ArgMatches, *}; // "*" because its macros don't support the use syntax yet.
 use ctk::{
@@ -17,6 +18,7 @@ use ctk::layout::spring_layout::{
 };
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 
 fn opt_matches<'a>() -> ArgMatches<'a> {
     app_from_crate!()
@@ -29,17 +31,17 @@ async fn main() {
 
     let _matches = opt_matches();
 
-    let _w = rain_server::world::LocalWorld::new();
+    let world = Arc::new(RwLock::new(rain_server::world::LocalWorld::new()));
 
-    //ctk_main().await;
-    ctk_title().await;
+    ctk_main(world).await;
+    //ctk_title().await;
 }
 
-async fn ctk_main() {
+async fn ctk_main(world: Arc<RwLock<impl World + 'static>>) {
     let layout = RefCell::new(Box::new(GridLayout::new()));
     layout.borrow_mut().set_cols(1);
 
-    let view = Rc::new(RefCell::new(WorldView::new()));
+    let view = Rc::new(RefCell::new(WorldView::new(world)));
     layout.borrow_mut().add(view);
 
     let mut tk = ctk::Ctk::initiate(layout).unwrap();

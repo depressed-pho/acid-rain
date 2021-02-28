@@ -8,6 +8,8 @@ use rain_core::world::position::WorldPos;
 use std::collections::HashMap;
 use uuid::Uuid;
 
+/// Local world is a server-side world which is owned by a server. The
+/// server accesses the world data directly.
 #[derive(Debug)]
 pub struct LocalWorld {
     chunks: LocalChunkManager,

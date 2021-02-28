@@ -23,6 +23,7 @@ dependencies = [
 name = "acid-rain-client"
 version = "0.1.0"
 dependencies = [
+ "acid-rain-core",
  "ctk",
 ]
 

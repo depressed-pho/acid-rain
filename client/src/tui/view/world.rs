@@ -10,27 +10,31 @@ use ctk::dimension::{
     Rectangle,
     SizeRequirements
 };
+use rain_core::world::World;
+use std::sync::{Arc, RwLock};
 
 #[derive(Debug)]
-pub struct WorldView {
+pub struct WorldView<W: World> {
     graphics: Graphics,
     bounds: Rectangle,
     border: Box<dyn Border>,
-    dirty: bool
+    dirty: bool,
+    world: Arc<RwLock<W>>
 }
 
-impl WorldView {
-    pub fn new() -> Self {
+impl<W: World> WorldView<W> {
+    pub fn new(world: Arc<RwLock<W>>) -> Self {
         Self {
             graphics: Graphics::new(),
             bounds: Rectangle::default(),
             border: Box::new(NullBorder::default()),
-            dirty: true
+            dirty: true,
+            world
         }
     }
 }
 
-impl Component for WorldView {
+impl<W: World> Component for WorldView<W> {
     fn paint(&mut self) {
         if self.dirty {
             // FIXME
