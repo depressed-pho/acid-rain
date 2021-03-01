@@ -1,8 +1,5 @@
-pub mod alignment;
-pub use alignment::{
-    HorizontalAlignment,
-    VerticalAlignment
-};
+mod alignment;
+pub use alignment::*;
 
 pub mod border;
 pub use border::*;

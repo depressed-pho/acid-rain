@@ -19,6 +19,7 @@ use ctk::layout::spring_layout::{
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
+use uuid::Uuid;
 
 fn opt_matches<'a>() -> ArgMatches<'a> {
     app_from_crate!()
@@ -32,16 +33,17 @@ async fn main() {
     let _matches = opt_matches();
 
     let world = Arc::new(RwLock::new(rain_server::world::LocalWorld::new()));
+    let root_id = world.read().unwrap().get_root_player().uuid();
 
-    ctk_main(world).await;
+    ctk_main(world, root_id).await;
     //ctk_title().await;
 }
 
-async fn ctk_main(world: Arc<RwLock<impl World + 'static>>) {
+async fn ctk_main(world: Arc<RwLock<impl World + 'static>>, player: Uuid) {
     let layout = RefCell::new(Box::new(GridLayout::new()));
     layout.borrow_mut().set_cols(1);
 
-    let view = Rc::new(RefCell::new(WorldView::new(world)));
+    let view = Rc::new(RefCell::new(WorldView::new(world, player)));
     layout.borrow_mut().add(view);
 
     let mut tk = ctk::Ctk::initiate(layout).unwrap();

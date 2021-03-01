@@ -10,8 +10,11 @@ use ctk::dimension::{
     Rectangle,
     SizeRequirements
 };
+use ctk::graphics::Attribute;
+use num::Zero;
 use rain_core::world::World;
 use std::sync::{Arc, RwLock};
+use uuid::Uuid;
 
 #[derive(Debug)]
 pub struct WorldView<W: World> {
@@ -19,25 +22,53 @@ pub struct WorldView<W: World> {
     bounds: Rectangle,
     border: Box<dyn Border>,
     dirty: bool,
-    world: Arc<RwLock<W>>
+
+    world: Arc<RwLock<W>>,
+    /// The player to track.
+    player: Uuid,
+    /// The offset from the center of the component where the player
+    /// should be located.
+    player_offset: Point
 }
 
 impl<W: World> WorldView<W> {
-    pub fn new(world: Arc<RwLock<W>>) -> Self {
+    pub fn new(world: Arc<RwLock<W>>, player: Uuid) -> Self {
         Self {
             graphics: Graphics::new(),
             bounds: Rectangle::default(),
             border: Box::new(NullBorder::default()),
             dirty: true,
-            world
+            world,
+            player,
+            player_offset: Point::zero()
         }
+    }
+
+    fn draw_tiles(&mut self) {
+        // FIXME
+    }
+
+    fn draw_player(&mut self) {
+        let inner  = self.get_inner();
+        let center = Point {
+            x: inner.pos.x + (inner.size.width - 1) / 2,
+            y: inner.pos.y + (inner.size.height - 1) / 2
+        };
+        self.graphics.attr_on(Attribute::Bold.into());
+        self.graphics.draw_char('@', center + self.player_offset);
     }
 }
 
 impl<W: World> Component for WorldView<W> {
     fn paint(&mut self) {
         if self.dirty {
-            // FIXME
+            self.border.paint(&mut self.graphics);
+
+            let inner = self.get_inner();
+            self.graphics.clear_rect(inner);
+
+            self.draw_tiles();
+            self.draw_player();
         }
         self.dirty = true;
     }

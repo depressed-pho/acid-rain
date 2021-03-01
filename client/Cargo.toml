@@ -14,7 +14,9 @@ repository = "https://github.com/depressed-pho/acid-rain.git"
 
 [dependencies]
 ctk = { path = "../ctk" }
+num = "^0.2"
 rain-core = { path = "../core", package = "acid-rain-core" }
+uuid = "^0.8"
 
 [badges]
 maintenance = { status = "experimental" }

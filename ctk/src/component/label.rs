@@ -16,7 +16,6 @@ use crate::util::{
     smallest_area_to_draw_text,
     draw_aligned_text
 };
-use num::Zero;
 
 #[derive(Debug)]
 pub struct Label {
@@ -63,12 +62,7 @@ impl Component for Label {
         if self.dirty {
             self.border.paint(&mut self.graphics);
 
-            let insets = self.get_insets();
-            let inner  = Rectangle {
-                pos: Point::zero(),
-                size: self.get_size()
-            }.shrink(insets);
-
+            let inner = self.get_inner();
             self.graphics.clear_rect(inner);
 
             let ltr = true; // THINKME: hard-coded for now

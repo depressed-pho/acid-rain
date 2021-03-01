@@ -1,3 +1,6 @@
+pub mod attribute;
+pub use attribute::*;
+
 use crate::{
     Component,
     RootWindow,
@@ -104,6 +107,11 @@ impl Graphics {
         }
     }
 
+    pub fn draw_char(&mut self, c: char, p: Point) {
+        let mut buf = [0; 4];
+        self.draw_string(c.encode_utf8(&mut buf), p)
+    }
+
     pub fn draw_string(&mut self, s: &str, p: Point) {
         if let Some(w) = self.pad {
             // FIXME: s might contain newlines or any other control
@@ -160,6 +168,18 @@ impl Graphics {
              * Unicode symbols when crate::is_utf8_locale() returns
              * true. Or convince ncurses to translate them for us.
              */
+        }
+    }
+
+    pub fn attr_on(&mut self, attrs: AttrSet) {
+        if let Some(w) = self.pad {
+            check(ncurses::wattr_on(w, attrs.into())).unwrap();
+        }
+    }
+
+    pub fn attr_off(&mut self, attrs: AttrSet) {
+        if let Some(w) = self.pad {
+            check(ncurses::wattr_off(w, attrs.into())).unwrap();
         }
     }
 }

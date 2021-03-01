@@ -3,6 +3,7 @@ pub mod tile;
 pub mod player;
 pub mod position;
 
+use crate::world::player::Player;
 use std::fmt::Debug;
 
 /// There are several types of worlds:
@@ -18,4 +19,6 @@ use std::fmt::Debug;
 ///   server. The server and the client communicate on network.
 ///
 pub trait World : Debug {
+    /// Immutably borrow the root player in this world.
+    fn get_root_player(&self) -> &Player;
 }

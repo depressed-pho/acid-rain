@@ -20,6 +20,7 @@ rain_client = { path = "client", package = "acid-rain-client" }
 rain_core = { path = "core", package = "acid-rain-core" }
 rain_server = { path = "server", package = "acid-rain-server" }
 tokio = { version = "^1.2", features = ["macros", "rt-multi-thread"] }
+uuid = "^0.8"
 
 [workspace]
 members = ["builtin", "client", "ctk", "core"]

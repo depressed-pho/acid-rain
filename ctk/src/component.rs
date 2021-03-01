@@ -18,6 +18,7 @@ use crate::dimension::{
     Rectangle,
     SizeRequirements
 };
+use num::Zero;
 use std::fmt::Debug;
 
 pub trait Component: Debug {
@@ -93,5 +94,13 @@ pub trait Component: Debug {
     /// Returns the border's insets.
     fn get_insets(&self) -> Insets {
         self.get_border().get_insets()
+    }
+
+    /// Return the inner area inside the border.
+    fn get_inner(&self) -> Rectangle {
+        Rectangle {
+            pos: Point::zero(),
+            size: self.get_size()
+        }.shrink(self.get_insets())
     }
 }

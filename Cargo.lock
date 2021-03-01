@@ -10,6 +10,7 @@ dependencies = [
  "clap",
  "ctk",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -25,6 +26,8 @@ version = "0.1.0"
 dependencies = [
  "acid-rain-core",
  "ctk",
+ "num",
+ "uuid",
 ]
 
 [[package]]

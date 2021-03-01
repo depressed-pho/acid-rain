@@ -15,7 +15,8 @@ pub struct LocalWorld {
     chunks: LocalChunkManager,
     /// Players in the world. Invariant: there is exactly one root
     /// player.
-    players: HashMap<Uuid, Player>
+    players: HashMap<Uuid, Player>,
+    root: Uuid
 }
 
 impl LocalWorld {
@@ -33,15 +34,20 @@ impl LocalWorld {
 
         // A fresh new world has just one root player and no one else.
         let mut players = HashMap::new();
-        let root = Player::new(Permission::Root, spawn);
-        players.insert(root.uuid(), root);
+        let root        = Player::new(Permission::Root, spawn);
+        let root_id     = root.uuid();
+        players.insert(root_id, root);
 
         Self {
             chunks: LocalChunkManager::new(tiles),
-            players
+            players,
+            root: root_id
         }
     }
 }
 
 impl World for LocalWorld {
+    fn get_root_player(&self) -> &Player {
+        self.players.get(&self.root).expect("Root player exists")
+    }
 }
