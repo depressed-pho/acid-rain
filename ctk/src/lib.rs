@@ -4,6 +4,9 @@ pub use alignment::*;
 pub mod border;
 pub use border::*;
 
+pub mod color;
+use color::manager::ColorManager;
+
 pub mod component;
 pub use component::*;
 
@@ -28,9 +31,10 @@ pub use crate::window::RootWindow;
 use lazy_static::lazy_static;
 use num::Zero;
 use std::cell::RefCell;
-use std::ffi::{CString, CStr};
+use std::ffi::CStr;
 use std::panic;
 use std::sync::Mutex;
+use std::thread_local;
 use tokio::select;
 use tokio::task;
 use tokio::io::unix::AsyncFd;
@@ -54,6 +58,14 @@ lazy_static! {
     };
 }
 
+thread_local! {
+    /// We don't want to pass this to every Graphics we'll create, so
+    /// we put this in TLS.
+    pub(crate) static COLOR_MANAGER: RefCell<Option<ColorManager>> =
+        RefCell::new(None);
+}
+
+/// Return true iff the current locale uses UTF-8.
 pub fn is_utf8_locale() -> bool {
     *IS_UTF8_LOCALE
 }
@@ -80,23 +92,21 @@ impl Ctk {
              * libcursesw.
              */
             if cfg!(feature = "unicode") {
-                /* THINKME: ncurses::setlocale() seems to be
-                 * malfunctioning but I have no idea why. Its code
-                 * looks just good but doesn't actually have any
-                 * effect.
-                 */
-                // ncurses::setlocale(ncurses::LcCategory::all, "");
-                let empty = CString::new("").unwrap();
-                unsafe {
-                    libc::setlocale(libc::LC_ALL, empty.as_ptr());
-                }
+                ncurses::setlocale(ncurses::LcCategory::all, "");
             }
         }
 
+        /* This is the beginning of curses. */
         let stdscr = check_null(ncurses::initscr()).unwrap();
 
-        /* We are going to use colors. */
-        check(ncurses::start_color())?;
+        /* Construct the color manager now, even if the terminal
+         * doesn't support colors. */
+        {
+            let color_manager = ColorManager::new()?;
+            COLOR_MANAGER.with(|cm| {
+                *cm.borrow_mut() = Some(color_manager);
+            });
+        }
 
         /* Cursor should be hidden by default. It should only be
          * visible when a text input field is active and focused. */
@@ -209,6 +219,10 @@ impl Ctk {
 impl Drop for Ctk {
     fn drop(&mut self) {
         self.end().unwrap();
+
+        COLOR_MANAGER.with(|cm| {
+            *cm.borrow_mut() = None;
+        });
 
         let mut initialized = INITIALIZED.lock().unwrap();
         *initialized = false;
