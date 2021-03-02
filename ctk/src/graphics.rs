@@ -2,19 +2,22 @@ pub mod attribute;
 pub use attribute::*;
 
 use crate::{
+    COLOR_MANAGER,
     Component,
     RootWindow,
     Symbol
 };
-use crate::util::{check, check_null};
+use crate::color::{Color, DefaultColor, RGBColor};
 use crate::dimension::{
     Dimension,
     Point,
     Rectangle
 };
+use crate::util::{check, check_null};
 use num::Zero;
 use std::convert::TryInto;
 use std::cmp::{min, max};
+use std::rc::Rc;
 use unicode_width::UnicodeWidthChar;
 
 #[derive(Debug)]
@@ -22,7 +25,9 @@ pub struct Graphics {
     /// The pad is initially non-existent. It is created when the area
     /// of the graphics context becomes non-zero.
     pad: Option<ncurses::WINDOW>,
-    size: Dimension
+    size: Dimension,
+    fg_color: Rc<dyn Color>,
+    bg_color: Rc<dyn Color>
 }
 
 impl Graphics {
@@ -32,7 +37,9 @@ impl Graphics {
             size: Dimension {
                 width: 0,
                 height: 0
-            }
+            },
+            fg_color: Rc::new(DefaultColor()),
+            bg_color: Rc::new(DefaultColor())
         }
     }
 
@@ -58,7 +65,7 @@ impl Graphics {
                     let w = check_null(
                         ncurses::newpad(new.height, new.width)).unwrap();
 
-                    /* THINKME: I don't know why, but newpad() in
+                    /* NOTE: I don't know why, but newpad() in
                      * ncursesw-6.1 seems to set 0x00 for the initial
                      * background.
                      */
@@ -182,10 +189,50 @@ impl Graphics {
             check(ncurses::wattr_off(w, attrs.into())).unwrap();
         }
     }
+
+    pub fn set_fg(&mut self, fg_color: impl Color) {
+        self.set_colors(fg_color, BoxedColor::from(self.bg_color.clone()));
+    }
+
+    pub fn set_bg(&mut self, bg_color: impl Color) {
+        self.set_colors(BoxedColor::from(self.fg_color.clone()), bg_color);
+    }
+
+    pub fn set_colors(&mut self, fg_color: impl Color, bg_color: impl Color) {
+        COLOR_MANAGER.with(|cm| {
+            todo!();
+        });
+    }
 }
 
 impl Drop for Graphics {
     fn drop(&mut self) {
         self.drop_pad();
+    }
+}
+
+// We can't do Box<dyn Color + Sized> so this is a workaround for
+// that.
+#[derive(Clone, Debug)]
+struct BoxedColor {
+    inner: Rc<dyn Color>
+}
+
+impl Color for BoxedColor {
+    fn as_rgb(&self) -> Option<RGBColor> {
+        self.inner.as_rgb()
+    }
+}
+
+impl From<Rc<dyn Color>> for BoxedColor {
+    fn from(inner: Rc<dyn Color>) -> Self {
+        // If it's already a BoxedColor, we should not wrap it
+        // again. That would cause infinitely many indirections.
+        if let Ok(boxed) = inner.clone().downcast_rc::<BoxedColor>() {
+            (*boxed).clone()
+        }
+        else {
+            Self { inner }
+        }
     }
 }

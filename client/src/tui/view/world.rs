@@ -5,6 +5,7 @@ use ctk::{
     RootWindow
 };
 use ctk::border::NullBorder;
+use ctk::color::DefaultColor;
 use ctk::dimension::{
     Point,
     Rectangle,
@@ -45,7 +46,12 @@ impl<W: World> WorldView<W> {
     }
 
     fn draw_tiles(&mut self) {
+        let inner = self.get_inner();
+
         // FIXME
+        use ctk::color::RGBColor;
+        self.graphics.set_fg(RGBColor {r: 255, g: 128, b: 128});
+        self.graphics.draw_char('.', inner.pos);
     }
 
     fn draw_player(&mut self) {
@@ -55,6 +61,7 @@ impl<W: World> WorldView<W> {
             y: inner.pos.y + (inner.size.height - 1) / 2
         };
         self.graphics.attr_on(Attribute::Bold.into());
+        self.graphics.set_colors(DefaultColor(), DefaultColor());
         self.graphics.draw_char('@', center + self.player_offset);
     }
 }

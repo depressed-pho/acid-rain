@@ -35,8 +35,8 @@ async fn main() {
     let world = Arc::new(RwLock::new(rain_server::world::LocalWorld::new()));
     let root_id = world.read().unwrap().get_root_player().uuid();
 
-    //ctk_main(world, root_id).await;
-    ctk_title().await;
+    ctk_main(world, root_id).await;
+    //ctk_title().await;
 }
 
 async fn ctk_main(world: Arc<RwLock<impl World + 'static>>, player: Uuid) {

@@ -13,11 +13,14 @@ homepage = "https://github.com/depressed-pho/acid-rain/ctk"
 repository = "https://github.com/depressed-pho/acid-rain.git"
 
 [dependencies]
+downcast-rs = "^1.2"
 fixed-map = "^0.7"
 lazy_static = "^1.4"
 libc = "^0.2"
+lru = "^0.6"
 ncurses = "^5.101"
 num = "^0.2"
+scan_fmt = "^0.2"
 tokio = { version = "^1.2", features = ["macros", "net", "signal", "rt"] }
 unicode-width = "^0.1"
 weak-table = "^0.3"
@@ -26,11 +29,14 @@ weak-table = "^0.3"
 proc-macro2 = "^1.0.7"
 
 [features]
-default = ["unicode"]
+default = ["unicode", "extended-colors"]
 
 # Try to use Unicode capability of the terminal if possible. Requires
 # libncursesw.
 unicode = ["ncurses/wide"]
+
+# Use the extended colors capability of ncurses.
+extended-colors = ["ncurses/extended_colors"]
 
 [badges]
 maintenance = { status = "experimental" }
