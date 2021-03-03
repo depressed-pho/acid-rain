@@ -1,4 +1,5 @@
-use crate::color::RGBColor;
+use color_space::{CompareCie2000, ToRgb};
+use crate::color::{ANSIColor, Color, RGBColor};
 use crate::util::check;
 use lru::LruCache;
 use scan_fmt::scan_fmt;
@@ -16,23 +17,45 @@ type PaletteIndex = i32;
 #[cfg(not(feature = "extended-colors"))]
 type PaletteIndex = i16;
 
+type Palette = LruCache<RGBColor, PaletteIndex>;
+type Pairs   = LruCache<Pair, PairIndex>;
+
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+struct Pair {
+    fg: PaletteIndex,
+    bg: PaletteIndex
+}
+
+impl Default for Pair {
+    fn default() -> Self {
+        Self {
+            fg: -1,
+            bg: -1
+        }
+    }
+}
+
 /// In order to efficiently use color palettes, we search for a
 /// sufficently similar color in a palette before defining a new
-/// color. This constant is a threshold of the euclidean distance
+/// color. This constant is a threshold of the CIE2000 distance
 /// between two RGB colors.
-const SIMILARITY_THRESHOLD: f64 = 0.2;
+///
+/// But LOL, I don't know what the fuck is the appropriate value for
+/// this. This is just arbitrary right now, and will hopefully be
+/// adjusted some day.
+const SIMILARITY_THRESHOLD: f64 = 2.0;
 
 #[derive(Debug)]
 enum TermType {
     NoColors,
     PalettedColor {
-        pairs: LruCache<PairIndex, PaletteIndex>,
-        palette: LruCache<PaletteIndex, RGBColor>,
+        pairs: Pairs,
+        palette: Palette,
         is_mutable: bool
     } ,
     DirectColor {
         /// 'None' represents the default color.
-        pairs: LruCache<PairIndex, Option<RGBColor>>,
+        pairs: Pairs,
         r_bits: u8,
         g_bits: u8,
         b_bits: u8
@@ -112,17 +135,42 @@ impl ColorManager {
             if has_colors {
                 if let Some((r_bits, g_bits, b_bits)) = detect_direct_color() {
                     TermType::DirectColor {
-                        pairs: LruCache::new(ncurses::COLOR_PAIRS().try_into().unwrap()),
+                        pairs: Pairs::new(ncurses::COLOR_PAIRS().try_into().unwrap()),
                         r_bits,
                         g_bits,
                         b_bits
                     }
                 }
                 else {
-                    TermType::PalettedColor {
-                        pairs: LruCache::new(ncurses::COLOR_PAIRS().try_into().unwrap()),
-                        palette: LruCache::new(ncurses::COLORS().try_into().unwrap()),
-                        is_mutable: ncurses::can_change_color()
+                    let pairs = Pairs::new(ncurses::COLOR_PAIRS().try_into().unwrap());
+                    let mut palette = Palette::new(ncurses::COLORS().try_into().unwrap());
+                    let is_mutable = ncurses::can_change_color();
+
+                    if is_mutable {
+                        TermType::PalettedColor {
+                            pairs,
+                            palette,
+                            is_mutable
+                        }
+                    }
+                    else {
+                        // The terminal doesn't allow mutating the
+                        // palette but we have no idea what colors it
+                        // has. So we assume it has the standard ANSI
+                        // colors.
+                        if palette.cap() >= 8 {
+                            populate_ansi_palette(&mut palette);
+                            TermType::PalettedColor {
+                                pairs,
+                                palette,
+                                is_mutable
+                            }
+                        }
+                        else {
+                            // But it even doesn't have 8 colors. What
+                            // the fuck does it have?
+                            TermType::NoColors
+                        }
                     }
                 }
             }
@@ -146,6 +194,60 @@ impl ColorManager {
             ttype,
             has_default_colors
         })
+    }
+
+    pub fn set_colors(&mut self, w: ncurses::WINDOW, fg_color: impl Color, bg_color: impl Color) {
+        let fallback_fg = self.fallback_default_fg_to();
+        let fallback_bg = self.fallback_default_bg_to();
+
+        match self.ttype {
+            TermType::NoColors => {
+                // Can't do anything about that.
+            },
+            TermType::PalettedColor {
+                ref mut pairs,
+                ref mut palette,
+                is_mutable
+            } => {
+                let pair = {
+                    if is_mutable {
+                        Pair {
+                            fg: find_or_create_color(fallback_fg, palette, fg_color),
+                            bg: find_or_create_color(fallback_bg, palette, bg_color)
+                        }
+                    }
+                    else {
+                        Pair {
+                            fg: find_closest_color(fallback_fg, palette, fg_color),
+                            bg: find_closest_color(fallback_bg, palette, bg_color)
+                        }
+                    }
+                };
+                let pair_idx = find_or_create_pair(pairs, pair);
+                check(safe_wcolor_set(w, pair_idx)).unwrap();
+            },
+            ref mut _ttype @ TermType::DirectColor { .. } => {
+                todo!();
+            }
+        }
+    }
+
+    fn fallback_default_fg_to(&self) -> Option<RGBColor> {
+        if self.has_default_colors {
+            None
+        }
+        else {
+            Some(ANSIColor::White.as_rgb())
+        }
+    }
+
+    fn fallback_default_bg_to(&self) -> Option<RGBColor> {
+        if self.has_default_colors {
+            None
+        }
+        else {
+            Some(ANSIColor::Black.as_rgb())
+        }
     }
 }
 
@@ -194,6 +296,137 @@ fn detect_direct_color() -> Option<(u8, u8, u8)> {
     }
 }
 
+fn populate_ansi_palette(palette: &mut Palette) {
+    assert!(palette.cap() >= 8);
+    assert!(palette.len() == 0);
+
+    palette.put(ANSIColor::Black  .as_rgb(), 0);
+    palette.put(ANSIColor::Red    .as_rgb(), 1);
+    palette.put(ANSIColor::Green  .as_rgb(), 2);
+    palette.put(ANSIColor::Yellow .as_rgb(), 3);
+    palette.put(ANSIColor::Blue   .as_rgb(), 4);
+    palette.put(ANSIColor::Magenta.as_rgb(), 5);
+    palette.put(ANSIColor::Cyan   .as_rgb(), 6);
+    palette.put(ANSIColor::White  .as_rgb(), 7);
+}
+
+/// This assumes the palette is mutable on this terminal.
+fn find_or_create_color(fallback_default_to: Option<RGBColor>,
+                        palette: &mut Palette,
+                        color: impl Color)
+                        -> PaletteIndex {
+    if let Some(similar) = find_similar_color(fallback_default_to, palette, color) {
+        similar
+    }
+    else {
+        todo!();
+    }
+}
+
+fn find_similar_color(fallback_default_to: Option<RGBColor>,
+                      palette: &Palette,
+                      color: impl Color)
+                      -> Option<PaletteIndex> {
+    // If it's DefaultColor it's a special case.
+    if let Some(-1) = color.magic_index() {
+        if let Some(rgb) = fallback_default_to {
+            // The terminal has no default colors.
+            find_similar_rgb(palette, rgb)
+        }
+        else {
+            // The magic number representing the default color.
+            Some(-1)
+        }
+    }
+    else {
+        find_similar_rgb(palette, color.as_rgb())
+    }
+}
+
+fn find_similar_rgb(palette: &Palette, color: RGBColor) -> Option<PaletteIndex> {
+    // First try an exact match. If we already have exactly the same
+    // color in the palette, we can simply use it.
+    todo!();
+}
+
+/// This assumes the palette is immutable on this terminal.
+fn find_closest_color(fallback_default_to: Option<RGBColor>,
+                      palette: &Palette,
+                      color: impl Color)
+                      -> PaletteIndex {
+    // If it's DefaultColor it's a special case.
+    if let Some(-1) = color.magic_index() {
+        if let Some(rgb) = fallback_default_to {
+            // The terminal has no default colors.
+            find_closest_rgb(palette, rgb)
+        }
+        else {
+            // The magic number representing the default color.
+            -1
+        }
+    }
+    else {
+        find_closest_rgb(palette, color.as_rgb())
+    }
+}
+
+fn find_closest_rgb(palette: &Palette, color: RGBColor) -> PaletteIndex {
+    let mut closest: Option<(f64, PaletteIndex)> = None;
+    for (rgb, idx) in palette.iter() {
+        // THINKME: Maybe this is awfully slow?
+        let distance = color.to_rgb().compare_cie2000(&rgb.to_rgb());
+
+        if let Some((closest_dist, _)) = closest {
+            if distance < closest_dist {
+                closest = Some((distance, *idx));
+            }
+        }
+        else {
+            closest = Some((distance, *idx));
+        }
+    }
+    closest.expect("The color palette is expected to be non-empty.").1
+}
+
+fn find_or_create_pair(pairs: &mut Pairs, pair: Pair) -> PairIndex {
+    if pair == Pair::default() {
+        // The pair index 0 is special. It means the default
+        // foreground and background, and curses doesn't allow
+        // applications to change it.
+        0
+    }
+    else if let Some(idx) = pairs.get(&pair) {
+        // Found an index in the pairs. Use it.
+        *idx
+    }
+    else {
+        let idx = {
+            if pairs.len() < pairs.cap() - 1 {
+                // There is still a room for a new pair. Create one.
+                let idx = TryInto::<PaletteIndex>::try_into(pairs.len()).unwrap() + 1;
+                pairs.put(pair, idx);
+                idx
+            }
+            else {
+                // No more room for a new pair. Reuse the least
+                // recently used one, hoping that the index is not
+                // used currently.
+                let idx = pairs.pop_lru().unwrap().1;
+                pairs.put(pair, idx);
+                idx
+            }
+        };
+
+        #[cfg(feature = "extended-colors")]
+        check(ncurses::init_extended_pair(idx, pair.fg, pair.bg)).unwrap();
+
+        #[cfg(not(feature = "extended-colors"))]
+        check(ncurses::init_pair(idx, pair.fg, pair.bg)).unwrap();
+
+        idx
+    }
+}
+
 // ncurses::tigetstr() assumes that tigetstr() always returns a valid
 // string. It's not the case.
 fn safe_tigetstr(capname: &str) -> Option<String> {
@@ -215,5 +448,15 @@ fn safe_tigetstr(capname: &str) -> Option<String> {
             let bytes = CStr::from_ptr(ret).to_bytes();
             Some(String::from_utf8_unchecked(bytes.to_vec()))
         }
+    }
+}
+
+// ncurses::wcolor_set() doesn't support extended colors.
+fn safe_wcolor_set(w: ncurses::WINDOW, pair: PairIndex) -> i32 {
+    unsafe {
+        let p16  = pair as i16;
+        let opts = &pair as *const i32 as ncurses::ll::void_p;
+
+        ncurses::ll::wcolor_set(w, p16, opts)
     }
 }

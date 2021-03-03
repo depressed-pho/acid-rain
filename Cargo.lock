@@ -164,6 +164,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "color_space"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3776b2bcc4e914db501bb9be9572dd706e344b9eb8f882894f3daa651d281381"
+
+[[package]]
 name = "const-random"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -187,6 +193,7 @@ dependencies = [
 name = "ctk"
 version = "0.1.0"
 dependencies = [
+ "color_space",
  "downcast-rs",
  "fixed-map",
  "lazy_static",

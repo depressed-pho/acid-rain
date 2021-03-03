@@ -7,7 +7,7 @@ use crate::{
     RootWindow,
     Symbol
 };
-use crate::color::{Color, DefaultColor, RGBColor};
+use crate::color::*;
 use crate::dimension::{
     Dimension,
     Point,
@@ -190,18 +190,25 @@ impl Graphics {
         }
     }
 
-    pub fn set_fg(&mut self, fg_color: impl Color) {
+    pub fn set_fg(&mut self, fg_color: impl Color + Clone) {
         self.set_colors(fg_color, BoxedColor::from(self.bg_color.clone()));
     }
 
-    pub fn set_bg(&mut self, bg_color: impl Color) {
+    pub fn set_bg(&mut self, bg_color: impl Color + Clone) {
         self.set_colors(BoxedColor::from(self.fg_color.clone()), bg_color);
     }
 
-    pub fn set_colors(&mut self, fg_color: impl Color, bg_color: impl Color) {
-        COLOR_MANAGER.with(|cm| {
-            todo!();
-        });
+    pub fn set_colors(&mut self, fg_color: impl Color + Clone, bg_color: impl Color + Clone) {
+        if let Some(w) = self.pad {
+            COLOR_MANAGER.with(|cm| {
+                (*cm.borrow_mut())
+                    .as_mut()
+                    .expect("Cannot call this method outside of the Ctk context.")
+                    .set_colors(w, fg_color.clone(), bg_color.clone());
+            });
+        }
+        self.fg_color = Rc::new(fg_color);
+        self.bg_color = Rc::new(bg_color);
     }
 }
 
@@ -219,7 +226,11 @@ struct BoxedColor {
 }
 
 impl Color for BoxedColor {
-    fn as_rgb(&self) -> Option<RGBColor> {
+    fn magic_index(&self) -> Option<i32> {
+        self.inner.magic_index()
+    }
+
+    fn as_rgb(&self) -> RGBColor {
         self.inner.as_rgb()
     }
 }
