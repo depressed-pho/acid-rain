@@ -50,8 +50,8 @@ impl<W: World> WorldView<W> {
 
         // FIXME
         use ctk::color::RGBColor;
-        self.graphics.set_fg(RGBColor {r: 255, g: 64, b: 64});
-        self.graphics.draw_char('.', inner.pos);
+        self.graphics.set_fg(RGBColor {r: 255, g: 64, b: 0});
+        self.graphics.draw_char('#', inner.pos);
     }
 
     fn draw_player(&mut self) {

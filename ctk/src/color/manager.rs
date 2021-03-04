@@ -43,7 +43,7 @@ impl Default for Pair {
 /// But LOL, I don't know what the fuck is the appropriate value for
 /// this. This is just arbitrary right now, and will hopefully be
 /// adjusted some day.
-const SIMILARITY_THRESHOLD: f64 = 2.0;
+const SIMILARITY_THRESHOLD: f64 = 2.3;
 
 #[derive(Debug)]
 enum TermType {
@@ -212,14 +212,14 @@ impl ColorManager {
                 let pair = {
                     if is_mutable {
                         Pair {
-                            fg: find_or_create_color(fallback_fg, palette, fg_color),
-                            bg: find_or_create_color(fallback_bg, palette, bg_color)
+                            fg: find_or_create_color(fallback_fg, palette, &fg_color),
+                            bg: find_or_create_color(fallback_bg, palette, &bg_color)
                         }
                     }
                     else {
                         Pair {
-                            fg: find_closest_color(fallback_fg, palette, fg_color),
-                            bg: find_closest_color(fallback_bg, palette, bg_color)
+                            fg: find_closest_color(fallback_fg, palette, &fg_color),
+                            bg: find_closest_color(fallback_bg, palette, &bg_color)
                         }
                     }
                 };
@@ -313,19 +313,56 @@ fn populate_ansi_palette(palette: &mut Palette) {
 /// This assumes the palette is mutable on this terminal.
 fn find_or_create_color(fallback_default_to: Option<RGBColor>,
                         palette: &mut Palette,
-                        color: impl Color)
+                        color: &impl Color)
                         -> PaletteIndex {
     if let Some(similar) = find_similar_color(fallback_default_to, palette, color) {
         similar
     }
     else {
-        todo!();
+        let rgb = color.as_rgb();
+        let idx =
+            if palette.len() < palette.cap() {
+                // There is still a room for a new color. Create one.
+                let idx = TryInto::<PaletteIndex>::try_into(palette.len()).unwrap();
+                palette.put(rgb, idx);
+                idx
+            }
+            else {
+                // No more room for a new color. Reuse the least
+                // recently used one, hoping that the color is not not
+                // used currently.
+                let idx = palette.pop_lru().unwrap().1;
+                palette.put(rgb, idx);
+                idx
+                // Maybe we should remove pairs that using this color,
+                // but we don't because the fact this color isn't used
+                // for a long time implies those pairs are also not
+                // used recently.
+            };
+
+        #[cfg(feature = "extended-colors")]
+        fn scale(c: u8) -> i32 {
+            (c as i32 * 1000) / 255
+        }
+
+        #[cfg(feature = "extended-colors")]
+        check(ncurses::init_extended_color(idx, scale(rgb.r), scale(rgb.g), scale(rgb.b))).unwrap();
+
+        #[cfg(not(feature = "extended-colors"))]
+        fn scale(c: u8) -> i16 {
+            (c as i16 * 1000) / 255
+        }
+
+        #[cfg(not(feature = "extended-colors"))]
+        check(ncurses::init_color(idx, scale(rgb.r), scale(rgb.g), scale(rgb.b))).unwrap();
+
+        idx
     }
 }
 
 fn find_similar_color(fallback_default_to: Option<RGBColor>,
-                      palette: &Palette,
-                      color: impl Color)
+                      palette: &mut Palette,
+                      color: &impl Color)
                       -> Option<PaletteIndex> {
     // If it's DefaultColor it's a special case.
     if let Some(-1) = color.magic_index() {
@@ -343,16 +380,40 @@ fn find_similar_color(fallback_default_to: Option<RGBColor>,
     }
 }
 
-fn find_similar_rgb(palette: &Palette, color: RGBColor) -> Option<PaletteIndex> {
+fn find_similar_rgb(palette: &mut Palette, color: RGBColor) -> Option<PaletteIndex> {
     // First try an exact match. If we already have exactly the same
     // color in the palette, we can simply use it.
-    todo!();
+    if let idx@Some(_) = palette.get(&color) {
+        // Found.
+        idx.cloned()
+    }
+    else {
+        // Then search for a sufficiently similar color in the
+        // palette. By "sufficiently similar" we mean some color that
+        // is mostly indistinguishable by the human eye.
+        let mut found: Option<(RGBColor, PaletteIndex)> = None;
+        for (rgb, idx) in palette.iter() {
+            // THINKME: Maybe this is awfully slow?
+            let distance = color.to_rgb().compare_cie2000(&rgb.to_rgb());
+
+            if distance <= SIMILARITY_THRESHOLD {
+                // This one is good enough. Mark it as the most
+                // recently used, and use it.
+                found = Some((*rgb, *idx));
+                break;
+            }
+        }
+        found.map(|(rgb, idx)| {
+            palette.get(&rgb);
+            idx
+        })
+    }
 }
 
 /// This assumes the palette is immutable on this terminal.
 fn find_closest_color(fallback_default_to: Option<RGBColor>,
                       palette: &Palette,
-                      color: impl Color)
+                      color: &impl Color)
                       -> PaletteIndex {
     // If it's DefaultColor it's a special case.
     if let Some(-1) = color.magic_index() {
@@ -392,7 +453,8 @@ fn find_or_create_pair(pairs: &mut Pairs, pair: Pair) -> PairIndex {
     if pair == Pair::default() {
         // The pair index 0 is special. It means the default
         // foreground and background, and curses doesn't allow
-        // applications to change it.
+        // applications to change it. This means we will have at most
+        // pairs.cap()-1 pairs.
         0
     }
     else if let Some(idx) = pairs.get(&pair) {
@@ -400,22 +462,21 @@ fn find_or_create_pair(pairs: &mut Pairs, pair: Pair) -> PairIndex {
         *idx
     }
     else {
-        let idx = {
+        let idx =
             if pairs.len() < pairs.cap() - 1 {
                 // There is still a room for a new pair. Create one.
-                let idx = TryInto::<PaletteIndex>::try_into(pairs.len()).unwrap() + 1;
+                let idx = TryInto::<PairIndex>::try_into(pairs.len()).unwrap() + 1;
                 pairs.put(pair, idx);
                 idx
             }
             else {
                 // No more room for a new pair. Reuse the least
-                // recently used one, hoping that the index is not
-                // used currently.
+                // recently used one, hoping that the pair is not used
+                // currently.
                 let idx = pairs.pop_lru().unwrap().1;
                 pairs.put(pair, idx);
                 idx
-            }
-        };
+            };
 
         #[cfg(feature = "extended-colors")]
         check(ncurses::init_extended_pair(idx, pair.fg, pair.bg)).unwrap();

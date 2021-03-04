@@ -75,15 +75,6 @@ pub struct RGBColor {
     pub b: u8
 }
 
-impl RGBColor {
-    // FIXME: Remove this!
-    pub(crate) fn distance(&self, rhs: &Self) -> f64 {
-        ((f64::from(self.r) - f64::from(rhs.r)).powi(2) +
-         (f64::from(self.g) - f64::from(rhs.g)).powi(2) +
-         (f64::from(self.b) - f64::from(rhs.b)).powi(2)).sqrt()
-    }
-}
-
 /// Any type that is ToRgb can also be converted to RGBColor.
 impl<T: ToRgb> FromColor<T> for RGBColor {
     fn from_color(color: &T) -> Self {
