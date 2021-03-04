@@ -1,13 +1,11 @@
-pub mod attribute;
-pub use attribute::*;
-
 use crate::{
     COLOR_MANAGER,
     Component,
     RootWindow,
     Symbol
 };
-use crate::color::*;
+use crate::attribute::AttrSet;
+use crate::color::{BoxedColor, Color, DefaultColor};
 use crate::dimension::{
     Dimension,
     Point,
@@ -17,7 +15,6 @@ use crate::util::{check, check_null};
 use num::Zero;
 use std::convert::TryInto;
 use std::cmp::{min, max};
-use std::rc::Rc;
 use unicode_width::UnicodeWidthChar;
 
 #[derive(Debug)]
@@ -26,8 +23,8 @@ pub struct Graphics {
     /// of the graphics context becomes non-zero.
     pad: Option<ncurses::WINDOW>,
     size: Dimension,
-    fg_color: Rc<dyn Color>,
-    bg_color: Rc<dyn Color>
+    fg_color: BoxedColor,
+    bg_color: BoxedColor
 }
 
 impl Graphics {
@@ -38,8 +35,8 @@ impl Graphics {
                 width: 0,
                 height: 0
             },
-            fg_color: Rc::new(DefaultColor()),
-            bg_color: Rc::new(DefaultColor())
+            fg_color: BoxedColor::new(DefaultColor()),
+            bg_color: BoxedColor::new(DefaultColor())
         }
     }
 
@@ -190,60 +187,30 @@ impl Graphics {
         }
     }
 
-    pub fn set_fg(&mut self, fg_color: impl Color + Clone) {
-        self.set_colors(fg_color, BoxedColor::from(self.bg_color.clone()));
+    pub fn set_fg(&mut self, fg_color: impl Color + Send + Sync) {
+        self.set_colors(fg_color, self.bg_color.clone());
     }
 
-    pub fn set_bg(&mut self, bg_color: impl Color + Clone) {
-        self.set_colors(BoxedColor::from(self.fg_color.clone()), bg_color);
+    pub fn set_bg(&mut self, bg_color: impl Color + Send + Sync) {
+        self.set_colors(self.fg_color.clone(), bg_color);
     }
 
-    pub fn set_colors(&mut self, fg_color: impl Color + Clone, bg_color: impl Color + Clone) {
+    pub fn set_colors(&mut self, fg_color: impl Color + Send + Sync, bg_color: impl Color + Send + Sync) {
         if let Some(w) = self.pad {
             COLOR_MANAGER.with(|cm| {
                 (*cm.borrow_mut())
                     .as_mut()
                     .expect("Cannot call this method outside of the Ctk context.")
-                    .set_colors(w, fg_color.clone(), bg_color.clone());
+                    .set_colors(w, &fg_color, &bg_color);
             });
         }
-        self.fg_color = Rc::new(fg_color);
-        self.bg_color = Rc::new(bg_color);
+        self.fg_color = BoxedColor::new(fg_color);
+        self.bg_color = BoxedColor::new(bg_color);
     }
 }
 
 impl Drop for Graphics {
     fn drop(&mut self) {
         self.drop_pad();
-    }
-}
-
-// We can't do Box<dyn Color + Sized> so this is a workaround for
-// that.
-#[derive(Clone, Debug)]
-struct BoxedColor {
-    inner: Rc<dyn Color>
-}
-
-impl Color for BoxedColor {
-    fn magic_index(&self) -> Option<i32> {
-        self.inner.magic_index()
-    }
-
-    fn as_rgb(&self) -> RGBColor {
-        self.inner.as_rgb()
-    }
-}
-
-impl From<Rc<dyn Color>> for BoxedColor {
-    fn from(inner: Rc<dyn Color>) -> Self {
-        // If it's already a BoxedColor, we should not wrap it
-        // again. That would cause infinitely many indirections.
-        if let Ok(boxed) = inner.clone().downcast_rc::<BoxedColor>() {
-            (*boxed).clone()
-        }
-        else {
-            Self { inner }
-        }
     }
 }

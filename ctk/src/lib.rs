@@ -1,6 +1,8 @@
 mod alignment;
 pub use alignment::*;
 
+pub mod attribute;
+
 pub mod border;
 pub use border::*;
 

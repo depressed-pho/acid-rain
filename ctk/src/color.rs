@@ -3,6 +3,7 @@ pub(crate) mod manager;
 use color_space::{FromColor, FromRgb, Rgb, ToRgb};
 use downcast_rs::{Downcast, impl_downcast};
 use std::fmt::Debug;
+use std::sync::Arc;
 
 /// A color to be used for the foreground or the background of a
 /// character on a terminal. On a terminal which doesn't have a
@@ -26,6 +27,44 @@ impl_downcast!(Color);
 impl<T: ToRgb + Debug + 'static> Color for T {
     fn as_rgb(&self) -> RGBColor {
         FromColor::<T>::from_color(self)
+    }
+}
+
+/// A sized type holding a trait object of some Color. This type
+/// itself implements Color.
+#[derive(Clone, Debug)]
+pub struct BoxedColor {
+    inner: Arc<dyn Color + Send + Sync>
+}
+
+impl BoxedColor {
+    pub fn new(color: impl Color + Send + Sync) -> Self {
+        // If it's already a BoxedColor, we should not wrap it
+        // again. That would cause infinitely many indirections.
+        if let Some(boxed) = (&color as &dyn Color).downcast_ref::<BoxedColor>() {
+            (*boxed).clone()
+        }
+        else {
+            Self {
+                inner: Arc::new(color)
+            }
+        }
+    }
+}
+
+impl Default for BoxedColor {
+    fn default() -> Self {
+        Self::new(DefaultColor())
+    }
+}
+
+impl Color for BoxedColor {
+    fn magic_index(&self) -> Option<i32> {
+        self.inner.magic_index()
+    }
+
+    fn as_rgb(&self) -> RGBColor {
+        self.inner.as_rgb()
     }
 }
 
@@ -112,5 +151,11 @@ impl Color for DefaultColor {
 
     fn as_rgb(&self) -> RGBColor {
         panic!("DefaultColor doesn't represent a specific color so it's impossible to convert it to RGB.");
+    }
+}
+
+impl Default for DefaultColor {
+    fn default() -> Self {
+        Self()
     }
 }

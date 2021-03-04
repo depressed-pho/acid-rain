@@ -18,6 +18,7 @@ name = "acid-rain-builtin"
 version = "0.1.0"
 dependencies = [
  "acid-rain-core",
+ "color_space",
 ]
 
 [[package]]
@@ -35,7 +36,9 @@ name = "acid-rain-core"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "ctk",
  "num",
+ "unicode-width",
  "uuid",
 ]
 

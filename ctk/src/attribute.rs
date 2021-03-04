@@ -20,6 +20,12 @@ pub struct AttrSet {
     raw: ncurses::attr_t
 }
 
+impl Default for AttrSet {
+    fn default() -> Self {
+        Attribute::Normal.into()
+    }
+}
+
 impl From<Attribute> for AttrSet {
     fn from(attr: Attribute) -> Self {
         let raw = match attr {
@@ -49,8 +55,17 @@ impl BitOr for AttrSet {
     type Output = Self;
 
     fn bitor(self, rhs: Self) -> Self {
-        Self {
-            raw: self.raw | rhs.raw
+        /* OR-ing Normal with anything else does not make sense, but
+         * the OR operator returning Result or Option is a terrible
+         * idea. What should we do then? For now we just panic when
+         * that happens. */
+        if self.raw & ncurses::A_NORMAL() != 0 || rhs.raw & ncurses::A_NORMAL() != 0 {
+            panic!("OR-ing Attribute::Normal with anything else does not make sense.");
+        }
+        else {
+            Self {
+                raw: self.raw | rhs.raw
+            }
         }
     }
 }

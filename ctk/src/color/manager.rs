@@ -196,7 +196,7 @@ impl ColorManager {
         })
     }
 
-    pub fn set_colors(&mut self, w: ncurses::WINDOW, fg_color: impl Color, bg_color: impl Color) {
+    pub fn set_colors(&mut self, w: ncurses::WINDOW, fg_color: &impl Color, bg_color: &impl Color) {
         let fallback_fg = self.fallback_default_fg_to();
         let fallback_bg = self.fallback_default_bg_to();
 
@@ -212,14 +212,14 @@ impl ColorManager {
                 let pair = {
                     if is_mutable {
                         Pair {
-                            fg: find_or_create_color(fallback_fg, palette, &fg_color),
-                            bg: find_or_create_color(fallback_bg, palette, &bg_color)
+                            fg: find_or_create_color(fallback_fg, palette, fg_color),
+                            bg: find_or_create_color(fallback_bg, palette, bg_color)
                         }
                     }
                     else {
                         Pair {
-                            fg: find_closest_color(fallback_fg, palette, &fg_color),
-                            bg: find_closest_color(fallback_bg, palette, &bg_color)
+                            fg: find_closest_color(fallback_fg, palette, fg_color),
+                            bg: find_closest_color(fallback_bg, palette, bg_color)
                         }
                     }
                 };
@@ -234,8 +234,8 @@ impl ColorManager {
             } => {
                 let pair =
                     Pair {
-                        fg: pack_color(fallback_fg, r_bits, g_bits, b_bits, &fg_color),
-                        bg: pack_color(fallback_bg, r_bits, g_bits, b_bits, &bg_color)
+                        fg: pack_color(fallback_fg, r_bits, g_bits, b_bits, fg_color),
+                        bg: pack_color(fallback_bg, r_bits, g_bits, b_bits, bg_color)
                     };
                 let pair_idx = find_or_create_pair(pairs, pair);
                 check(safe_wcolor_set(w, pair_idx)).unwrap();
@@ -471,7 +471,6 @@ fn pack_color(fallback_default_to: Option<RGBColor>,
         let c_r = (rgb.r as PaletteIndex * max_r) / 255;
         let c_g = (rgb.g as PaletteIndex * max_g) / 255;
         let c_b = (rgb.b as PaletteIndex * max_b) / 255;
-
         (c_r & r_bits as PaletteIndex) << (g_bits + b_bits) |
         (c_g & g_bits as PaletteIndex) << b_bits |
         (c_b & b_bits as PaletteIndex)

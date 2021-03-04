@@ -4,6 +4,7 @@ use ctk::{
     Graphics,
     RootWindow
 };
+use ctk::attribute::Attribute;
 use ctk::border::NullBorder;
 use ctk::color::DefaultColor;
 use ctk::dimension::{
@@ -11,7 +12,6 @@ use ctk::dimension::{
     Rectangle,
     SizeRequirements
 };
-use ctk::graphics::Attribute;
 use num::Zero;
 use rain_core::world::World;
 use std::sync::{Arc, RwLock};
@@ -47,6 +47,14 @@ impl<W: World> WorldView<W> {
 
     fn draw_tiles(&mut self) {
         let inner = self.get_inner();
+
+        /* Draw all the tiles currently visible from the
+         * viewpoint. The easiest way to do this to iterate on every
+         * visible position and ask the world for the tile there, but
+         * that would cause too many atomic operations and would be
+         * terribly inefficient. So we somehow collect all the visible
+         * chunks and read-lock them all, then iterate on positions.
+         */
 
         // FIXME
         use ctk::color::RGBColor;
