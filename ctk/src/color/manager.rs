@@ -226,8 +226,19 @@ impl ColorManager {
                 let pair_idx = find_or_create_pair(pairs, pair);
                 check(safe_wcolor_set(w, pair_idx)).unwrap();
             },
-            ref mut _ttype @ TermType::DirectColor { .. } => {
-                todo!();
+            TermType::DirectColor {
+                ref mut pairs,
+                r_bits,
+                g_bits,
+                b_bits
+            } => {
+                let pair =
+                    Pair {
+                        fg: pack_color(fallback_fg, r_bits, g_bits, b_bits, &fg_color),
+                        bg: pack_color(fallback_bg, r_bits, g_bits, b_bits, &bg_color)
+                    };
+                let pair_idx = find_or_create_pair(pairs, pair);
+                check(safe_wcolor_set(w, pair_idx)).unwrap();
             }
         }
     }
@@ -260,7 +271,6 @@ fn detect_direct_color() -> Option<(u8, u8, u8)> {
         while 1 << width < ncurses::COLORS() {
             width += 1;
         }
-
         match ncurses::tigetflag("RGB") {
             n if n > 0 => {
                 let bits   = (width + 2) / 3;
@@ -447,6 +457,40 @@ fn find_closest_rgb(palette: &Palette, color: RGBColor) -> PaletteIndex {
         }
     }
     closest.expect("The color palette is expected to be non-empty.").1
+}
+
+fn pack_color(fallback_default_to: Option<RGBColor>,
+              r_bits: u8, g_bits: u8, b_bits: u8,
+              color: &impl Color)
+              -> PaletteIndex {
+
+    let max_r = (1 << (r_bits as PaletteIndex)) - 1;
+    let max_g = (1 << (g_bits as PaletteIndex)) - 1;
+    let max_b = (1 << (b_bits as PaletteIndex)) - 1;
+    let pack = |rgb: RGBColor| -> PaletteIndex {
+        let c_r = (rgb.r as PaletteIndex * max_r) / 255;
+        let c_g = (rgb.g as PaletteIndex * max_g) / 255;
+        let c_b = (rgb.b as PaletteIndex * max_b) / 255;
+
+        (c_r & r_bits as PaletteIndex) << (g_bits + b_bits) |
+        (c_g & g_bits as PaletteIndex) << b_bits |
+        (c_b & b_bits as PaletteIndex)
+    };
+
+    // If it's DefaultColor it's a special case.
+    if let Some(-1) = color.magic_index() {
+        if let Some(rgb) = fallback_default_to {
+            // The terminal has no default colors.
+            pack(rgb)
+        }
+        else {
+            // The magic number representing the default color.
+            -1
+        }
+    }
+    else {
+        pack(color.as_rgb())
+    }
 }
 
 fn find_or_create_pair(pairs: &mut Pairs, pair: Pair) -> PairIndex {
