@@ -1,6 +1,6 @@
 use std::ops::BitOr;
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Attribute {
     Normal,
     Standout,
@@ -15,7 +15,7 @@ pub enum Attribute {
     Italic
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct AttrSet {
     raw: ncurses::attr_t
 }

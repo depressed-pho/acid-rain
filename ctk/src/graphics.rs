@@ -187,15 +187,15 @@ impl Graphics {
         }
     }
 
-    pub fn set_fg(&mut self, fg_color: impl Color + Send + Sync) {
+    pub fn set_fg(&mut self, fg_color: impl Color) {
         self.set_colors(fg_color, self.bg_color.clone());
     }
 
-    pub fn set_bg(&mut self, bg_color: impl Color + Send + Sync) {
+    pub fn set_bg(&mut self, bg_color: impl Color) {
         self.set_colors(self.fg_color.clone(), bg_color);
     }
 
-    pub fn set_colors(&mut self, fg_color: impl Color + Send + Sync, bg_color: impl Color + Send + Sync) {
+    pub fn set_colors(&mut self, fg_color: impl Color, bg_color: impl Color) {
         if let Some(w) = self.pad {
             COLOR_MANAGER.with(|cm| {
                 (*cm.borrow_mut())

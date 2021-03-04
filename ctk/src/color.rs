@@ -6,9 +6,9 @@ use std::fmt::Debug;
 use std::sync::Arc;
 
 /// A color to be used for the foreground or the background of a
-/// character on a terminal. On a terminal which doesn't have a
-/// capability of using colors, setting colors will do nothing.
-pub trait Color: Debug + Downcast {
+/// character on a terminal. If the terminal doesn't have a capability
+/// of using colors, setting colors will do nothing.
+pub trait Color: Debug + Downcast + Sync + Send {
     /// If you don't know what this is, leave it unimplemented.
     fn magic_index(&self) -> Option<i32> {
         None
@@ -24,7 +24,7 @@ pub trait Color: Debug + Downcast {
 impl_downcast!(Color);
 
 /// Any type implementing ToRgb can also be a Color.
-impl<T: ToRgb + Debug + 'static> Color for T {
+impl<T: ToRgb + Debug + Sync + Send + 'static> Color for T {
     fn as_rgb(&self) -> RGBColor {
         FromColor::<T>::from_color(self)
     }
@@ -34,11 +34,11 @@ impl<T: ToRgb + Debug + 'static> Color for T {
 /// itself implements Color.
 #[derive(Clone, Debug)]
 pub struct BoxedColor {
-    inner: Arc<dyn Color + Send + Sync>
+    inner: Arc<dyn Color>
 }
 
 impl BoxedColor {
-    pub fn new(color: impl Color + Send + Sync) -> Self {
+    pub fn new(color: impl Color) -> Self {
         // If it's already a BoxedColor, we should not wrap it
         // again. That would cause infinitely many indirections.
         if let Some(boxed) = (&color as &dyn Color).downcast_ref::<BoxedColor>() {

@@ -9,102 +9,161 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 /// exactly 1.
 #[derive(Debug)]
 pub struct Appearance {
-    unicode: String,
-    ascii: char,
-    attrs: AttrSet,
-    fg_color: BoxedColor,
-    bg_color: BoxedColor
+    unicode_: String,
+    ascii_: char,
+    attrs_: AttrSet,
+    fg_color_: BoxedColor,
+    bg_color_: BoxedColor
 }
 
 impl Appearance {
-    // We really want to use "typed-builder" in crates.io but it's not
-    // flexible enough for us. Hand-rolling the compile-time check is
-    // seriously tedious so we only do a runtime check.
-    pub fn builder() -> AppearanceBuilder {
-        AppearanceBuilder::default()
+    /// Create a builder for building `Appearance`. On the builder,
+    /// call `.unicode(...)`, `.ascii(...)`, `.attrs(...)`(optional),
+    /// `.fg_color(...)`(optional), `.bg_color(...)`(optional) to set
+    /// the values of the fields. Finally, call `.build()` to create
+    /// the instance of Appearance.
+    pub fn builder() -> AppearanceBuilder<(), (), (), (), ()> {
+        // We really want to use "typed-builder" in crates.io but it's
+        // not flexible enough for us. Hand-rolling the compile-time
+        // check is seriously tedious but we do it anyway...
+        AppearanceBuilder {
+            fields: ((), (), (), (), ())
+        }
+    }
+
+    pub fn unicode(&self) -> &str {
+        &self.unicode_
+    }
+
+    pub fn ascii(&self) -> char {
+        self.ascii_
+    }
+
+    pub fn attrs(&self) -> AttrSet {
+        self.attrs_
+    }
+
+    pub fn fg_color(&self) -> impl Color {
+        self.fg_color_.clone()
+    }
+
+    pub fn bg_color(&self) -> impl Color {
+        self.bg_color_.clone()
     }
 }
 
-#[derive(Debug, Default)]
-pub struct AppearanceBuilder {
-    unicode: Option<String>,
-    ascii: Option<char>,
-    attrs: (bool, AttrSet),
-    fg_color: (bool, BoxedColor),
-    bg_color: (bool, BoxedColor)
+/// Builder for [Appearance] instances.
+///
+/// See [Appearance::builder()] for more info.
+#[derive(Debug)]
+pub struct AppearanceBuilder<T1, T2, T3, T4, T5> {
+    fields: (T1, T2, T3, T4, T5)
 }
 
-impl AppearanceBuilder {
-    pub fn unicode(mut self, v: impl Into<String>) -> Self {
-        // Option::expect_none() is still nightly-only.
-        if self.unicode.is_some() {
-            panic!("unicode() has been called twice.");
+impl<Ascii_, Attrs_, FgColor_, BgColor_> AppearanceBuilder<(), Ascii_, Attrs_, FgColor_, BgColor_> {
+    pub fn unicode(self, v: impl Into<String>) -> AppearanceBuilder<String, Ascii_, Attrs_, FgColor_, BgColor_> {
+        let (_, ascii, attrs, fg_color, bg_color) = self.fields;
+        let unicode = v.into();
+        if unicode.width() != 1 {
+            panic!("The displayed width must be exactly 1: {}", unicode);
         }
-        else {
-            let s = v.into();
-            if s.width() != 1 {
-                panic!("The displayed width must be exactly 1: {}", s);
-            }
-            self.unicode = Some(s);
+        AppearanceBuilder {
+            fields: (unicode, ascii, attrs, fg_color, bg_color)
         }
-        self
     }
+}
 
-    pub fn ascii(mut self, v: impl Into<char>) -> Self {
-        // Option::expect_none() is still nightly-only.
-        if self.ascii.is_some() {
-            panic!("ascii() has been called twice.");
+impl<Unicode_, Attrs_, FgColor_, BgColor_> AppearanceBuilder<Unicode_, (), Attrs_, FgColor_, BgColor_> {
+    pub fn ascii(self, v: impl Into<char>) -> AppearanceBuilder<Unicode_, char, Attrs_, FgColor_, BgColor_> {
+        let (unicode, _, attrs, fg_color, bg_color) = self.fields;
+        // Custom validation: typed-builder doesn't support this.
+        let ascii = v.into();
+        if ascii.width() != Some(1) {
+            panic!("The displayed width must be exactly 1: {}", ascii);
         }
-        else {
-            let c = v.into();
-            if c.width() != Some(1) {
-                panic!("The displayed width must be exactly 1: {}", c);
-            }
-            if (c as i32) < 0x20 || (c as i32) > 0x7e {
-                panic!("The character is not a printable ASCII character: {}", c);
-            }
-            self.ascii = Some(c);
+        if (ascii as i32) < 0x20 || (ascii as i32) > 0x7e {
+            panic!("The character is not a printable ASCII character: {}", ascii);
         }
-        self
+        AppearanceBuilder {
+            fields: (unicode, ascii, attrs, fg_color, bg_color)
+        }
     }
+}
 
-    pub fn attrs(mut self, v: impl Into<AttrSet>) -> Self {
-        if self.attrs.0 {
-            panic!("attrs() has been called twice.");
+impl<Unicode_, Ascii_, FgColor_, BgColor_> AppearanceBuilder<Unicode_, Ascii_, (), FgColor_, BgColor_> {
+    pub fn attrs(self, v: impl Into<AttrSet>) -> AppearanceBuilder<Unicode_, Ascii_, AttrSet, FgColor_, BgColor_> {
+        let (unicode, ascii, _, fg_color, bg_color) = self.fields;
+        let attrs = v.into();
+        AppearanceBuilder {
+            fields: (unicode, ascii, attrs, fg_color, bg_color)
         }
-        else {
-            self.attrs = (true, v.into());
-        }
-        self
     }
+}
 
-    pub fn fg_color(mut self, v: impl Color + Send + Sync) -> Self {
-        if self.fg_color.0 {
-            panic!("fg_color() has been called twice.");
+impl<Unicode_, Ascii_, Attrs_, BgColor_> AppearanceBuilder<Unicode_, Ascii_, Attrs_, (), BgColor_> {
+    pub fn fg_color(self, v: impl Color) -> AppearanceBuilder<Unicode_, Ascii_, Attrs_, BoxedColor, BgColor_> {
+        let (unicode, ascii, attrs, _, bg_color) = self.fields;
+        // Custom conversion: typed-builder doesn't support this.
+        let fg_color = BoxedColor::new(v);
+        AppearanceBuilder {
+            fields: (unicode, ascii, attrs, fg_color, bg_color)
         }
-        else {
-            self.fg_color = (true, BoxedColor::new(v));
-        }
-        self
     }
+}
 
-    pub fn bg_color(mut self, v: impl Color + Send + Sync) -> Self {
-        if self.bg_color.0 {
-            panic!("bg_color() has been called twice.");
+impl<Unicode_, Ascii_, Attrs_, FgColor_> AppearanceBuilder<Unicode_, Ascii_, Attrs_, FgColor_, ()> {
+    pub fn bg_color(self, v: impl Color) -> AppearanceBuilder<Unicode_, Ascii_, Attrs_, FgColor_, BoxedColor> {
+        let (unicode, ascii, attrs, fg_color, _) = self.fields;
+        // Custom conversion: typed-builder doesn't support this.
+        let bg_color = BoxedColor::new(v);
+        AppearanceBuilder {
+            fields: (unicode, ascii, attrs, fg_color, bg_color)
         }
-        else {
-            self.bg_color = (true, BoxedColor::new(v));
-        }
-        self
     }
+}
 
+impl<Attrs_, FgColor_, BgColor_> AppearanceBuilder<String, char, Attrs_, FgColor_, BgColor_>
+where Attrs_: AppearanceBuilderOptional<AttrSet>,
+      FgColor_: AppearanceBuilderOptional<BoxedColor>,
+      BgColor_: AppearanceBuilderOptional<BoxedColor> {
+    /// Finalise the builder and create an instance of [Appearance].
     pub fn build(self) -> Appearance {
+        let (unicode, ascii, attrs, fg_color, bg_color) = self.fields;
         Appearance {
-            unicode: self.unicode.expect("unicode() has not been called but it has no default value"),
-            ascii: self.ascii.expect("ascii() has not been called but it has no default value"),
-            attrs: self.attrs.1,
-            fg_color: self.fg_color.1,
-            bg_color: self.bg_color.1
+            unicode_: unicode,
+            ascii_: ascii,
+            attrs_: attrs.into(),
+            fg_color_: fg_color.into(),
+            bg_color_: bg_color.into()
         }
+    }
+}
+
+#[doc(hide)]
+pub trait AppearanceBuilderOptional<T> {
+    fn into(self) -> T;
+}
+
+impl AppearanceBuilderOptional<AttrSet> for () {
+    fn into(self) -> AttrSet {
+        AttrSet::default()
+    }
+}
+
+impl AppearanceBuilderOptional<AttrSet> for AttrSet {
+    fn into(self) -> AttrSet {
+        self
+    }
+}
+
+impl AppearanceBuilderOptional<BoxedColor> for () {
+    fn into(self) -> BoxedColor {
+        BoxedColor::default()
+    }
+}
+
+impl AppearanceBuilderOptional<BoxedColor> for BoxedColor {
+    fn into(self) -> BoxedColor {
+        self
     }
 }
