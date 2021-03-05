@@ -52,8 +52,13 @@ impl<W: World> WorldView<W> {
          * viewpoint. The easiest way to do this to iterate on every
          * visible position and ask the world for the tile there, but
          * that would cause too many atomic operations and would be
-         * terribly inefficient. So we somehow collect all the visible
-         * chunks and read-lock them all, then iterate on positions.
+         * terribly inefficient. The second easiest approach is to
+         * collect all the visible chunks and read-lock them all, then
+         * iterate on positions, but this may cause a dead lock. So we
+         * iterate on visible chunks instead, and render their visible
+         * parts with locking only one chunk at a time. This may
+         * render chunks inconsistently, but that should be
+         * acceptable.
          */
 
         // FIXME

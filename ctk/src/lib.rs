@@ -35,6 +35,7 @@ use num::Zero;
 use std::cell::RefCell;
 use std::ffi::CStr;
 use std::panic;
+use std::rc::Rc;
 use std::sync::Mutex;
 use std::thread_local;
 use tokio::select;
@@ -79,7 +80,7 @@ pub struct Ctk {
 impl Ctk {
     /// Create an instance of Ctk. At most one instance can
     /// exist. Violating this would return an error.
-    pub fn initiate(layout: RefCell<Box<dyn Layout>>) -> Result<Ctk, ()> {
+    pub fn initiate(layout: Rc<RefCell<dyn Layout>>) -> Result<Ctk, ()> {
         {
             let mut initialized = INITIALIZED.lock().unwrap();
 

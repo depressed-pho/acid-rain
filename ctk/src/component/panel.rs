@@ -12,18 +12,19 @@ use crate::dimension::{
     SizeRequirements
 };
 use std::cell::RefCell;
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct Panel {
     graphics: Graphics,
     bounds: Rectangle,
-    layout: RefCell<Box<dyn Layout>>,
+    layout: Rc<RefCell<dyn Layout>>,
     border: Box<dyn Border>,
     dirty: bool
 }
 
 impl Panel {
-    pub fn new(layout: RefCell<Box<dyn Layout>>) -> Panel {
+    pub fn new(layout: Rc<RefCell<dyn Layout>>) -> Panel {
         Panel {
             graphics: Graphics::new(),
             bounds: Rectangle::default(),

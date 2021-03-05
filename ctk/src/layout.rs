@@ -20,8 +20,9 @@ use crate::dimension::SizeRequirements;
 /// container component.
 ///
 /// Note that layout managers generally cannot be safely shared by
-/// multiple components. It is therefore not a good idea to wrap them
-/// in cloneable smart pointers such as Rc.
+/// multiple components. The only reason components take an Rc pointer
+/// to a layout is so that you can mutate the layout after
+/// constructing the component tree.
 pub trait Layout: Debug {
     /// Do laying out sub-components if the layout manager is invalid.
     ///

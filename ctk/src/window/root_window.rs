@@ -13,6 +13,7 @@ use crate::dimension::{
 };
 use num::Zero;
 use std::cell::RefCell;
+use std::rc::Rc;
 
 /// The root window is a special window which covers the entire
 /// terminal screen. Its position is fixed to (0, 0), and its size can
@@ -22,7 +23,7 @@ pub struct RootWindow {
     screen: ncurses::WINDOW,
     graphics: Graphics,
     bounds: Rectangle,
-    layout: RefCell<Box<dyn Layout>>,
+    layout: Rc<RefCell<dyn Layout>>,
     /* We really want to do Box<dyn Border + Copy> but Rust currently
      * doesn't allow that: E0225 */
     border: Box<dyn Border>,
@@ -30,7 +31,7 @@ pub struct RootWindow {
 }
 
 impl RootWindow {
-    pub(crate) fn new(screen: ncurses::WINDOW, layout: RefCell<Box<dyn Layout>>) -> RootWindow {
+    pub(crate) fn new(screen: ncurses::WINDOW, layout: Rc<RefCell<dyn Layout>>) -> RootWindow {
         let bounds = Self::bounds_from_screen(screen);
 
         let mut graphics = Graphics::new();
