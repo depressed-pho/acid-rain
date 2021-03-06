@@ -43,4 +43,8 @@ impl Player {
     pub fn uuid(&self) -> Uuid {
         self.uuid
     }
+
+    pub fn get_pos(&self) -> WorldPos {
+        self.pos
+    }
 }

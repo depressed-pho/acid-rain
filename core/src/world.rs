@@ -3,8 +3,10 @@ pub mod tile;
 pub mod player;
 pub mod position;
 
+use crate::world::chunk::ChunkManager;
 use crate::world::player::Player;
 use std::fmt::Debug;
+use uuid::Uuid;
 
 /// There are several types of worlds:
 ///
@@ -19,6 +21,12 @@ use std::fmt::Debug;
 ///   server. The server and the client communicate on network.
 ///
 pub trait World : Debug {
+    /// Immutably borrow the chunk manager.
+    fn get_chunk_manager(&self) -> &dyn ChunkManager;
+
     /// Immutably borrow the root player in this world.
     fn get_root_player(&self) -> &Player;
+
+    /// Immutably borrow a player in this world.
+    fn get_player(&self, uuid: &Uuid) -> Option<&Player>;
 }
