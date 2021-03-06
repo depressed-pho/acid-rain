@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use crate::{
     Graphics,
     Symbol,
@@ -20,6 +21,7 @@ impl Default for ButtonBorder {
     }
 }
 
+#[async_trait]
 impl Border for ButtonBorder {
     fn get_insets(&self) -> Insets {
         Insets {
@@ -30,7 +32,7 @@ impl Border for ButtonBorder {
         }
     }
 
-    fn paint(&self, g: &mut Graphics) {
+    async fn paint(&self, g: &mut Graphics) {
         /* For possible other candidates for symbols see
          * https://en.wikipedia.org/wiki/Bracket
          */

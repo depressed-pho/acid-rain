@@ -1,12 +1,13 @@
 mod implementation;
 pub use implementation::*;
 
+use async_trait::async_trait;
 use crate::dimension::LengthRequirements;
 use std::any::Any;
-use std::cell::RefCell;
 use std::fmt::{self, Debug};
 use std::ops::{Add, Mul, Sub, Neg};
-use std::rc::{Rc, Weak};
+use std::sync::{Arc, Weak};
+use tokio::sync::RwLock;
 use weak_table::PtrWeakHashSet;
 
 /// A spring holds a [LengthRequirements] and the current length. It can
@@ -27,10 +28,10 @@ use weak_table::PtrWeakHashSet;
 /// The struct [Spring] is actually a reference-counting wrapper for
 /// the trait [SpringImpl]. The reason why there has to be a wrapper
 /// is that arithmetic traits such as Add can not be directly
-/// implemented for `Rc<RefCell<dyn SpringImpl>>`.
+/// implemented for `Arc<RwLock<dyn SpringImpl>>`.
 #[derive(Clone)]
 pub struct Spring {
-    rc: Rc<RefCell<dyn SpringImpl>>
+    rc: Arc<RwLock<dyn SpringImpl>>
 }
 
 impl Spring {
@@ -39,11 +40,11 @@ impl Spring {
             !(&s_impl as &dyn Any).is::<Spring>(),
             "Wrapping a Spring into another Spring does not make sense");
         Self {
-            rc: Rc::new(RefCell::new(s_impl))
+            rc: Arc::new(RwLock::new(s_impl))
         }
     }
 
-    pub(crate) fn unwrap(&self) -> &Rc<RefCell<dyn SpringImpl>> {
+    pub(crate) fn unwrap(&self) -> &Arc<RwLock<dyn SpringImpl>> {
         &self.rc
     }
 }
@@ -51,26 +52,29 @@ impl Spring {
 impl Debug for Spring {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         /* Format the wrapper spring as if nothing were wrapped. */
-        self.rc.borrow().fmt(fmt)
+        futures::executor::block_on(async {
+            self.rc.read().await.fmt(fmt)
+        })
     }
 }
 
-pub trait SpringImpl: Debug {
+#[async_trait]
+pub trait SpringImpl: Debug + Send + Sync {
     /// Return the requirements for the length of this spring.
-    fn get_requirements(&self) -> LengthRequirements;
+    async fn get_requirements(&self) -> LengthRequirements;
 
     /// Return the current length of this spring.
-    fn get_length(&self) -> i32;
+    async fn get_length(&self) -> i32;
 
     /// Set the current length of this spring.
-    fn set_length(&mut self, length: i32);
+    async fn set_length(&mut self, length: i32);
 
     /// Return true iff the spring depends on any of springs in a
     /// given set.
-    fn is_cyclic(&self, seen: &mut SpringSet) -> bool;
+    async fn is_cyclic(&self, seen: &mut SpringSet) -> bool;
 
-    fn range(&self, contract: bool) -> i32 {
-        let reqs = self.get_requirements();
+    async fn range(&self, contract: bool) -> i32 {
+        let reqs = self.get_requirements().await;
         if contract {
             reqs.preferred - reqs.minimum
         }
@@ -79,10 +83,10 @@ pub trait SpringImpl: Debug {
         }
     }
 
-    fn get_strain(&self, length: i32) -> f64 {
-        let reqs  = self.get_requirements();
+    async fn get_strain(&self, length: i32) -> f64 {
+        let reqs  = self.get_requirements().await;
         let delta = length - reqs.preferred;
-        let range = self.range(length < reqs.preferred);
+        let range = self.range(length < reqs.preferred).await;
         if range == 0 {
             /* The range being 0 means that the spring is rigid, and
              * its length should always be its preferred length. This
@@ -95,34 +99,35 @@ pub trait SpringImpl: Debug {
         }
     }
 
-    fn set_strain(&mut self, strain: f64) {
+    async fn set_strain(&mut self, strain: f64) {
         self.set_length(
-            self.get_requirements().preferred +
-                (strain * self.range(strain < 0.0) as f64).round() as i32);
+            self.get_requirements().await.preferred +
+                (strain * self.range(strain < 0.0).await as f64).round() as i32).await;
     }
 }
 
+#[async_trait]
 impl SpringImpl for Spring {
-    fn get_requirements(&self) -> LengthRequirements {
-        self.rc.borrow().get_requirements()
+    async fn get_requirements(&self) -> LengthRequirements {
+        self.rc.read().await.get_requirements().await
     }
 
-    fn get_length(&self) -> i32 {
-        self.rc.borrow().get_length()
+    async fn get_length(&self) -> i32 {
+        self.rc.read().await.get_length().await
     }
 
-    fn set_length(&mut self, v: i32) {
-        self.rc.borrow_mut().set_length(v);
+    async fn set_length(&mut self, v: i32) {
+        self.rc.write().await.set_length(v).await;
     }
 
-    fn is_cyclic(&self, seen: &mut SpringSet) -> bool {
-        self.rc.borrow().is_cyclic(seen)
+    async fn is_cyclic(&self, seen: &mut SpringSet) -> bool {
+        self.rc.read().await.is_cyclic(seen).await
     }
 }
 
 #[derive(Debug)]
 pub struct SpringSet {
-    set: PtrWeakHashSet<Weak<RefCell<dyn SpringImpl>>>,
+    set: PtrWeakHashSet<Weak<RwLock<dyn SpringImpl>>>,
     has_cycle: bool
 }
 
@@ -134,7 +139,7 @@ impl SpringSet {
         }
     }
 
-    pub fn add(&mut self, s: &Spring) -> &mut Self {
+    pub async fn add(&mut self, s: &Spring) -> &mut Self {
         /* Once we find a single cycle, we don't need to check for any
          * others. */
         if !self.has_cycle {
@@ -143,7 +148,7 @@ impl SpringSet {
             /* Do we still have no cycles? Then recurse into the
              * supplied spring. */
             if !self.has_cycle {
-                s.is_cyclic(self);
+                s.is_cyclic(self).await;
             }
         }
         self

@@ -27,6 +27,16 @@ pub struct Graphics {
     bg_color: BoxedColor
 }
 
+/// Mark Graphics as Send. NCurses doesn't rely on thread-local
+/// storages or anything so WINDOW pointers can be safely sent between
+/// threads, although that doesn't make sense in general.
+unsafe impl Send for Graphics {}
+
+/// Mark Graphics as Sync as well. While ncurses::WINDOW itself does
+/// not prevent data races at all, we make sure that we only touch it
+/// in the Ctk context.
+unsafe impl Sync for Graphics {}
+
 impl Graphics {
     pub fn new() -> Graphics {
         Graphics {
@@ -85,7 +95,7 @@ impl Graphics {
 
     /// Copy the content of the graphics context to the curses
     /// screen.
-    pub fn refresh(&self, root: &RootWindow, pos: Point) {
+    pub unsafe fn refresh(&self, root: &RootWindow, pos: Point) {
         if let Some(w) = self.pad {
             let scr     = root.get_size();
             let pminrow = max(-pos.y, 0);

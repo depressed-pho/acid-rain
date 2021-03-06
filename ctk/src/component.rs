@@ -7,6 +7,7 @@ pub use label::*;
 mod panel;
 pub use panel::*;
 
+use async_trait::async_trait;
 use crate::{
     Border,
     RootWindow
@@ -21,16 +22,18 @@ use crate::dimension::{
 use num::Zero;
 use std::fmt::Debug;
 
-pub trait Component: Debug {
+#[async_trait]
+pub trait Component: Debug + Send + Sync {
     /// Paint the content of the graphics context if it might not have
     /// the desired content. This method must recursively repaint
     /// sub-components if the component is a container.
-    fn paint(&mut self);
+    async fn paint(&mut self);
 
     /// Copy the content of the graphics context to the curses
     /// screen. This method must recursively do the copying if the
-    /// component is a container.
-    fn refresh(&self, root: &RootWindow, offset: Point);
+    /// component is a container. This method is unsafe because it
+    /// must not be executed outside of the Ctk context.
+    async unsafe fn refresh(&self, root: &RootWindow, offset: Point);
 
     /// Validate sub-components if the component has any.
     ///
@@ -40,7 +43,7 @@ pub trait Component: Debug {
     /// layout manager. Otherwise it should do nothing. The default
     /// implementation does nothing as if the component was not a
     /// container.
-    fn validate(&mut self) {}
+    async fn validate(&mut self) {}
 
     /// Get the bounds of this component. The bounds specify this
     /// component's width, height, and location relative to its
@@ -52,7 +55,7 @@ pub trait Component: Debug {
     /// [invalidate()](crate::layout::Layout::invalidate()) the
     /// component hierarchy if the component is a container. It must
     /// also resize the graphics context.
-    fn set_bounds(&mut self, b: Rectangle);
+    async fn set_bounds(&mut self, b: Rectangle);
 
     /// Get the location of this component, i.e. the position of the
     /// bounds.
@@ -66,24 +69,18 @@ pub trait Component: Debug {
     }
 
     /// Set the size of this component.
-    fn set_size(&mut self, size: Dimension) {
+    async fn set_size(&mut self, size: Dimension) {
         self.set_bounds(
             Rectangle {
                 size,
                 ..self.get_bounds()
-            });
-    }
-
-    /// Update the size of this component by applying a function to
-    /// the current value.
-    fn update_size(&mut self, f: &dyn Fn(Dimension) -> Dimension) {
-        self.set_size(f(self.get_size()));
+            }).await;
     }
 
     /// Get the size requirements of this component. They are hints
     /// for layout managers and they usually, but not always, honor
     /// them.
-    fn get_size_requirements(&self) -> SizeRequirements;
+    async fn get_size_requirements(&self) -> SizeRequirements;
 
     /// Get the border of this component.
     fn get_border(&self) -> &Box<dyn Border>;

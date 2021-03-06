@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use crate::{
     Component,
     Layout
@@ -9,15 +10,15 @@ use crate::dimension::{
     SizeRequirements
 };
 use num::Zero;
-use std::cell::RefCell;
 use std::convert::TryInto;
-use std::rc::Rc;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 #[derive(Debug)]
 pub struct GridLayout {
     cells: Dimension,
     gap: Dimension,
-    components: Vec<Rc<RefCell<dyn Component>>>,
+    components: Vec<Arc<RwLock<dyn Component>>>,
     is_valid: bool
 }
 
@@ -34,7 +35,7 @@ impl GridLayout {
         }
     }
 
-    pub fn add(&mut self, c: Rc<RefCell<dyn Component>>) -> &mut Self {
+    pub fn add(&mut self, c: Arc<RwLock<dyn Component>>) -> &mut Self {
         self.components.push(c);
         self.invalidate();
         self
@@ -93,7 +94,7 @@ impl GridLayout {
         }
     }
 
-    fn do_layout(&mut self, parent: &dyn Component) {
+    async fn do_layout(&mut self, parent: &dyn Component) {
         let n_comps: i32 = self.components.len().try_into().unwrap();
         if n_comps == 0 {
             return;
@@ -122,11 +123,11 @@ impl GridLayout {
 
                     let i: usize = (r * n_cells.width + c).try_into().unwrap();
                     if i < n_comps.try_into().unwrap() {
-                        self.components[i].borrow_mut().set_bounds(
+                        self.components[i].write().await.set_bounds(
                             Rectangle {
                                 pos: Point { x, y },
                                 size: comp_size
-                            });
+                            }).await;
                     }
                 }
             }
@@ -142,11 +143,11 @@ impl GridLayout {
 
                     let i: usize = (r * n_cells.width + c).try_into().unwrap();
                     if i < n_comps.try_into().unwrap() {
-                        self.components[i].borrow_mut().set_bounds(
+                        self.components[i].write().await.set_bounds(
                             Rectangle {
                                 pos: Point { x, y },
                                 size: comp_size
-                            });
+                            }).await;
                     }
                 }
             }
@@ -154,14 +155,15 @@ impl GridLayout {
     }
 }
 
+#[async_trait]
 impl Layout for GridLayout {
-    fn validate(&mut self, parent: &dyn Component) {
+    async fn validate(&mut self, parent: &dyn Component) {
         if !self.is_valid {
-            self.do_layout(parent);
+            self.do_layout(parent).await;
             self.is_valid = true;
         }
         for child in self.components.iter() {
-            child.borrow_mut().validate();
+            child.write().await.validate().await;
         }
     }
 
@@ -169,7 +171,7 @@ impl Layout for GridLayout {
         self.is_valid = false;
     }
 
-    fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Rc<RefCell<dyn Component>>> + 'a> {
+    fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Arc<RwLock<dyn Component>>> + Send + 'a> {
         Box::new(self.components.iter())
     }
 
@@ -181,15 +183,16 @@ impl Layout for GridLayout {
     /// columns, plus the left and right insets of the parent
     /// component. The remaining parts of the requirements are computed
     /// all similarly.
-    fn get_size_requirements(&self, parent: &dyn Component) -> SizeRequirements {
+    async fn get_size_requirements(&self, parent: &dyn Component) -> SizeRequirements {
         let n_cells   = self.num_cells();
         let insets    = parent.get_insets();
-        let cell_reqs = self.components.iter().fold(
-            SizeRequirements::any(),
-            |acc, child| {
-                acc & child.borrow().get_size_requirements()
-            });
-
+        let cell_reqs = {
+            let mut acc = SizeRequirements::any();
+            for child in self.components.iter() {
+                acc = acc & child.read().await.get_size_requirements().await
+            }
+            acc
+        };
         cell_reqs * n_cells + self.gap * (n_cells - 1) + insets
     }
 }

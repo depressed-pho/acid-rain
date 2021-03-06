@@ -4,6 +4,7 @@ pub use constraints::*;
 mod spring;
 pub use spring::*;
 
+use async_trait::async_trait;
 use crate::{
     Component,
     Layout
@@ -15,9 +16,9 @@ use crate::dimension::{
     Rectangle,
     SizeRequirements
 };
-use std::cell::RefCell;
 use std::fmt::{self, Debug};
-use std::rc::{Rc, Weak};
+use std::sync::{Arc, Weak};
+use tokio::sync::RwLock;
 use weak_table::PtrWeakKeyHashMap;
 
 #[derive(Debug)]
@@ -33,9 +34,9 @@ pub struct SpringLayout {
      * - For all keys in "constraints", there exists a component in
      *   "components".
      */
-    components: Vec<Rc<RefCell<dyn Component>>>,
-    constraints: PtrWeakKeyHashMap<Weak<RefCell<dyn Component>>, Rc<RefCell<Constraints>>>,
-    parent_constr: Rc<RefCell<Constraints>>,
+    components: Vec<Arc<RwLock<dyn Component>>>,
+    constraints: PtrWeakKeyHashMap<Weak<RwLock<dyn Component>>, Arc<RwLock<Constraints>>>,
+    parent_constr: Arc<RwLock<Constraints>>,
     is_valid: bool
 }
 
@@ -47,12 +48,12 @@ impl SpringLayout {
         Self {
             components: Vec::new(),
             constraints: PtrWeakKeyHashMap::new(),
-            parent_constr: Rc::new(RefCell::new(con)),
+            parent_constr: Arc::new(RwLock::new(con)),
             is_valid: true
         }
     }
 
-    pub fn add(&mut self, c: Rc<RefCell<dyn Component>>) -> &mut Self {
+    pub fn add(&mut self, c: Arc<RwLock<dyn Component>>) -> &mut Self {
         self.components.push(c.clone());
 
         /* The rules for default springs are as follows:
@@ -76,13 +77,13 @@ impl SpringLayout {
         con.set_spring(Edge::Width, Some(WidthSpring::new(c.clone())));
         con.set_spring(Edge::Height, Some(HeightSpring::new(c.clone())));
 
-        self.constraints.insert(c, Rc::new(RefCell::new(con)));
+        self.constraints.insert(c, Arc::new(RwLock::new(con)));
         self.invalidate();
         self
     }
 
-    pub fn remove(&mut self, c: Rc<RefCell<dyn Component>>) -> &mut Self {
-        self.components.retain(|c_| !Rc::ptr_eq(&c, &c_));
+    pub fn remove(&mut self, c: Arc<RwLock<dyn Component>>) -> &mut Self {
+        self.components.retain(|c_| !Arc::ptr_eq(&c, &c_));
         self.constraints.remove(&c);
         self.invalidate();
         self
@@ -94,7 +95,7 @@ impl SpringLayout {
     ///
     /// This method is unsafe because callers can accidentally create
     /// cycles in springs.
-    unsafe fn get_constraints(&self, of: EdgesOf) -> Rc<RefCell<Constraints>> {
+    unsafe fn get_constraints(&self, of: EdgesOf) -> Arc<RwLock<Constraints>> {
         match &of {
             EdgesOf::Parent   => Some(self.parent_constr.clone()),
             EdgesOf::Child(c) => self.constraints.get(&c).cloned()
@@ -115,13 +116,13 @@ impl SpringLayout {
     /// Set a spring controlling the specified edge of a child
     /// component. This method panics if setting the given spring would
     /// create a cycle.
-    pub fn set_spring(&mut self, edge: Edge, of: EdgesOf, s: Spring) -> &mut Self {
+    pub async fn set_spring(&mut self, edge: Edge, of: EdgesOf, s: Spring) -> &mut Self {
         let cc = unsafe { self.get_constraints(of.clone()) };
-        cc.borrow_mut().set_spring(edge, Some(s.clone()));
-        if s.is_cyclic(&mut SpringSet::new()) {
+        cc.write().await.set_spring(edge, Some(s.clone()));
+        if s.is_cyclic(&mut SpringSet::new()).await {
             // Remove it. We don't want to enter into an infinite
             // loop by debug-formatting the cyclic spring.
-            cc.borrow_mut().set_spring(edge, None);
+            cc.write().await.set_spring(edge, None);
             panic!("A cycle has been detected in spring on {:?} of {:?}: {:#?}", edge, of, s);
         }
         self
@@ -135,60 +136,66 @@ impl SpringLayout {
         }
     }
 
-    fn do_layout(&mut self, parent: &dyn Component) {
+    async fn do_layout(&mut self, parent: &dyn Component) {
         let pc_    = unsafe { self.get_constraints(EdgesOf::Parent) };
-        let pc     = pc_.borrow();
+        let pc     = pc_.read().await;
         let insets = parent.get_insets();
         let size   = parent.get_size();
         pc.get_spring(Edge::Left)
             .unwrap_or_else(|| panic!("No springs for the left edge of the parent"))
-            .set_length(0);
+            .set_length(0)
+            .await;
         pc.get_spring(Edge::Top)
             .unwrap_or_else(|| panic!("No springs for the top edge of the parent"))
-            .set_length(0);
+            .set_length(0)
+            .await;
         pc.get_spring(Edge::Width)
             .unwrap_or_else(|| panic!("No springs for the width of the parent"))
-            .set_length(size.width - insets.left - insets.right);
+            .set_length(size.width - insets.left - insets.right)
+            .await;
         pc.get_spring(Edge::Height)
             .unwrap_or_else(|| panic!("No springs for the height of the parent"))
-            .set_length(size.height - insets.top - insets.bottom);
+            .set_length(size.height - insets.top - insets.bottom)
+            .await;
 
-        for (c, cc) in self.constraints.iter() {
+        for (c, cc_) in self.constraints.iter() {
+            let cc     = cc_.read().await;
             let bounds = Rectangle {
                 pos: Point {
-                    x: cc.borrow()
+                    x: cc
                         .get_spring(Edge::Left)
                         .unwrap_or_else(|| panic!("No springs for the left edge of the component: {:#?}", c))
-                        .get_length(),
-                    y: cc.borrow()
+                        .get_length().await,
+                    y: cc
                         .get_spring(Edge::Top)
                         .unwrap_or_else(|| panic!("No springs for the top edge of the component: {:#?}", c))
-                        .get_length()
+                        .get_length().await
                 },
                 size: Dimension {
-                    width: cc.borrow()
+                    width: cc
                         .get_spring(Edge::Width)
                         .unwrap_or_else(|| panic!("No springs for the width of the component: {:#?}", c))
-                        .get_length(),
-                    height: cc.borrow()
+                        .get_length().await,
+                    height: cc
                         .get_spring(Edge::Height)
                         .unwrap_or_else(|| panic!("No springs for the height of the component: {:#?}", c))
-                        .get_length()
+                        .get_length().await
                 }
             };
-            c.borrow_mut().set_bounds(bounds);
+            c.write().await.set_bounds(bounds).await;
         }
     }
 }
 
+#[async_trait]
 impl Layout for SpringLayout {
-    fn validate(&mut self, parent: &dyn Component) {
+    async fn validate(&mut self, parent: &dyn Component) {
         if !self.is_valid {
-            self.do_layout(parent);
+            self.do_layout(parent).await;
             self.is_valid = true;
         }
         for child in self.components.iter() {
-            child.borrow_mut().validate();
+            child.write().await.validate().await;
         }
     }
 
@@ -196,20 +203,20 @@ impl Layout for SpringLayout {
         self.is_valid = false
     }
 
-    fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Rc<RefCell<dyn Component>>> + 'a> {
+    fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Arc<RwLock<dyn Component>>> + Send + 'a> {
         Box::new(self.components.iter())
     }
 
-    fn get_size_requirements(&self, parent: &dyn Component) -> SizeRequirements {
+    async fn get_size_requirements(&self, parent: &dyn Component) -> SizeRequirements {
         let pc_ = unsafe { self.get_constraints(EdgesOf::Parent) };
-        let pc  = pc_.borrow();
+        let pc  = pc_.read().await;
         let w   = pc.get_spring(Edge::Width)
                     .unwrap_or_else(|| panic!("No springs for the width of the parent"));
         let h   = pc.get_spring(Edge::Height)
                     .unwrap_or_else(|| panic!("No springs for the height of the parent"));
         let req = SizeRequirements {
-            width: w.get_requirements(),
-            height: h.get_requirements()
+            width: w.get_requirements().await,
+            height: h.get_requirements().await
         };
         req + parent.get_insets()
     }
@@ -218,18 +225,17 @@ impl Layout for SpringLayout {
 #[derive(Clone)]
 pub enum EdgesOf {
     Parent,
-    Child(Rc<RefCell<dyn Component>>)
-    /* THINKME: Ideally this should be Child(&'a Rc<...>) but
-     * coerce_unsized doesn't seem to work in this case.
-     */
+    Child(Arc<RwLock<dyn Component>>)
 }
 
 impl Debug for EdgesOf {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::Parent    => fmt.write_str("Parent"),
-            Self::Child(rc) => rc.borrow().fmt(fmt)
-        }
+        futures::executor::block_on(async {
+            match self {
+                Self::Parent    => fmt.write_str("Parent"),
+                Self::Child(rc) => rc.read().await.fmt(fmt)
+            }
+        })
     }
 }
 
@@ -246,8 +252,8 @@ impl<'a> SpringLinker<'a> {
         }
     }
 
-    pub fn hook(self, edge: Edge, of: EdgesOf) -> &'a mut SpringLayout {
-        self.layout.set_spring(edge, of, self.spring);
+    pub async fn hook(self, edge: Edge, of: EdgesOf) -> &'a mut SpringLayout {
+        self.layout.set_spring(edge, of, self.spring).await;
         self.layout
     }
 }
@@ -255,17 +261,18 @@ impl<'a> SpringLinker<'a> {
 struct SpringProxy {
     edge: Edge,
     of: EdgesOf,
-    constraints: Rc<RefCell<Constraints>>
+    constraints: Arc<RwLock<Constraints>>
 }
 
 impl SpringProxy {
-    pub fn new(edge: Edge, of: EdgesOf, constraints: Rc<RefCell<Constraints>>) -> Spring {
+    pub fn new(edge: Edge, of: EdgesOf, constraints: Arc<RwLock<Constraints>>) -> Spring {
         Spring::wrap(Self { edge, of, constraints })
     }
 
-    fn deref(&self) -> Spring {
+    async fn deref(&self) -> Spring {
         self.constraints
-            .borrow()
+            .read()
+            .await
             .get_spring(self.edge)
             .unwrap_or_else(|| {
                 panic!("The referenced edge of the proxy has no spring: {:?}", self.edge)
@@ -275,28 +282,31 @@ impl SpringProxy {
 
 impl Debug for SpringProxy {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.debug_struct("SpringProxy")
-            .field("edge", &self.edge)
-            .field("of", &self.of)
-            .field("proxying", &self.deref())
-            .finish()
+        futures::executor::block_on(async {
+            fmt.debug_struct("SpringProxy")
+                .field("edge", &self.edge)
+                .field("of", &self.of)
+                .field("proxying", &self.deref().await)
+                .finish()
+        })
     }
 }
 
+#[async_trait]
 impl SpringImpl for SpringProxy {
-    fn get_requirements(&self) -> LengthRequirements {
-        self.deref().get_requirements()
+    async fn get_requirements(&self) -> LengthRequirements {
+        self.deref().await.get_requirements().await
     }
 
-    fn get_length(&self) -> i32 {
-        self.deref().get_length()
+    async fn get_length(&self) -> i32 {
+        self.deref().await.get_length().await
     }
 
-    fn set_length(&mut self, length: i32) {
-        self.deref().set_length(length)
+    async fn set_length(&mut self, length: i32) {
+        self.deref().await.set_length(length).await
     }
 
-    fn is_cyclic(&self, seen: &mut SpringSet) -> bool {
-        self.deref().is_cyclic(seen)
+    async fn is_cyclic(&self, seen: &mut SpringSet) -> bool {
+        self.deref().await.is_cyclic(seen).await
     }
 }

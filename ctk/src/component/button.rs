@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use crate::{
     Border,
     Component,
@@ -57,10 +58,11 @@ impl Button {
     }
 }
 
+#[async_trait]
 impl Component for Button {
-    fn paint(&mut self) {
+    async fn paint(&mut self) {
         if self.dirty {
-            self.border.paint(&mut self.graphics);
+            self.border.paint(&mut self.graphics).await;
 
             let inner = self.get_inner();
             self.graphics.clear_rect(inner);
@@ -73,7 +75,7 @@ impl Component for Button {
         self.dirty = false;
     }
 
-    fn refresh(&self, root: &RootWindow, offset: Point) {
+    async unsafe fn refresh(&self, root: &RootWindow, offset: Point) {
         self.graphics.refresh(root, self.get_location() + offset);
     }
 
@@ -81,14 +83,14 @@ impl Component for Button {
         self.bounds
     }
 
-    fn set_bounds(&mut self, b: Rectangle) {
+    async fn set_bounds(&mut self, b: Rectangle) {
         self.bounds = b;
         if self.graphics.set_size(b.size) {
             self.dirty = true;
         }
     }
 
-    fn get_size_requirements(&self) -> SizeRequirements {
+    async fn get_size_requirements(&self) -> SizeRequirements {
         self.size_req + self.get_insets()
     }
 

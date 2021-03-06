@@ -3,7 +3,8 @@ use rain_core::world::chunk::{Chunk, ChunkPos, ChunkManager};
 use rain_core::world::chunk::palette::ChunkPalette;
 use rain_core::world::tile::{ArcTile, TileRegistry};
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 #[derive(Debug)]
 /// This is a server-side chunk manager. When a chunk is requested, it
@@ -48,11 +49,11 @@ impl LocalChunkManager {
 #[async_trait]
 impl ChunkManager for LocalChunkManager {
     async fn get(&self, pos: ChunkPos) -> Arc<RwLock<Chunk>> {
-        if let Some(chunk) = self.loaded.read().unwrap().get(&pos) {
+        if let Some(chunk) = self.loaded.read().await.get(&pos) {
             return chunk.clone();
         }
         let chunk = Arc::new(RwLock::new(self.generate(pos).await));
-        self.loaded.write().unwrap().insert(pos, chunk.clone());
+        self.loaded.write().await.insert(pos, chunk.clone());
         chunk
     }
 }

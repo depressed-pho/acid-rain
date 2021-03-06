@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use crate::Graphics;
 use crate::border::Border;
 use crate::dimension::Insets;
@@ -12,12 +13,13 @@ impl Default for NullBorder {
     }
 }
 
+#[async_trait]
 impl Border for NullBorder {
     fn get_insets(&self) -> Insets {
         Insets::zero()
     }
 
-    fn paint(&self, _: &mut Graphics) {
+    async fn paint(&self, _: &mut Graphics) {
         // Paint nothing.
     }
 }

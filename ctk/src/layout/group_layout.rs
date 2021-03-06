@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use crate::{
     Component,
     Layout
@@ -5,8 +6,8 @@ use crate::{
 use crate::dimension::{
     SizeRequirements
 };
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 /// This layout manager is not finished, and will probably never be.
 #[derive(Debug)]
@@ -46,8 +47,9 @@ impl GroupLayout {
     }
 }
 
+#[async_trait]
 impl Layout for GroupLayout {
-    fn validate(&mut self, parent: &dyn Component) {
+    async fn validate(&mut self, parent: &dyn Component) {
         if !self.is_valid {
             self.do_layout(parent);
             self.is_valid = true;
@@ -64,11 +66,11 @@ impl Layout for GroupLayout {
         self.is_valid = false
     }
 
-    fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Rc<RefCell<dyn Component>>> + 'a> {
+    fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Arc<RwLock<dyn Component>>> + Send + 'a> {
         unimplemented!();
     }
 
-    fn get_size_requirements(&self, _parent: &dyn Component) -> SizeRequirements {
+    async fn get_size_requirements(&self, _parent: &dyn Component) -> SizeRequirements {
         unimplemented!();
     }
 }

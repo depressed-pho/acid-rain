@@ -7,9 +7,10 @@ pub use group_layout::GroupLayout;
 pub mod spring_layout;
 pub use spring_layout::SpringLayout;
 
-use std::cell::RefCell;
+use async_trait::async_trait;
 use std::fmt::Debug;
-use std::rc::Rc;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 use crate::{
     Component
@@ -23,7 +24,8 @@ use crate::dimension::SizeRequirements;
 /// multiple components. The only reason components take an Rc pointer
 /// to a layout is so that you can mutate the layout after
 /// constructing the component tree.
-pub trait Layout: Debug {
+#[async_trait]
+pub trait Layout: Debug + Send + Sync {
     /// Do laying out sub-components if the layout manager is invalid.
     ///
     /// The argument `parent` is the parent component which owns this
@@ -40,12 +42,12 @@ pub trait Layout: Debug {
     /// layout managers must call [Component::validate()] on each of
     /// them, regardless of whether the layout manager is itself
     /// invalid.
-    fn validate(&mut self, parent: &dyn Component);
+    async fn validate(&mut self, parent: &dyn Component);
     fn invalidate(&mut self);
 
     // We can't simply do "-> impl Iterator<...>" due to E0562:
     // https://github.com/rust-lang/rfcs/blob/master/text/1522-conservative-impl-trait.md
-    fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Rc<RefCell<dyn Component>>> + 'a>;
+    fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Arc<RwLock<dyn Component>>> + Send + 'a>;
 
-    fn get_size_requirements(&self, parent: &dyn Component) -> SizeRequirements;
+    async fn get_size_requirements(&self, parent: &dyn Component) -> SizeRequirements;
 }
