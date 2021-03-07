@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use crate::{
     Border,
     Component,
@@ -12,20 +11,20 @@ use crate::dimension::{
     Rectangle,
     SizeRequirements
 };
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct Panel {
     graphics: Graphics,
     bounds: Rectangle,
-    layout: Arc<RwLock<dyn Layout>>,
+    layout: Rc<RefCell<dyn Layout>>,
     border: Box<dyn Border>,
     dirty: bool
 }
 
 impl Panel {
-    pub fn new(layout: Arc<RwLock<dyn Layout>>) -> Panel {
+    pub fn new(layout: Rc<RefCell<dyn Layout>>) -> Panel {
         Panel {
             graphics: Graphics::new(),
             bounds: Rectangle::default(),
@@ -36,44 +35,43 @@ impl Panel {
     }
 }
 
-#[async_trait]
 impl Component for Panel {
-    async fn paint(&mut self) {
+    fn paint(&mut self) {
         if self.dirty {
-            self.border.paint(&mut self.graphics).await;
+            self.border.paint(&mut self.graphics);
         }
         self.dirty = false;
-        for child in self.layout.read().await.children() {
-            child.write().await.paint().await;
+        for child in self.layout.borrow().children() {
+            child.borrow_mut().paint();
         }
     }
 
-    async unsafe fn refresh(&self, root: &RootWindow, offset: Point) {
+    fn refresh(&self, root: &RootWindow, offset: Point) {
         let pos = self.get_location() + offset;
         self.graphics.refresh(root, pos);
-        for child in self.layout.read().await.children() {
-            child.read().await.refresh(root, pos).await;
+        for child in self.layout.borrow().children() {
+            child.borrow().refresh(root, pos);
         }
     }
 
-    async fn validate(&mut self) {
-        self.layout.write().await.validate(self).await;
+    fn validate(&mut self) {
+        self.layout.borrow_mut().validate(self);
     }
 
     fn get_bounds(&self) -> Rectangle {
         self.bounds
     }
 
-    async fn set_bounds(&mut self, b: Rectangle) {
+    fn set_bounds(&mut self, b: Rectangle) {
         self.bounds = b;
-        self.layout.write().await.invalidate();
+        self.layout.borrow_mut().invalidate();
         if self.graphics.set_size(b.size) {
             self.dirty = true;
         }
     }
 
-    async fn get_size_requirements(&self) -> SizeRequirements {
-        self.layout.read().await.get_size_requirements(self).await
+    fn get_size_requirements(&self) -> SizeRequirements {
+        self.layout.borrow().get_size_requirements(self)
     }
 
     fn get_border(&self) -> &Box<dyn Border> {

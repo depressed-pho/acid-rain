@@ -16,8 +16,9 @@ use ctk::layout::spring_layout::{
     SpringLayout,
     StaticSpring
 };
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 use uuid::Uuid;
 
 fn opt_matches<'a>() -> ArgMatches<'a> {
@@ -32,74 +33,70 @@ async fn main() {
     let _matches = opt_matches();
 
     let world = Arc::new(RwLock::new(rain_server::world::LocalWorld::new()));
-    let root_id = world.read().await.get_root_player().uuid();
+    let root_id = world.read().unwrap().get_root_player().uuid();
 
     ctk_main(world, root_id).await;
     //ctk_title().await;
 }
 
-async fn ctk_main(world: Arc<RwLock<impl World + Send + Sync + 'static>>, player: Uuid) {
-    let layout = Arc::new(RwLock::new(GridLayout::new()));
-    layout.write().await.set_cols(1);
+async fn ctk_main(world: Arc<RwLock<impl World + 'static>>, player: Uuid) {
+    let layout = Rc::new(RefCell::new(GridLayout::new()));
+    layout.borrow_mut().set_cols(1);
 
-    let view = Arc::new(RwLock::new(WorldView::new(world, player)));
-    layout.write().await.add(view);
+    let view = Rc::new(RefCell::new(WorldView::new(world, player)));
+    layout.borrow_mut().add(view);
 
     let mut tk = ctk::Ctk::initiate(layout).unwrap();
     tk.step().await;
 }
 
 async fn ctk_title() {
-    let layout = Arc::new(RwLock::new(GridLayout::new()));
-    layout.write().await.set_cols(1);
+    let layout = Rc::new(RefCell::new(GridLayout::new()));
+    layout.borrow_mut().set_cols(1);
 
-    let title = Arc::new(RwLock::new(Label::new("A c i d   R a i n")));
-    title.write().await.set_horizontal_alignment(HA::Center);
-    layout.write().await.add(title);
+    let title = Rc::new(RefCell::new(Label::new("A c i d   R a i n")));
+    title.borrow_mut().set_horizontal_alignment(HA::Center);
+    layout.borrow_mut().add(title);
 
     let buttons_outer = {
-        let layout = Arc::new(RwLock::new(SpringLayout::new()));
+        let layout = Rc::new(RefCell::new(SpringLayout::new()));
 
         let buttons = {
-            let layout = Arc::new(RwLock::new(GridLayout::new()));
-            layout.write().await.set_cols(1).set_vgap(1);
+            let layout = Rc::new(RefCell::new(GridLayout::new()));
+            layout.borrow_mut().set_cols(1).set_vgap(1);
 
-            let play = Arc::new(RwLock::new(Button::new("Play")));
-            layout.write().await.add(play);
+            let play = Rc::new(RefCell::new(Button::new("Play")));
+            layout.borrow_mut().add(play);
 
-            let quit = Arc::new(RwLock::new(Button::new("Quit")));
-            layout.write().await.add(quit);
+            let quit = Rc::new(RefCell::new(Button::new("Quit")));
+            layout.borrow_mut().add(quit);
 
-            Arc::new(RwLock::new(Panel::new(layout)))
+            Rc::new(RefCell::new(Panel::new(layout)))
         };
         {
             let gap = || StaticSpring::new(LengthRequirements::any().preferred(0));
 
-            layout.write().await.add(buttons.clone())
+            layout.borrow_mut().add(buttons.clone())
 
              .take(Edge::Left, EdgesOf::Parent)
                 .modify(|s| s + gap())
                 .hook(Edge::Left, EdgesOf::Child(buttons.clone()))
-                .await
 
              .take(Edge::Top, EdgesOf::Parent)
                 .modify(|s| s + gap())
                 .hook(Edge::Top, EdgesOf::Child(buttons.clone()))
-                .await
 
              .take(Edge::Right, EdgesOf::Child(buttons.clone()))
                 .modify(|s| s + gap())
                 .hook(Edge::Right, EdgesOf::Parent)
-                .await
 
              .take(Edge::Bottom, EdgesOf::Child(buttons.clone()))
                 .modify(|s| s + gap())
-                .hook(Edge::Bottom, EdgesOf::Parent)
-                .await;
+                .hook(Edge::Bottom, EdgesOf::Parent);
         }
-        Arc::new(RwLock::new(Panel::new(layout)))
+        Rc::new(RefCell::new(Panel::new(layout)))
     };
-    layout.write().await.add(buttons_outer);
+    layout.borrow_mut().add(buttons_outer);
 
     let mut tk = ctk::Ctk::initiate(layout).unwrap();
     tk.step().await;

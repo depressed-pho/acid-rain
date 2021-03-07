@@ -1,6 +1,6 @@
 use crate::layout::spring_layout::Spring;
 use fixed_map::{Key, Map as FixedMap};
-use std::sync::{RwLock, RwLockWriteGuard};
+use std::cell::{RefCell, RefMut};
 
 #[derive(Eq, PartialEq, Clone, Copy, Key, Hash, Debug)]
 pub enum Edge {
@@ -31,8 +31,8 @@ pub(crate) struct Constraints {
      * - There are at most 2 explicit springs for each axis.
      */
     explicit:   FixedMap<Edge, Spring>,
-    h_implicit: RwLock<FixedMap<Edge, Option<Spring>>>,
-    v_implicit: RwLock<FixedMap<Edge, Option<Spring>>>,
+    h_implicit: RefCell<FixedMap<Edge, Option<Spring>>>,
+    v_implicit: RefCell<FixedMap<Edge, Option<Spring>>>,
     h_history:  Vec<Edge>,
     v_history:  Vec<Edge>
 }
@@ -42,8 +42,8 @@ impl Constraints {
     pub(crate) fn new() -> Self {
         Constraints {
             explicit:   FixedMap::new(),
-            h_implicit: RwLock::new(FixedMap::new()),
-            v_implicit: RwLock::new(FixedMap::new()),
+            h_implicit: RefCell::new(FixedMap::new()),
+            v_implicit: RefCell::new(FixedMap::new()),
             h_history:  Vec::with_capacity(2),
             v_history:  Vec::with_capacity(2)
         }
@@ -58,12 +58,12 @@ impl Constraints {
         }
     }
 
-    fn implicit_mut(&self, edge: Edge) -> RwLockWriteGuard<'_, FixedMap<Edge, Option<Spring>>> {
+    fn implicit_mut(&self, edge: Edge) -> RefMut<FixedMap<Edge, Option<Spring>>> {
         if edge.is_horizontal() {
-            self.h_implicit.write().unwrap()
+            self.h_implicit.borrow_mut()
         }
         else {
-            self.v_implicit.write().unwrap()
+            self.v_implicit.borrow_mut()
         }
     }
 

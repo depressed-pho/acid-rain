@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use ctk::{
     Border,
     Component,
@@ -17,13 +16,12 @@ use ctk::dimension::{
 use num::Zero;
 use rain_core::world::World;
 use rain_core::world::position::WorldPos;
-use rain_core::world::chunk::ChunkPos;
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use rain_core::world::chunk::{ChunkManager, ChunkPos};
+use std::sync::{Arc, RwLock};
 use uuid::Uuid;
 
 #[derive(Debug)]
-pub struct WorldView<W: World + Send + Sync> {
+pub struct WorldView<W: World> {
     graphics: Graphics,
     bounds: Rectangle,
     border: Box<dyn Border>,
@@ -37,7 +35,7 @@ pub struct WorldView<W: World + Send + Sync> {
     player_offset: Point
 }
 
-impl<W: World + Send + Sync> WorldView<W> {
+impl<W: World> WorldView<W> {
     pub fn new(world: Arc<RwLock<W>>, player: Uuid) -> Self {
         Self {
             graphics: Graphics::new(),
@@ -60,9 +58,9 @@ impl<W: World + Send + Sync> WorldView<W> {
     }
 
     /// Convert a point in the component coords to that of the world coords.
-    async fn world_pos_at(&self, cp: Point) -> WorldPos {
+    fn world_pos_at(&self, cp: Point) -> WorldPos {
         // Get the player position in the world coords.
-        let world  = self.world.read().await;
+        let world  = self.world.read().unwrap();
         let player = world.get_player(&self.player).expect("Player is missing");
         let ppos_w = player.get_pos();
 
@@ -83,7 +81,7 @@ impl<W: World + Send + Sync> WorldView<W> {
         }
     }
 
-    async fn draw_chunks(&mut self) {
+    fn draw_chunks(&mut self) {
         let inner = self.get_inner();
 
         /* Draw all the tiles currently visible from the
@@ -98,22 +96,21 @@ impl<W: World + Send + Sync> WorldView<W> {
          * render chunks inconsistently, but that should be
          * acceptable.
          */
-        let w_top_left     = self.world_pos_at(inner.pos).await;
+        let w_top_left     = self.world_pos_at(inner.pos);
         let w_top_right    = w_top_left. map_x(|x| x + inner.size.width);
         let w_bottom_left  = w_top_left. map_y(|y| y + inner.size.height);
+        let w_bottom_right = w_top_right.map_y(|y| y + inner.size.height);
         let c_top_left     = ChunkPos::from(w_top_left);
         let c_top_right    = ChunkPos::from(w_top_right);
         let c_bottom_left  = ChunkPos::from(w_bottom_left);
 
-        let world = self.world.read().await;
+        let world = self.world.read().unwrap();
         let cm    = world.get_chunk_manager();
 
         for y in c_top_left.y .. c_bottom_left.y {
             for x in c_top_left.x .. c_top_right.y {
-                let cpos   = ChunkPos { x, y };
-                let chunk_ = cm.get(cpos).await;
-                let chunk  = chunk_.read().await;
-                //panic!("{:?}", chunk);
+                let cpos  = ChunkPos { x, y };
+                //let chunk = cm.get(cpos).await;
             }
         }
 
@@ -131,22 +128,21 @@ impl<W: World + Send + Sync> WorldView<W> {
     }
 }
 
-#[async_trait]
-impl<W: World + Send + Sync> Component for WorldView<W> {
-    async fn paint(&mut self) {
+impl<W: World> Component for WorldView<W> {
+    fn paint(&mut self) {
         if self.dirty {
-            self.border.paint(&mut self.graphics).await;
+            self.border.paint(&mut self.graphics);
 
             let inner = self.get_inner();
             self.graphics.clear_rect(inner);
 
-            self.draw_chunks().await;
+            self.draw_chunks();
             self.draw_player();
         }
         self.dirty = true;
     }
 
-    async unsafe fn refresh(&self, root: &RootWindow, offset: Point) {
+    fn refresh(&self, root: &RootWindow, offset: Point) {
         self.graphics.refresh(root, self.get_location() + offset);
     }
 
@@ -154,14 +150,14 @@ impl<W: World + Send + Sync> Component for WorldView<W> {
         self.bounds
     }
 
-    async fn set_bounds(&mut self, b: Rectangle) {
+    fn set_bounds(&mut self, b: Rectangle) {
         self.bounds = b;
         if self.graphics.set_size(b.size) {
             self.dirty = true;
         }
     }
 
-    async fn get_size_requirements(&self) -> SizeRequirements {
+    fn get_size_requirements(&self) -> SizeRequirements {
         SizeRequirements::any()
     }
 

@@ -16,7 +16,6 @@ repository = "https://github.com/depressed-pho/acid-rain.git"
 async-trait = "^0.1"
 ctk = { path = "../ctk" }
 num = "^0.2"
-tokio = { version = "^1.2", features = ["sync"] }
 unicode-width = "^0.1"
 uuid = { version = "^0.8", features = ["v4"] }
 

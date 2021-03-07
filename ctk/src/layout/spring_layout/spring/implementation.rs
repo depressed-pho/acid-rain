@@ -1,13 +1,12 @@
-use async_trait::async_trait;
 use crate::Component;
 use crate::dimension::{
     LengthRequirements
 };
 use lazy_static::lazy_static;
+use std::cell::RefCell;
 use std::fmt::{self, Debug};
-use std::sync::Arc;
+use std::rc::Rc;
 use super::{Spring, SpringImpl, SpringSet};
-use tokio::sync::RwLock;
 
 lazy_static! {
     /* In order to evenly distribute extra spaces, it is crucial to
@@ -37,21 +36,20 @@ impl StaticSpring {
     }
 }
 
-#[async_trait]
 impl SpringImpl for StaticSpring {
-    async fn get_requirements(&self) -> LengthRequirements {
+    fn get_requirements(&self) -> LengthRequirements {
         self.reqs
     }
 
-    async fn get_length(&self) -> i32 {
+    fn get_length(&self) -> i32 {
         self.length
     }
 
-    async fn set_length(&mut self, length: i32) {
+    fn set_length(&mut self, length: i32) {
         self.length = length;
     }
 
-    async fn is_cyclic(&self, _seen: &mut SpringSet) -> bool {
+    fn is_cyclic(&self, _seen: &mut SpringSet) -> bool {
         false
     }
 }
@@ -61,47 +59,41 @@ impl SpringImpl for StaticSpring {
 /// component.
 #[derive(Clone)]
 pub struct WidthSpring {
-    of: Arc<RwLock<dyn Component>>,
+    of: Rc<RefCell<dyn Component>>,
     length: Option<i32>
 }
 
 impl WidthSpring {
-    pub fn new(of: Arc<RwLock<dyn Component>>) -> Spring {
+    pub fn new(of: Rc<RefCell<dyn Component>>) -> Spring {
         Spring::wrap(Self { of, length: None })
     }
 }
 
 impl Debug for WidthSpring {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        futures::executor::block_on(async {
-            fmt.debug_struct("WidthSpring")
-                .field("of", &self.of.read().await)
-                .field("length", &self.length)
-                .finish()
-        })
+        fmt.debug_struct("WidthSpring")
+            .field("of", &self.of.borrow())
+            .field("length", &self.length)
+            .finish()
     }
 }
 
-#[async_trait]
 impl SpringImpl for WidthSpring {
-    async fn get_requirements(&self) -> LengthRequirements {
-        self.of.read().await.get_size_requirements().await.width & *MAX
+    fn get_requirements(&self) -> LengthRequirements {
+        self.of.borrow().get_size_requirements().width & *MAX
     }
 
-    async fn get_length(&self) -> i32 {
-        if let Some(l) = self.length {
-            l
-        }
-        else {
-            self.get_requirements().await.preferred
-        }
+    fn get_length(&self) -> i32 {
+        self.length.unwrap_or_else(|| {
+            self.get_requirements().preferred
+        })
     }
 
-    async fn set_length(&mut self, width: i32) {
+    fn set_length(&mut self, width: i32) {
         self.length = Some(width);
     }
 
-    async fn is_cyclic(&self, _seen: &mut SpringSet) -> bool {
+    fn is_cyclic(&self, _seen: &mut SpringSet) -> bool {
         false
     }
 }
@@ -111,47 +103,41 @@ impl SpringImpl for WidthSpring {
 /// component.
 #[derive(Clone)]
 pub struct HeightSpring {
-    of: Arc<RwLock<dyn Component>>,
+    of: Rc<RefCell<dyn Component>>,
     length: Option<i32>
 }
 
 impl HeightSpring {
-    pub fn new(of: Arc<RwLock<dyn Component>>) -> Spring {
+    pub fn new(of: Rc<RefCell<dyn Component>>) -> Spring {
         Spring::wrap(Self { of, length: None })
     }
 }
 
 impl Debug for HeightSpring {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        futures::executor::block_on(async {
-            fmt.debug_struct("HeightSpring")
-                .field("of", &self.of.read().await)
-                .field("length", &self.length)
-                .finish()
-        })
+        fmt.debug_struct("HeightSpring")
+            .field("of", &self.of.borrow())
+            .field("length", &self.length)
+            .finish()
     }
 }
 
-#[async_trait]
 impl SpringImpl for HeightSpring {
-    async fn get_requirements(&self) -> LengthRequirements {
-        self.of.read().await.get_size_requirements().await.height & *MAX
+    fn get_requirements(&self) -> LengthRequirements {
+        self.of.borrow().get_size_requirements().height & *MAX
     }
 
-    async fn get_length(&self) -> i32 {
-        if let Some(l) = self.length {
-            l
-        }
-        else {
-            self.get_requirements().await.preferred
-        }
+    fn get_length(&self) -> i32 {
+        self.length.unwrap_or_else(|| {
+            self.get_requirements().preferred
+        })
     }
 
-    async fn set_length(&mut self, height: i32) {
+    fn set_length(&mut self, height: i32) {
         self.length = Some(height);
     }
 
-    async fn is_cyclic(&self, _seen: &mut SpringSet) -> bool {
+    fn is_cyclic(&self, _seen: &mut SpringSet) -> bool {
         false
     }
 }
@@ -168,31 +154,22 @@ impl SumSpring {
     }
 }
 
-#[async_trait]
 impl SpringImpl for SumSpring {
-    async fn get_requirements(&self) -> LengthRequirements {
-        let (a, b) = tokio::join!(
-            self.a.get_requirements(),
-            self.b.get_requirements());
-        a + b
+    fn get_requirements(&self) -> LengthRequirements {
+        self.a.get_requirements() + self.b.get_requirements()
     }
 
-    async fn get_length(&self) -> i32 {
-        let (a, b) = tokio::join!(
-            self.a.get_length(),
-            self.b.get_length());
-        a + b
+    fn get_length(&self) -> i32 {
+        self.a.get_length() + self.b.get_length()
     }
 
-    async fn set_length(&mut self, length: i32) {
-        self.a.set_strain(self.get_strain(length).await).await;
-        self.b.set_length(length - self.a.get_length().await).await;
+    fn set_length(&mut self, length: i32) {
+        self.a.set_strain(self.get_strain(length));
+        self.b.set_length(length - self.a.get_length());
     }
 
-    async fn is_cyclic(&self, seen: &mut SpringSet) -> bool {
-        seen.add(&self.a).await
-            .add(&self.b).await
-            .is_cyclic()
+    fn is_cyclic(&self, seen: &mut SpringSet) -> bool {
+        seen.add(&self.a).add(&self.b).is_cyclic()
     }
 }
 
@@ -207,21 +184,20 @@ impl NegativeSpring {
     }
 }
 
-#[async_trait]
 impl SpringImpl for NegativeSpring {
-    async fn get_requirements(&self) -> LengthRequirements {
-        -self.s.get_requirements().await
+    fn get_requirements(&self) -> LengthRequirements {
+        -self.s.get_requirements()
     }
 
-    async fn get_length(&self) -> i32 {
-        -self.s.get_length().await
+    fn get_length(&self) -> i32 {
+        -self.s.get_length()
     }
 
-    async fn set_length(&mut self, length: i32) {
-        self.s.set_length(-length).await;
+    fn set_length(&mut self, length: i32) {
+        self.s.set_length(-length);
     }
 
-    async fn is_cyclic(&self, seen: &mut SpringSet) -> bool {
-        seen.add(&self.s).await.is_cyclic()
+    fn is_cyclic(&self, _seen: &mut SpringSet) -> bool {
+        unimplemented!();
     }
 }

@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use crate::{
     Border,
     Component,
@@ -13,8 +12,8 @@ use crate::dimension::{
     SizeRequirements
 };
 use num::Zero;
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 /// The root window is a special window which covers the entire
 /// terminal screen. Its position is fixed to (0, 0), and its size can
@@ -24,25 +23,15 @@ pub struct RootWindow {
     screen: ncurses::WINDOW,
     graphics: Graphics,
     bounds: Rectangle,
-    layout: Arc<RwLock<dyn Layout>>,
+    layout: Rc<RefCell<dyn Layout>>,
     /* We really want to do Box<dyn Border + Copy> but Rust currently
      * doesn't allow that: E0225 */
     border: Box<dyn Border>,
     dirty: bool
 }
 
-/// Mark Graphics as Send. NCurses doesn't rely on thread-local
-/// storages or anything so WINDOW pointers can be safely sent between
-/// threads, although that doesn't make sense in general.
-unsafe impl Send for RootWindow {}
-
-/// Mark Graphics as Sync as well. While ncurses::WINDOW itself does
-/// not prevent data races at all, we make sure that we only touch it
-/// in the Ctk context.
-unsafe impl Sync for RootWindow {}
-
 impl RootWindow {
-    pub(crate) fn new(screen: ncurses::WINDOW, layout: Arc<RwLock<dyn Layout>>) -> RootWindow {
+    pub(crate) fn new(screen: ncurses::WINDOW, layout: Rc<RefCell<dyn Layout>>) -> RootWindow {
         let bounds = Self::bounds_from_screen(screen);
 
         let mut graphics = Graphics::new();
@@ -58,9 +47,9 @@ impl RootWindow {
         }
     }
 
-    pub(crate) async fn resize(&mut self) {
+    pub(crate) fn resize(&mut self) {
         self.set_bounds(
-            Self::bounds_from_screen(self.screen)).await;
+            Self::bounds_from_screen(self.screen));
     }
 
     fn bounds_from_screen(screen: ncurses::WINDOW) -> Rectangle {
@@ -74,30 +63,29 @@ impl RootWindow {
     }
 }
 
-#[async_trait]
 impl Component for RootWindow {
-    async fn paint(&mut self) {
+    fn paint(&mut self) {
         if self.dirty {
-            self.border.paint(&mut self.graphics).await;
+            self.border.paint(&mut self.graphics);
         }
         self.dirty = false;
-        for child in self.layout.read().await.children() {
-            child.write().await.paint().await;
+        for child in self.layout.borrow().children() {
+            child.borrow_mut().paint();
         }
     }
 
-    async unsafe fn refresh(&self, root: &Self, offset: Point) {
+    fn refresh(&self, root: &Self, offset: Point) {
         assert!(self as *const Self == root as *const Self);
         assert!(offset.is_zero());
 
         self.graphics.refresh(root, self.get_location());
-        for child in self.layout.read().await.children() {
-            child.read().await.refresh(root, offset).await;
+        for child in self.layout.borrow().children() {
+            child.borrow().refresh(root, offset);
         }
     }
 
-    async fn validate(&mut self) {
-        self.layout.write().await.validate(self).await;
+    fn validate(&mut self) {
+        self.layout.borrow_mut().validate(self);
     }
 
     fn get_bounds(&self) -> Rectangle {
@@ -105,15 +93,15 @@ impl Component for RootWindow {
     }
 
     /// For internal use only. User code must not invoke this.
-    async fn set_bounds(&mut self, b: Rectangle) {
+    fn set_bounds(&mut self, b: Rectangle) {
         self.bounds = b;
-        self.layout.write().await.invalidate();
+        self.layout.borrow_mut().invalidate();
         if self.graphics.set_size(b.size) {
             self.dirty = true;
         }
     }
 
-    async fn get_size_requirements(&self) -> SizeRequirements {
+    fn get_size_requirements(&self) -> SizeRequirements {
         SizeRequirements::exactly(self.get_size())
     }
 
