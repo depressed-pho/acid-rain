@@ -7,7 +7,6 @@ use rain_core::world::tile::TileRegistry;
 use rain_core::world::player::{Permission, Player};
 use rain_core::world::position::WorldPos;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
 use uuid::Uuid;
 
 /// Local world is a server-side world which is owned by a server. The
@@ -49,7 +48,7 @@ impl LocalWorld {
 }
 
 impl World for LocalWorld {
-    fn get_chunk(&self, pos: ChunkPos) -> Option<Arc<RwLock<Chunk>>> {
+    fn get_chunk(&self, pos: ChunkPos) -> Option<&Chunk> {
         if let Some(chunk) = self.chunks.get(pos) {
             Some(chunk)
         }
@@ -57,6 +56,10 @@ impl World for LocalWorld {
             // FIXME: Async fetch and event notification
             None
         }
+    }
+
+    fn ensure_chunk_exists(&mut self, pos: ChunkPos) {
+        self.chunks.ensure_chunk_exists(pos)
     }
 
     fn get_root_player(&self) -> &Player {

@@ -6,7 +6,6 @@ pub mod position;
 use crate::world::chunk::{Chunk, ChunkPos};
 use crate::world::player::Player;
 use std::fmt::Debug;
-use std::sync::{Arc, RwLock};
 use uuid::Uuid;
 
 /// There are several types of worlds:
@@ -24,7 +23,10 @@ use uuid::Uuid;
 pub trait World : Debug {
     /// Get the chunk at a certain position if it's
     /// available. Otherwise an event ChunkArrived will happen later.
-    fn get_chunk(&self, pos: ChunkPos) -> Option<Arc<RwLock<Chunk>>>;
+    fn get_chunk(&self, pos: ChunkPos) -> Option<&Chunk>;
+
+    // FIXME: Remove this later.
+    fn ensure_chunk_exists(&mut self, pos: ChunkPos);
 
     /// Immutably borrow the root player in this world.
     fn get_root_player(&self) -> &Player;

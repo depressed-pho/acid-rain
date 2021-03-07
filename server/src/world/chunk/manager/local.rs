@@ -2,9 +2,8 @@ use rain_core::world::chunk::{Chunk, ChunkPos, ChunkManager};
 use rain_core::world::chunk::palette::ChunkPalette;
 use rain_core::world::tile::{ArcTile, TileRegistry};
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
-#[derive(Debug)]
 /// This is a server-side chunk manager. When a chunk is requested, it
 /// searches for the chunk in the loaded chunk map, or loads the chunk
 /// from disk, or performs a chunk generation. The server thread
@@ -14,10 +13,11 @@ use std::sync::{Arc, RwLock};
 /// entities, the chunk will be unloaded from memory. The cache is
 /// therefore not an LRU.
 ///
+#[derive(Debug)]
 pub struct LocalChunkManager {
     tiles: Arc<TileRegistry>,
     palette: Arc<ChunkPalette>, // Shared among chunks.
-    loaded: RwLock<HashMap<ChunkPos, Arc<RwLock<Chunk>>>>
+    loaded: HashMap<ChunkPos, Chunk>
 }
 
 impl LocalChunkManager {
@@ -31,7 +31,7 @@ impl LocalChunkManager {
         Self {
             tiles: Arc::new(tiles),
             palette: Arc::new(palette),
-            loaded: RwLock::new(HashMap::new())
+            loaded: HashMap::new()
         }
     }
 
@@ -45,13 +45,14 @@ impl LocalChunkManager {
 }
 
 impl ChunkManager for LocalChunkManager {
-    fn get(&self, pos: ChunkPos) -> Option<Arc<RwLock<Chunk>>> {
-        if let Some(chunk) = self.loaded.read().unwrap().get(&pos) {
-            return Some(chunk.clone());
+    fn get(&self, pos: ChunkPos) -> Option<&Chunk> {
+        self.loaded.get(&pos)
+    }
+
+    fn ensure_chunk_exists(&mut self, pos: ChunkPos) {
+        if !self.loaded.contains_key(&pos) {
+            let chunk = self.generate(pos);
+            self.loaded.insert(pos, chunk);
         }
-        // FIXME: Return None in this case.
-        let chunk = Arc::new(RwLock::new(self.generate(pos)));
-        self.loaded.write().unwrap().insert(pos, chunk.clone());
-        Some(chunk)
     }
 }

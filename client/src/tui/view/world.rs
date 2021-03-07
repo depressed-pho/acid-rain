@@ -87,16 +87,11 @@ impl<W: World> WorldView<W> {
         let inner = self.get_inner();
 
         /* Draw all the tiles currently visible from the
-         * viewpoint. The easiest way to do this to iterate on every
-         * visible position and ask the world for the tile there, but
-         * that would cause too many atomic operations and would be
-         * terribly inefficient. The second easiest approach is to
-         * collect all the visible chunks and read-lock them all, then
-         * iterate on positions, but this may cause a dead lock. So we
-         * iterate on visible chunks instead, and render their visible
-         * parts with locking only one chunk at a time. This may
-         * render chunks inconsistently, but that should be
-         * acceptable.
+         * viewpoint. The easiest way to do this is to iterate on
+         * every visible world position and ask the world for the tile
+         * there, but that would cause too many chunk lookups and
+         * would be terribly inefficient. So we iterate on visible
+         * chunks instead, and render their visible parts.
          */
         let w_top_left    = self.world_pos_at(inner.pos);
         let w_top_right   = w_top_left.map_x(|x| x + inner.size.width - 1);
@@ -118,14 +113,13 @@ impl<W: World> WorldView<W> {
             }
         };
 
-        let world = self.world.read().unwrap();
+        let mut world = self.world.write().unwrap();
 
         for cy in c_top_left.y ..= c_bottom_left.y {
             for cx in c_top_left.x ..= c_top_right.x {
                 let cpos = ChunkPos { x: cx, y: cy };
-                if let Some(chunk_) = world.get_chunk(cpos) {
-                    let chunk = chunk_.read().unwrap();
-
+                world.ensure_chunk_exists(cpos);
+                if let Some(chunk) = world.get_chunk(cpos) {
                     /* Now the problem is how to determine the visible
                      * area of this chunk. For each chunk we know
                      * which area in the world coords the chunk
