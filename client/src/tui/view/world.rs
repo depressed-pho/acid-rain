@@ -2,7 +2,8 @@ use ctk::{
     Border,
     Component,
     Graphics,
-    RootWindow
+    RootWindow,
+    is_utf8_locale
 };
 use ctk::attribute::Attribute;
 use ctk::border::NullBorder;
@@ -16,7 +17,8 @@ use ctk::dimension::{
 use num::Zero;
 use rain_core::world::World;
 use rain_core::world::position::WorldPos;
-use rain_core::world::chunk::{ChunkManager, ChunkPos};
+use rain_core::world::chunk::{ChunkPos, TileOffset};
+use std::cmp::{max, min};
 use std::sync::{Arc, RwLock};
 use uuid::Uuid;
 
@@ -96,28 +98,68 @@ impl<W: World> WorldView<W> {
          * render chunks inconsistently, but that should be
          * acceptable.
          */
-        let w_top_left     = self.world_pos_at(inner.pos);
-        let w_top_right    = w_top_left. map_x(|x| x + inner.size.width);
-        let w_bottom_left  = w_top_left. map_y(|y| y + inner.size.height);
-        let w_bottom_right = w_top_right.map_y(|y| y + inner.size.height);
-        let c_top_left     = ChunkPos::from(w_top_left);
-        let c_top_right    = ChunkPos::from(w_top_right);
-        let c_bottom_left  = ChunkPos::from(w_bottom_left);
+        let w_top_left    = self.world_pos_at(inner.pos);
+        let w_top_right   = w_top_left.map_x(|x| x + inner.size.width - 1);
+        let w_bottom_left = w_top_left.map_y(|y| y + inner.size.height - 1);
+        let c_top_left    = ChunkPos::from(w_top_left);
+        let c_top_right   = ChunkPos::from(w_top_right);
+        let c_bottom_left = ChunkPos::from(w_bottom_left);
+
+        // We'll use this to later translate a WorldPos to component
+        // coords.
+        let delta = Dimension {
+            width:  inner.pos.x - w_top_left.x,
+            height: inner.pos.y - w_top_left.y
+        };
+        let component_pos_at = |wpos: WorldPos| -> Point {
+            Point {
+                x: wpos.x + delta.width,
+                y: wpos.y + delta.height
+            }
+        };
 
         let world = self.world.read().unwrap();
-        let cm    = world.get_chunk_manager();
 
-        for y in c_top_left.y .. c_bottom_left.y {
-            for x in c_top_left.x .. c_top_right.y {
-                let cpos  = ChunkPos { x, y };
-                //let chunk = cm.get(cpos).await;
+        for cy in c_top_left.y ..= c_bottom_left.y {
+            for cx in c_top_left.x ..= c_top_right.x {
+                let cpos = ChunkPos { x: cx, y: cy };
+                if let Some(chunk_) = world.get_chunk(cpos) {
+                    let chunk = chunk_.read().unwrap();
+
+                    /* Now the problem is how to determine the visible
+                     * area of this chunk. For each chunk we know
+                     * which area in the world coords the chunk
+                     * covers.
+                     */
+                    let wc_top_left    = cpos.into_wpos(0);
+                    let wc_top_right   = ChunkPos::from(wc_top_left).map_x(|x| x + 1).into_wpos(0).map_x(|x| x - 1);
+                    let wc_bottom_left = ChunkPos::from(wc_top_left).map_y(|y| y + 1).into_wpos(0).map_y(|y| y - 1);
+
+                    /* And we know which area in the world coords is
+                     * visible.
+                     */
+                    for wy in max(w_top_left.y, wc_top_left.y) ..= min(w_bottom_left.y, wc_bottom_left.y) {
+                        for wx in max(w_top_left.x, wc_top_left.x) ..= min(w_top_right.x, wc_top_right.x) {
+                            let wpos = WorldPos { x: wx, y: wy, z: 0 };
+                            let off  = TileOffset::from(wpos);
+                            let ts   = chunk.get_tile_state(&off);
+                            let appr = ts.appearance();
+
+                            self.graphics
+                                .attr_set(appr.attrs())
+                                .set_colors(appr.fg_color(), appr.bg_color());
+
+                            if is_utf8_locale() {
+                                self.graphics.draw_string(appr.unicode(), component_pos_at(wpos));
+                            }
+                            else {
+                                self.graphics.draw_char(appr.ascii(), component_pos_at(wpos));
+                            }
+                        }
+                    }
+                }
             }
         }
-
-        // FIXME
-        use ctk::color::RGBColor;
-        self.graphics.set_fg(RGBColor {r: 255, g: 64, b: 0});
-        self.graphics.draw_char('#', inner.pos);
     }
 
     fn draw_player(&mut self) {

@@ -1,5 +1,5 @@
 use crate::dimension::{Dimension, Insets};
-use num::{
+use num_traits::{
     Bounded,
     Signed,
     Zero,

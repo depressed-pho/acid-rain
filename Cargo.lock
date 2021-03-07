@@ -37,7 +37,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "ctk",
- "num",
+ "num-integer",
  "unicode-width",
  "uuid",
 ]
@@ -203,7 +203,7 @@ dependencies = [
  "libc",
  "lru",
  "ncurses",
- "num",
+ "num-traits",
  "proc-macro2",
  "scan_fmt",
  "tokio",

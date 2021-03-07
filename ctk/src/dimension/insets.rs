@@ -1,4 +1,4 @@
-use num::Zero;
+use num_traits::Zero;
 use std::ops::Add;
 
 /// An Insets object is a representation of the borders of a

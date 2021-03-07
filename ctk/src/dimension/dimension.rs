@@ -1,5 +1,5 @@
 use crate::dimension::Rectangle;
-use num::Zero;
+use num_traits::Zero;
 use std::convert::From;
 use std::ops::{Add, Sub, Mul, Div};
 

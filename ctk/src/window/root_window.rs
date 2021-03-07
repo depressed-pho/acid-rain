@@ -11,7 +11,7 @@ use crate::dimension::{
     Rectangle,
     SizeRequirements
 };
-use num::Zero;
+use num_traits::Zero;
 use std::cell::RefCell;
 use std::rc::Rc;
 

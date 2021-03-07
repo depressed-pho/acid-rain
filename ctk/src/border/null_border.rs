@@ -1,7 +1,7 @@
 use crate::Graphics;
 use crate::border::Border;
 use crate::dimension::Insets;
-use num::Zero;
+use num_traits::Zero;
 
 #[derive(Debug)]
 pub struct NullBorder {}

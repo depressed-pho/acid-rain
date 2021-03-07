@@ -2,11 +2,12 @@ use crate::world::chunk::manager::LocalChunkManager;
 use rain_builtin::loader::BuiltinModuleLoader;
 use rain_core::module::loader::ModuleLoader;
 use rain_core::world::World;
-use rain_core::world::chunk::ChunkManager;
+use rain_core::world::chunk::{Chunk, ChunkPos, ChunkManager};
 use rain_core::world::tile::TileRegistry;
 use rain_core::world::player::{Permission, Player};
 use rain_core::world::position::WorldPos;
 use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 use uuid::Uuid;
 
 /// Local world is a server-side world which is owned by a server. The
@@ -48,8 +49,14 @@ impl LocalWorld {
 }
 
 impl World for LocalWorld {
-    fn get_chunk_manager(&self) -> &dyn ChunkManager {
-        &self.chunks
+    fn get_chunk(&self, pos: ChunkPos) -> Option<Arc<RwLock<Chunk>>> {
+        if let Some(chunk) = self.chunks.get(pos) {
+            Some(chunk)
+        }
+        else {
+            // FIXME: Async fetch and event notification
+            None
+        }
     }
 
     fn get_root_player(&self) -> &Player {

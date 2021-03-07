@@ -2,7 +2,9 @@ use crate::{
     COLOR_MANAGER,
     Component,
     RootWindow,
-    Symbol
+    Symbol,
+    safe_wattr_get,
+    safe_wattr_set
 };
 use crate::attribute::AttrSet;
 use crate::color::{BoxedColor, Color, DefaultColor};
@@ -12,7 +14,7 @@ use crate::dimension::{
     Rectangle
 };
 use crate::util::{check, check_null};
-use num::Zero;
+use num_traits::Zero;
 use std::convert::TryInto;
 use std::cmp::{min, max};
 use unicode_width::UnicodeWidthChar;
@@ -100,7 +102,7 @@ impl Graphics {
         }
     }
 
-    pub fn clear_rect(&mut self, r: Rectangle) {
+    pub fn clear_rect(&mut self, r: Rectangle) -> &mut Self {
         if let Some(w) = self.pad {
             let bg = ncurses::getbkgd(w);
             for y in r.pos.y .. r.pos.y + r.size.height {
@@ -109,14 +111,16 @@ impl Graphics {
                         w, y, r.pos.x, bg, r.size.width)).unwrap();
             }
         }
+        self
     }
 
-    pub fn draw_char(&mut self, c: char, p: Point) {
+    pub fn draw_char(&mut self, c: char, p: Point) -> &mut Self {
         let mut buf = [0; 4];
-        self.draw_string(c.encode_utf8(&mut buf), p)
+        self.draw_string(c.encode_utf8(&mut buf), p);
+        self
     }
 
-    pub fn draw_string(&mut self, s: &str, p: Point) {
+    pub fn draw_string(&mut self, s: &str, p: Point) -> &mut Self {
         if let Some(w) = self.pad {
             // FIXME: s might contain newlines or any other control
             // characters. What to do about them?
@@ -157,9 +161,10 @@ impl Graphics {
                         w, p.y, p.x, s, s.len().try_into().unwrap())).unwrap();
             }
         }
+        self
     }
 
-    pub fn draw_symbol(&mut self, s: Symbol, p: Point) {
+    pub fn draw_symbol(&mut self, s: Symbol, p: Point) -> &mut Self {
         if let Some(w) = self.pad {
             /* We don't use mvwaddch() because it always tries to
              * advance the cursor, which is impossible if it's already
@@ -173,29 +178,44 @@ impl Graphics {
              * true. Or convince ncurses to translate them for us.
              */
         }
+        self
     }
 
-    pub fn attr_on(&mut self, attrs: AttrSet) {
+    pub fn attr_on(&mut self, attrs: AttrSet) -> &mut Self {
         if let Some(w) = self.pad {
             check(ncurses::wattr_on(w, attrs.into())).unwrap();
         }
+        self
     }
 
-    pub fn attr_off(&mut self, attrs: AttrSet) {
+    pub fn attr_off(&mut self, attrs: AttrSet) -> &mut Self {
         if let Some(w) = self.pad {
             check(ncurses::wattr_off(w, attrs.into())).unwrap();
         }
+        self
     }
 
-    pub fn set_fg(&mut self, fg_color: impl Color) {
+    pub fn attr_set(&mut self, attrs: AttrSet) -> &mut Self {
+        if let Some(w) = self.pad {
+            let mut old_attrs = 0;
+            let mut old_pair  = 0;
+            check(safe_wattr_get(w, &mut old_attrs, &mut old_pair)).unwrap();
+            check(safe_wattr_set(w, attrs.into(), old_pair)).unwrap();
+        }
+        self
+    }
+
+    pub fn set_fg(&mut self, fg_color: impl Color) -> &mut Self {
         self.set_colors(fg_color, self.bg_color.clone());
+        self
     }
 
-    pub fn set_bg(&mut self, bg_color: impl Color) {
+    pub fn set_bg(&mut self, bg_color: impl Color) -> &mut Self {
         self.set_colors(self.fg_color.clone(), bg_color);
+        self
     }
 
-    pub fn set_colors(&mut self, fg_color: impl Color, bg_color: impl Color) {
+    pub fn set_colors(&mut self, fg_color: impl Color, bg_color: impl Color) -> &mut Self {
         if let Some(w) = self.pad {
             COLOR_MANAGER.with(|cm| {
                 (*cm.borrow_mut())
@@ -206,6 +226,7 @@ impl Graphics {
         }
         self.fg_color = BoxedColor::new(fg_color);
         self.bg_color = BoxedColor::new(bg_color);
+        self
     }
 }
 

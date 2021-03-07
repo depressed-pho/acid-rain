@@ -1,3 +1,4 @@
+use crate::tui::Appearance;
 use crate::world::tile::Tile;
 use std::sync::Arc;
 
@@ -10,4 +11,10 @@ pub type TileStateValue = u32;
 pub struct TileState {
     pub tile: Arc<dyn Tile>,
     pub value: TileStateValue
+}
+
+impl TileState {
+    pub fn appearance(&self) -> &Appearance {
+        self.tile.appearance(self.value)
+    }
 }

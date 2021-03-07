@@ -18,7 +18,7 @@ use crate::dimension::{
     Rectangle,
     SizeRequirements
 };
-use num::Zero;
+use num_traits::Zero;
 use std::fmt::Debug;
 
 pub trait Component: Debug {

@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use rain_core::world::chunk::{Chunk, ChunkPos, ChunkManager};
 use rain_core::world::chunk::palette::ChunkPalette;
 use rain_core::world::tile::{ArcTile, TileRegistry};
@@ -16,7 +15,7 @@ use std::sync::{Arc, RwLock};
 /// therefore not an LRU.
 ///
 pub struct LocalChunkManager {
-    tiles: TileRegistry,
+    tiles: Arc<TileRegistry>,
     palette: Arc<ChunkPalette>, // Shared among chunks.
     loaded: RwLock<HashMap<ChunkPos, Arc<RwLock<Chunk>>>>
 }
@@ -30,29 +29,29 @@ impl LocalChunkManager {
         palette.insert(dirt.id());
 
         Self {
-            tiles,
+            tiles: Arc::new(tiles),
             palette: Arc::new(palette),
             loaded: RwLock::new(HashMap::new())
         }
     }
 
-    async fn generate(&self, _pos: ChunkPos) -> Chunk {
+    fn generate(&self, _pos: ChunkPos) -> Chunk {
         // FIXME: Generate a chunk properly.
         let dirt = self.tiles.get("acid-rain:dirt").unwrap();
         let dirt_ts = dirt.default_state();
 
-        Chunk::new(&self.palette, &dirt_ts)
+        Chunk::new(&self.tiles, &self.palette, &dirt_ts)
     }
 }
 
-#[async_trait]
 impl ChunkManager for LocalChunkManager {
-    async fn get(&self, pos: ChunkPos) -> Arc<RwLock<Chunk>> {
+    fn get(&self, pos: ChunkPos) -> Option<Arc<RwLock<Chunk>>> {
         if let Some(chunk) = self.loaded.read().unwrap().get(&pos) {
-            return chunk.clone();
+            return Some(chunk.clone());
         }
-        let chunk = Arc::new(RwLock::new(self.generate(pos).await));
+        // FIXME: Return None in this case.
+        let chunk = Arc::new(RwLock::new(self.generate(pos)));
         self.loaded.write().unwrap().insert(pos, chunk.clone());
-        chunk
+        Some(chunk)
     }
 }

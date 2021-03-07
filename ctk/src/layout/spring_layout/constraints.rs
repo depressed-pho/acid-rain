@@ -223,7 +223,6 @@ impl Constraints {
     }
 }
 
-// THINKME: We want to use Vec::remove_item() but it's only in nightly.
 fn remove_item<T: PartialEq>(v: &mut Vec<T>, a: &T) -> Option<T> {
     let i = v.iter().position(|b| *b == *a)?;
     Some(v.remove(i))

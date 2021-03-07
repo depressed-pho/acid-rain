@@ -3,7 +3,7 @@ use crate::dimension::{
     Insets,
     Point
 };
-use num::Zero;
+use num_traits::Zero;
 use std::ops::{Add, Sub};
 
 /// A Rectangle specifies an area in a coordinate space that is

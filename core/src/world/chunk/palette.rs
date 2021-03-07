@@ -51,7 +51,11 @@ impl ChunkPalette {
         }
     }
 
-    pub fn index_of<K: Borrow<str>>(&self, tile: &K) -> Option<TileIndex> {
-        self.index_of_.get(tile.borrow()).copied()
+    pub fn index_of<K: Borrow<str>>(&self, id: &K) -> Option<TileIndex> {
+        self.index_of_.get(id.borrow()).copied()
+    }
+
+    pub fn id_of<K: Borrow<TileIndex>>(&self, idx: &K) -> Option<&Arc<str>> {
+        self.id_of_.get(idx.borrow())
     }
 }

@@ -7,7 +7,7 @@ pub mod border;
 pub use border::*;
 
 pub mod color;
-use color::manager::ColorManager;
+use color::manager::*;
 
 pub mod component;
 pub use component::*;
@@ -31,7 +31,7 @@ pub mod window;
 pub use crate::window::RootWindow;
 
 use lazy_static::lazy_static;
-use num::Zero;
+use num_traits::Zero;
 use std::cell::RefCell;
 use std::ffi::CStr;
 use std::panic;

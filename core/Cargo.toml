@@ -15,7 +15,7 @@ repository = "https://github.com/depressed-pho/acid-rain.git"
 [dependencies]
 async-trait = "^0.1"
 ctk = { path = "../ctk" }
-num = "^0.2"
+num-integer = "^0.1"
 unicode-width = "^0.1"
 uuid = { version = "^0.8", features = ["v4"] }
 

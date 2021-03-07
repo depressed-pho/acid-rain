@@ -13,7 +13,7 @@ impl Default for Dirt {
             apr: Appearance::builder()
                 .unicode(".")
                 .ascii('.')
-                .fg_color(Hsl::new(25.0, 0.75, 0.47)) // CSS3 chocolate
+                .fg_color(Hsl::new(36.0, 0.89, 0.38)) // Similar to CSS3 darkgoldenrod
                 .build()
         }
     }

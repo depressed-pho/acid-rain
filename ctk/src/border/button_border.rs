@@ -9,7 +9,7 @@ use crate::dimension::{
     Insets,
     Point
 };
-use num::Zero;
+use num_traits::Zero;
 
 #[derive(Debug)]
 pub struct ButtonBorder {}

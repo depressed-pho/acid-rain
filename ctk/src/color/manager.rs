@@ -556,6 +556,7 @@ fn safe_tigetstr(capname: &str) -> Option<String> {
 }
 
 // ncurses::wcolor_set() doesn't support extended colors.
+#[cfg(feature = "extended-colors")]
 fn safe_wcolor_set(w: ncurses::WINDOW, pair: PairIndex) -> i32 {
     unsafe {
         let p16  = pair as i16;
@@ -563,4 +564,51 @@ fn safe_wcolor_set(w: ncurses::WINDOW, pair: PairIndex) -> i32 {
 
         ncurses::ll::wcolor_set(w, p16, opts)
     }
+}
+
+#[cfg(not(feature = "extended-colors"))]
+fn safe_wcolor_set(w: ncurses::WINDOW, pair: PairIndex) -> i32 {
+    ncurses::wcolor_set(w, pair)
+}
+
+
+// ncurses::wattr_get() doesn't support extended colors.
+#[cfg(feature = "extended-colors")]
+pub(crate) fn safe_wattr_get(w: ncurses::WINDOW,
+                             attrs: &mut ncurses::attr_t,
+                             pair: &mut PairIndex)
+                             -> i32 {
+    unsafe {
+        let mut tmp: i16 = 0;
+
+        ncurses::ll::wattr_get(
+            w,
+            attrs as *mut ncurses::attr_t,
+            &mut tmp as *mut i16,
+            pair as *mut i32 as ncurses::ll::void_p)
+    }
+}
+
+#[cfg(not(feature = "extended-colors"))]
+pub(crate) fn safe_wattr_get(w: ncurses::WINDOW,
+                             attrs: &mut ncurses::attr_t,
+                             pair: &mut PairIndex)
+                             -> i32 {
+    ncurses::wattr_get(w, attrs, pair)
+}
+
+// ncurses::wattr_set() doesn't support extended colors.
+#[cfg(feature = "extended-colors")]
+pub(crate) fn safe_wattr_set(w: ncurses::WINDOW, attrs: ncurses::attr_t, pair: PairIndex) -> i32 {
+    unsafe {
+        let p16  = pair as i16;
+        let opts = &pair as *const i32 as ncurses::ll::void_p;
+
+        ncurses::ll::wattr_set(w, attrs, p16, opts)
+    }
+}
+
+#[cfg(not(feature = "extended-colors"))]
+pub(crate) fn safe_wattr_set(w: ncurses::WINDOW, attrs: ncurses::attr_t, pair: PairIndex) -> i32 {
+    ncurses::wattr_set(w, attrs, pair)
 }

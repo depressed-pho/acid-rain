@@ -1,6 +1,6 @@
 use crate::world::chunk::CHUNK_SIZE;
 use crate::world::position::WorldPos;
-use num::Integer;
+use num_integer::Integer;
 use std::convert::TryInto;
 
 /// A point representing a chunk position in (x, y) coordinate
@@ -10,6 +10,34 @@ use std::convert::TryInto;
 pub struct ChunkPos {
     pub x: i32,
     pub y: i32
+}
+
+impl ChunkPos {
+    pub fn map_x(self, f: impl Fn(i32) -> i32) -> Self {
+        Self {
+            x: f(self.x),
+            y: self.y,
+        }
+    }
+
+    pub fn map_y(self, f: impl Fn(i32) -> i32) -> Self {
+        Self {
+            x: self.x,
+            y: f(self.y),
+        }
+    }
+
+
+    /// [WorldPos] does not implement From<ChunkPos> because
+    /// [ChunkPos] has no `z` component.
+    pub fn into_wpos(self, z: i8) -> WorldPos {
+        let chunk_size: i32 = CHUNK_SIZE.try_into().unwrap();
+        WorldPos {
+            x: self.x * chunk_size,
+            y: self.y * chunk_size,
+            z: z
+        }
+    }
 }
 
 impl Default for ChunkPos {
