@@ -12,6 +12,9 @@ use color::manager::*;
 pub mod component;
 pub use component::*;
 
+pub mod event;
+use event::KeyEvent;
+
 pub mod graphics;
 pub use graphics::*;
 
@@ -128,6 +131,11 @@ impl Ctk {
         /* We don't want the TTY driver to echo inputs. */
         check(ncurses::noecho())?;
 
+        /* We want ncurses to interpret special keys, and also the
+         * meta modifier. */
+        check(ncurses::keypad(stdscr, true))?;
+        check(ncurses::meta(stdscr, true))?;
+
         /* We are going to rebind keys like C-s and C-c, and also
          * dislike cooked mode. */
         check(ncurses::raw())?;
@@ -203,7 +211,17 @@ impl Ctk {
     }
 
     async fn read_keys(&mut self) {
-        while let Some(wch) = ncurses::get_wch() {
+        // We enable the nodelay() mode which is *supposed* to make
+        // get_wch() non-blocking, but when ESC is typed it
+        // blocks. This is because we don't, and don't want to, also
+        // enable the notimeout() mode because then we'd have to
+        // interpret escape sequences ourselves.
+        async fn get_wch() -> Option<ncurses::WchResult> {
+            task::spawn_blocking(|| {
+                ncurses::get_wch()
+            }).await.unwrap()
+        }
+        while let Some(wch) = get_wch().await {
             match wch {
                 ncurses::WchResult::KeyCode(ncurses::KEY_RESIZE) => {
                     // Recursively resize all the windows by resizing
@@ -212,6 +230,8 @@ impl Ctk {
                     self.update_graphics().await;
                 }
                 _ => {
+                    let ev = KeyEvent::from(wch);
+                    panic!("ev = {:?}", ev);
                     // FIXME
                 }
             }
