@@ -131,10 +131,13 @@ impl Ctk {
         /* We don't want the TTY driver to echo inputs. */
         check(ncurses::noecho())?;
 
-        /* We want ncurses to interpret special keys, and also the
-         * meta modifier. */
+        /* We want ncurses to interpret special keys. We also want to
+         * enter meta(3) mode if we can, but Unicode-aware terminals
+         * tend to ignore "meta_on" and "meta_off" and never emit
+         * characters with the 8th bit on. This is very understandable
+         * because it would completely break wide characters. */
         check(ncurses::keypad(stdscr, true))?;
-        check(ncurses::meta(stdscr, true))?;
+        check(ncurses::meta(stdscr, false))?;
 
         /* We are going to rebind keys like C-s and C-c, and also
          * dislike cooked mode. */

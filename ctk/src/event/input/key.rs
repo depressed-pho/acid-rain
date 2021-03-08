@@ -73,9 +73,9 @@ impl From<WchResult> for KeyEvent {
 fn decode_keycode(c: i32) -> KeyEvent {
     /* NCurses recognizes only a small portion of shifted action
      * keys. Detecting key combinations like Ctrl-Right is plain just
-     * impossible. Alt *might* be detectable with define_key(3) but
-     * that is truly terminal-specific, and ncurses/terminfo doesn't
-     * abstract it away. */
+     * impossible. Alt *might* be detectable with the help of
+     * define_key(3) but that is truly terminal-specific, and
+     * ncurses/terminfo doesn't abstract it away. */
     let no_mods = Modifiers::default();
     let shifted = Shift.into();
     match c {
