@@ -139,7 +139,6 @@ impl Ctk {
         /* We are going to rebind keys like C-s and C-c, and also
          * dislike cooked mode. */
         check(ncurses::raw())?;
-        check(ncurses::cbreak())?;
 
         /* We don't want ncurses::getch() to block. */
         check(ncurses::nodelay(stdscr, true))?;

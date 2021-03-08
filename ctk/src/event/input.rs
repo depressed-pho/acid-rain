@@ -4,6 +4,17 @@ pub use key::*;
 use std::fmt::{self, Debug};
 
 pub trait InputEvent: Debug {
+    /// Return `true` if the event was fired while Shift being
+    /// pressed. Somewhat inaccurate for key input events.
+    fn is_shift_down(&self) -> bool;
+
+    /// Return `true` if the event was fired while Control being
+    /// pressed. Quite inaccurate for key input events.
+    fn is_control_down(&self) -> bool;
+
+    /// Return `true` if the event was fired while Alt being
+    /// pressed. *Very* inaccurate for key input events.
+    fn is_alt_down(&self) -> bool;
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]

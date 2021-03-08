@@ -3,24 +3,25 @@ use self::ActionKey::*;
 use self::Key::*;
 use super::{InputEvent, Modifier::*, Modifiers};
 
-/// An event to be fired when a key is typed. Key combinations with
-/// modifier keys are poorly detected. No, it's not a GUI
-/// toolkit. It's only a terminal. There won't be separate key-up or
-/// key-down events, nor distinct events for modifier keys (like when
-/// Shift key is pressed).
+/// An event to be fired when a key is typed. Key events are first
+/// sent to the currently focused component. If it doesn't comsume
+/// them, its ancestors will recursively receive them. If no
+/// components are focused, key events will be discarded.
 ///
-/// Upper-case latin alphabets are reported as the upper-case letters
-/// with Shift being typed. Lower-case latin alphabets are reported as
-/// their corresponding upper-case letters without Shift.
+/// Key combinations with modifier keys are poorly detected. No, it's
+/// not a GUI toolkit. It's only a terminal. There won't be separate
+/// key-up or key-down events, nor distinct events for modifier keys
+/// (like when Shift key is pressed).
 ///
-/// However, symbols generated with Shift key are reported as
-/// if they were from separate keys for such characters. The same goes
-/// for symbols generated with Shift key. That is, when `!` is typed
-/// on a US keyboard, it is reported as a key event with character `!`
-/// without Shift key being pressed. This is how terminals work and it
-/// is impossible to detect it as Shift-1 because users might not be
-/// using a US keyboard and terminals tell us nothing about the
-/// keyboard layout.
+/// Latin alphabets generated with Shift key (i.e. upper-case letters)
+/// are reported as if they were from separate keys for such
+/// characters, and [InputEvent::is_shift_down()] returns `false` in
+/// this case. The same goes for symbols generated with Shift
+/// key. That is, when `!` is typed on a US keyboard, it is reported
+/// as a key event with character `!` without Shift key being
+/// pressed. This is how terminals work and it is impossible to detect
+/// it as Shift-1 because users might not be using a US keyboard and
+/// terminals tell us nothing about the keyboard layout.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub struct KeyEvent {
     mods: Modifiers,
@@ -30,22 +31,24 @@ pub struct KeyEvent {
 impl KeyEvent {
     pub fn key_char(&self) -> Option<char> {
         match self.key {
-            Char(ch) =>
-                if ch >= 'A' && ch <= 'Z' && self.mods.is_shift_down() {
-                    fn to_lower(ch: char) -> char {
-                        unsafe { std::mem::transmute((ch as u32) + 0x20) }
-                    }
-                    Some(to_lower(ch))
-                }
-                else {
-                    Some(ch)
-                },
-            _ => None
+            Char(ch) => Some(ch),
+            _        => None
         }
     }
 }
 
 impl InputEvent for KeyEvent {
+    fn is_shift_down(&self) -> bool {
+        self.mods.is_shift_down()
+    }
+
+    fn is_control_down(&self) -> bool {
+        self.mods.is_control_down()
+    }
+
+    fn is_alt_down(&self) -> bool {
+        self.mods.is_alt_down()
+    }
 }
 
 impl From<WchResult> for KeyEvent {
@@ -124,45 +127,36 @@ fn decode_char(c: ncurses::winttype) -> KeyEvent {
         0x00 => KeyEvent { mods: ctrl   , key: Action(Space ) },
         0x09 => KeyEvent { mods: no_mods, key: Action(Tab   ) }, // No Ctrl-I for you.
         0x15 => KeyEvent { mods: no_mods, key: Action(Return) }, // No Ctrl-M.
+        // ESC is the most problematic key in this terrible world. C-[
+        // is also eaten by it.
+        0x1B => KeyEvent { mods: no_mods, key: Action(Escape) },
         _ if c >= 0x01 && c <= 0x1A => {
+            // C-a to C-z (lower-case)
+            KeyEvent {
+                mods: ctrl,
+                key: unsafe { Char(std::mem::transmute(c + 0x60)) }
+            }
+        },
+        _ if c >= 0x1C && c <= 0x1f => {
+            // C-\, C-], C-^, and C-_.
             KeyEvent {
                 mods: ctrl,
                 key: unsafe { Char(std::mem::transmute(c + 0x40)) }
             }
         },
-        // ESC is the most problematic key in this terrible world.
-        0x1B => KeyEvent { mods: no_mods, key: Action(Escape) },
-        0x20 => KeyEvent { mods: no_mods, key: Action(Space ) },
+        0x20 => KeyEvent { mods: no_mods, key: Action(Space) },
         // ASCII DEL. Should we count this as Delete? There is a
         // fucking long story behind this fucking key, and there seems
         // to be absolutely no sane way to handle this "correctly."
         0x7F => KeyEvent { mods: no_mods, key: Action(Backspace) },
-
         // Non-control characters.
         _ =>
             // char::from_u32() is nightly-only. How the fuck are we
             // supposed to do this in stable Rust safely?
             if let Some(ch) = unsafe { Some(std::mem::transmute(c)) } {
-                if ch >= 'A' && ch <= 'Z' {
-                    KeyEvent {
-                        mods: Shift.into(),
-                        key: Char(ch)
-                    }
-                }
-                else if ch >= 'a' && ch <= 'z' {
-                    fn to_upper(ch: char) -> char {
-                        unsafe { std::mem::transmute((ch as u32) - 0x20) }
-                    }
-                    KeyEvent {
-                        mods: no_mods,
-                        key: Char(to_upper(ch))
-                    }
-                }
-                else {
-                    KeyEvent {
-                        mods: no_mods,
-                        key: Char(ch)
-                    }
+                KeyEvent {
+                    mods: no_mods,
+                    key: Char(ch)
                 }
             }
             else {
