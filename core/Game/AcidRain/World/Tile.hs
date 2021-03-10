@@ -2,6 +2,7 @@
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Tile
   ( Tile(..)
+  , TileID
   , SomeTile(..)
   , TileState(..)
   , TileStateValue
@@ -11,10 +12,11 @@ import Data.Text (Text)
 import Data.Word (Word32)
 import Game.AcidRain.TUI (Appearance)
 
+type TileID = Text
 
 class Tile τ where
     -- | Get the tile ID such as @acid-rain:dirt@.
-    tileID ∷ τ → Text
+    tileID ∷ τ → TileID
     -- | Get the default state value of the tile.
     defaultStateValue ∷ τ → TileStateValue
     defaultStateValue _ = 0
