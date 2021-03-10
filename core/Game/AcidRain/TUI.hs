@@ -1,8 +1,7 @@
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.TUI
-    ( Appearance(..)
-    )
-    where
+  ( Appearance(..)
+  ) where
 
 import Data.Text (Text)
 import Graphics.Vty.Attributes (Attr)
