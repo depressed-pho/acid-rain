@@ -1,10 +1,13 @@
+use crate::Component;
 use self::Instruction::*;
 use std::fmt;
 use std::rc::{Rc, Weak};
 use std::cell::RefCell;
 
+type Ctx = Rc<RefCell<dyn Component>>;
+
 // A convenient type alias for use only in this module.
-type EventListener<T> = dyn FnMut(&T) -> Instruction + 'static;
+type EventListener<T> = dyn Fn(&Ctx, &T) -> Instruction + 'static;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum Instruction {
@@ -15,19 +18,24 @@ pub enum Instruction {
     Stop
 }
 
-/// An event bus is a registry of event listeners which usually
-/// resides in a [Component](crate::Component). The type parameter `T`
-/// denotes the type of event.
+/// An event bus is a registry of event listeners which resides in a
+/// [Component](crate::Component). The type parameter `T` denotes the
+/// type of event.
 ///
-/// Event listeners are functions taking an event object `T` and
-/// return either [Proceed] or [Stop].
+/// Event listeners are functions taking a component and an event
+/// object `T` and return either [Proceed] or [Stop].
 ///
 #[derive(Clone)]
 pub struct EventBus<T> {
-    // Why RefCell? Because we want listeners to be FnMut rather than
-    // Fn. Event listeners are meant to have side-effects so forcing
-    // them to be Fn is not nice.
-    listeners: Vec<Rc<RefCell<EventListener<T>>>>
+    // Why listeners are Fn and not FnMut? Because they have to be
+    // 'static (or technically, they must outlive busses) so allowing
+    // them to capture &mut refs doesn't really give them much. On the
+    // other hand, if we were to use FnMut we'd have to wrap listeners
+    // in RefCell and pay the runtime cost for that.
+    //
+    // Rc is necessary to support deregistration.
+    //
+    listeners: Vec<Rc<EventListener<T>>>
 }
 
 impl<T> EventBus<T> {
@@ -44,14 +52,14 @@ impl<T> EventBus<T> {
     /// they have the right to [Stop] propagation. This method returns
     /// a token which can be used for removing the listener.
     pub fn add_listener<F>(&mut self, listener: F) -> ListenerToken<T>
-    where F: FnMut(&T) -> Instruction + 'static {
+    where F: Fn(&Ctx, &T) -> Instruction + 'static {
 
-        // NOTE: I have absolutely no idea why removing this type
-        // annotation results in a compilation error.
-        let arc: Rc<RefCell<EventListener<T>>> = Rc::new(RefCell::new(listener));
-        let token = ListenerToken::new(&arc);
+        // NOTE: I have absolutely no idea why removing this explicit
+        // type coertion results in a compilation error.
+        let rc    = Rc::new(listener) as Rc<EventListener<T>>;
+        let token = ListenerToken::new(&rc);
 
-        self.listeners.push(arc);
+        self.listeners.push(rc);
         token
     }
 
@@ -70,9 +78,9 @@ impl<T> EventBus<T> {
 
     /// Dispatch an event to the bus. Returns [Stop] If any of the
     /// listener returns [Stop], otherwise it returns [Proceed].
-    pub fn dispatch(&self, event: &T) -> Instruction {
+    pub fn dispatch(&self, ctx: &Ctx, event: &T) -> Instruction {
         for l in self.listeners.iter().rev() {
-            match l.borrow_mut()(event) {
+            match l(ctx, event) {
                 Stop => return Stop,
                 _    => {}
             }
@@ -83,17 +91,20 @@ impl<T> EventBus<T> {
 
 impl<T: 'static> fmt::Debug for EventBus<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_fmt(format_args!("EventBus<{:?}> {{ .. }}", std::any::TypeId::of::<T>()))
+        f.write_fmt(
+            format_args!(
+                "EventBus<{:?}> {{ .. }}",
+                std::any::TypeId::of::<T>()))
     }
 }
 
 #[derive(Clone)]
 pub struct ListenerToken<T> {
-    ptr: Weak<RefCell<EventListener<T>>>
+    ptr: Weak<EventListener<T>>
 }
 
 impl<T> ListenerToken<T> {
-    fn new(listener: &Rc<RefCell<EventListener<T>>>) -> Self {
+    fn new(listener: &Rc<EventListener<T>>) -> Self {
         Self {
             ptr: Rc::downgrade(listener)
         }

@@ -12,6 +12,11 @@ use crate::dimension::{
     Rectangle,
     SizeRequirements
 };
+use crate::event::{
+    EventBus,
+    //Instruction::*,
+    KeyEvent
+};
 use crate::util::{
     smallest_area_to_draw_text,
     draw_aligned_text
@@ -26,7 +31,8 @@ pub struct Button {
     dirty: bool,
     label: String,
     h_align: HorizontalAlignment,
-    v_align: VerticalAlignment
+    v_align: VerticalAlignment,
+    key_bus: EventBus<KeyEvent>
 }
 
 impl Button {
@@ -34,6 +40,12 @@ impl Button {
         let label_   = label.into();
         let size_req = SizeRequirements::exactly(
             smallest_area_to_draw_text(&label_));
+
+        let mut key_bus = EventBus::new();
+        key_bus.add_listener(|_ctx, _ev| {
+            todo!()
+        });
+
         Button {
             graphics: Graphics::new(),
             bounds: Rectangle::default(),
@@ -42,7 +54,8 @@ impl Button {
             dirty: true,
             label: label_,
             h_align: HA::Center,
-            v_align: VA::Center
+            v_align: VA::Center,
+            key_bus
         }
     }
 
