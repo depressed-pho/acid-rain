@@ -1,4 +1,2 @@
-GNUmakefile
-/target
-**/*.rs.bk
 *.core
+dist-newstyle

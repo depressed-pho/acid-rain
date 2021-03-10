@@ -1,0 +1,30 @@
+cabal-version:       2.4
+
+name:                acid-rain-core
+version:             0.1.0.0
+synopsis:            Common code shared by Acid Rain client, server, and mods
+-- bug-reports:
+license:             CC0-1.0
+license-file:        LICENSE
+author:              PHO
+maintainer:          pho@cielonegro.org
+category:            Game
+extra-source-files:  CHANGELOG.md
+
+library
+  exposed-modules:
+    Game.AcidRain.TUI
+    Game.AcidRain.World.Tile
+
+  -- other-modules:
+  -- other-extensions:
+
+  build-depends:
+    base ^>= 4.13.0.0,
+    text == 1.2.*,
+    vty  == 5.33.*
+
+  -- hs-source-dirs:
+  default-language:    Haskell2010
+  ghc-options:
+      -Wall
