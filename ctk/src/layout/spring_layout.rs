@@ -6,7 +6,9 @@ pub use spring::*;
 
 use crate::{
     Component,
-    Layout
+    ComponentRef,
+    Layout,
+    WeakComponentRef
 };
 use crate::dimension::{
     Dimension,
@@ -17,7 +19,7 @@ use crate::dimension::{
 };
 use std::cell::RefCell;
 use std::fmt::{self, Debug};
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 use weak_table::PtrWeakKeyHashMap;
 
 #[derive(Debug)]
@@ -33,9 +35,9 @@ pub struct SpringLayout {
      * - For all keys in "constraints", there exists a component in
      *   "components".
      */
-    components: Vec<Rc<RefCell<dyn Component>>>,
-    constraints: PtrWeakKeyHashMap<Weak<RefCell<dyn Component>>, Rc<RefCell<Constraints>>>,
-    parent_constr: Rc<RefCell<Constraints>>,
+    components: Vec<ComponentRef<dyn Component>>,
+    constraints: PtrWeakKeyHashMap<WeakComponentRef<dyn Component>, Rc<RefCell<Constraints>>>,
+    self_constr: Rc<RefCell<Constraints>>,
     is_valid: bool
 }
 
@@ -47,12 +49,12 @@ impl SpringLayout {
         Self {
             components: Vec::new(),
             constraints: PtrWeakKeyHashMap::new(),
-            parent_constr: Rc::new(RefCell::new(con)),
+            self_constr: Rc::new(RefCell::new(con)),
             is_valid: true
         }
     }
 
-    pub fn add(&mut self, c: Rc<RefCell<dyn Component>>) -> &mut Self {
+    pub fn add(&mut self, c: ComponentRef<dyn Component>) -> &mut Self {
         self.components.push(c.clone());
 
         /* The rules for default springs are as follows:
@@ -81,9 +83,10 @@ impl SpringLayout {
         self
     }
 
-    pub fn remove(&mut self, c: Rc<RefCell<dyn Component>>) -> &mut Self {
-        self.components.retain(|c_| !Rc::ptr_eq(&c, &c_));
-        self.constraints.remove(&c);
+    pub fn remove(&mut self, c: &ComponentRef<dyn Component>) -> &mut Self {
+        c.borrow_mut().set_parent(None);
+        self.components.retain(|c_| !c.ptr_eq(c_));
+        self.constraints.remove(c);
         self.invalidate();
         self
     }
@@ -96,7 +99,7 @@ impl SpringLayout {
     /// cycles in springs.
     unsafe fn get_constraints(&self, of: EdgesOf) -> Rc<RefCell<Constraints>> {
         match &of {
-            EdgesOf::Parent   => Some(self.parent_constr.clone()),
+            EdgesOf::This     => Some(self.self_constr.clone()),
             EdgesOf::Child(c) => self.constraints.get(&c).cloned()
         }
         .unwrap_or_else(|| panic!("No such component exists: {:#?}", of))
@@ -135,22 +138,22 @@ impl SpringLayout {
         }
     }
 
-    fn do_layout(&mut self, parent: &dyn Component) {
-        let pc_    = unsafe { self.get_constraints(EdgesOf::Parent) };
+    fn do_layout(&mut self, this: &dyn Component) {
+        let pc_    = unsafe { self.get_constraints(EdgesOf::This) };
         let pc     = pc_.borrow();
-        let insets = parent.get_insets();
-        let size   = parent.get_size();
+        let insets = this.get_insets();
+        let size   = this.get_size();
         pc.get_spring(Edge::Left)
-            .unwrap_or_else(|| panic!("No springs for the left edge of the parent"))
+            .unwrap_or_else(|| panic!("No springs for the left edge of self"))
             .set_length(0);
         pc.get_spring(Edge::Top)
-            .unwrap_or_else(|| panic!("No springs for the top edge of the parent"))
+            .unwrap_or_else(|| panic!("No springs for the top edge of self"))
             .set_length(0);
         pc.get_spring(Edge::Width)
-            .unwrap_or_else(|| panic!("No springs for the width of the parent"))
+            .unwrap_or_else(|| panic!("No springs for the width of self"))
             .set_length(size.width - insets.left - insets.right);
         pc.get_spring(Edge::Height)
-            .unwrap_or_else(|| panic!("No springs for the height of the parent"))
+            .unwrap_or_else(|| panic!("No springs for the height of self"))
             .set_length(size.height - insets.top - insets.bottom);
 
         for (c, cc) in self.constraints.iter() {
@@ -182,13 +185,15 @@ impl SpringLayout {
 }
 
 impl Layout for SpringLayout {
-    fn validate(&mut self, parent: &dyn Component) {
+    fn validate(&mut self, this: &dyn Component, this_ref: &ComponentRef<dyn Component>) {
         if !self.is_valid {
-            self.do_layout(parent);
+            self.do_layout(this);
             self.is_valid = true;
         }
-        for child in self.components.iter() {
-            child.borrow_mut().validate();
+        for child_ in self.components.iter() {
+            let mut child = child_.borrow_mut();
+            child.set_parent(Some(this_ref));
+            child.validate(child_);
         }
     }
 
@@ -196,38 +201,38 @@ impl Layout for SpringLayout {
         self.is_valid = false
     }
 
-    fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Rc<RefCell<dyn Component>>> + 'a> {
+    fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a ComponentRef<dyn Component>> + 'a> {
         Box::new(self.components.iter())
     }
 
-    fn get_size_requirements(&self, parent: &dyn Component) -> SizeRequirements {
-        let pc_ = unsafe { self.get_constraints(EdgesOf::Parent) };
+    fn get_size_requirements(&self, this: &dyn Component) -> SizeRequirements {
+        let pc_ = unsafe { self.get_constraints(EdgesOf::This) };
         let pc  = pc_.borrow();
         let w   = pc.get_spring(Edge::Width)
-                    .unwrap_or_else(|| panic!("No springs for the width of the parent"));
+                    .unwrap_or_else(|| panic!("No springs for the width of self"));
         let h   = pc.get_spring(Edge::Height)
-                    .unwrap_or_else(|| panic!("No springs for the height of the parent"));
+                    .unwrap_or_else(|| panic!("No springs for the height of self"));
         let req = SizeRequirements {
             width: w.get_requirements(),
             height: h.get_requirements()
         };
-        req + parent.get_insets()
+        req + this.get_insets()
     }
 }
 
 #[derive(Clone)]
 pub enum EdgesOf {
-    Parent,
-    Child(Rc<RefCell<dyn Component>>)
-    /* THINKME: Ideally this should be Child(&'a Rc<...>) but
-     * coerce_unsized doesn't seem to work in this case.
+    This,
+    Child(ComponentRef<dyn Component>)
+    /* THINKME: Ideally this should be Child(&'a ComponentRef<...>)
+     * but coerce_unsized doesn't seem to work in this case.
      */
 }
 
 impl Debug for EdgesOf {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Parent    => fmt.write_str("Parent"),
+            Self::This      => fmt.write_str("This"),
             Self::Child(rc) => rc.borrow().fmt(fmt)
         }
     }

@@ -1,12 +1,11 @@
 use crate::{
     Component,
+    ComponentRef,
     Layout
 };
 use crate::dimension::{
     SizeRequirements
 };
-use std::cell::RefCell;
-use std::rc::Rc;
 
 /// This layout manager is not finished, and will probably never be.
 #[derive(Debug)]
@@ -47,14 +46,16 @@ impl GroupLayout {
 }
 
 impl Layout for GroupLayout {
-    fn validate(&mut self, parent: &dyn Component) {
+    fn validate(&mut self, this: &dyn Component, _this_ref: &ComponentRef<dyn Component>) {
         if !self.is_valid {
-            self.do_layout(parent);
+            self.do_layout(this);
             self.is_valid = true;
         }
         /* FIXME
         for child in self.components.iter() {
-            child.borrow_mut().validate();
+            let mut child = child_.borrow_mut();
+            child.set_parent(Some(this_ref));
+            child.validate(child_);
         }
          */
         unimplemented!();
@@ -64,7 +65,7 @@ impl Layout for GroupLayout {
         self.is_valid = false
     }
 
-    fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Rc<RefCell<dyn Component>>> + 'a> {
+    fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a ComponentRef<dyn Component>> + 'a> {
         unimplemented!();
     }
 

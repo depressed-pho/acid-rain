@@ -69,7 +69,7 @@ impl Component for RootWindow {
         None
     }
 
-    fn set_parent(&mut self, _: Option<ComponentRef<dyn Component>>) {
+    fn set_parent(&mut self, _: Option<&ComponentRef<dyn Component>>) {
         panic!("The root window cannot have any parents.")
     }
 
@@ -93,8 +93,8 @@ impl Component for RootWindow {
         }
     }
 
-    fn validate(&mut self) {
-        self.layout.borrow_mut().validate(self);
+    fn validate(&mut self, this: &ComponentRef<dyn Component>) {
+        self.layout.borrow_mut().validate(self, this);
     }
 
     fn get_bounds(&self) -> Rectangle {

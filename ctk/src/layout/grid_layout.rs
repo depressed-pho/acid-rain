@@ -1,5 +1,6 @@
 use crate::{
     Component,
+    ComponentRef,
     Layout
 };
 use crate::dimension::{
@@ -9,15 +10,13 @@ use crate::dimension::{
     SizeRequirements
 };
 use num_traits::Zero;
-use std::cell::RefCell;
 use std::convert::TryInto;
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct GridLayout {
     cells: Dimension,
     gap: Dimension,
-    components: Vec<Rc<RefCell<dyn Component>>>,
+    components: Vec<ComponentRef<dyn Component>>,
     is_valid: bool
 }
 
@@ -34,7 +33,7 @@ impl GridLayout {
         }
     }
 
-    pub fn add(&mut self, c: Rc<RefCell<dyn Component>>) -> &mut Self {
+    pub fn add(&mut self, c: ComponentRef<dyn Component>) -> &mut Self {
         self.components.push(c);
         self.invalidate();
         self
@@ -93,7 +92,7 @@ impl GridLayout {
         }
     }
 
-    fn do_layout(&mut self, parent: &dyn Component) {
+    fn do_layout(&mut self, this: &dyn Component) {
         let n_comps: i32 = self.components.len().try_into().unwrap();
         if n_comps == 0 {
             return;
@@ -101,11 +100,11 @@ impl GridLayout {
 
         let n_cells     = self.num_cells();
         let total_gaps  = (n_cells - 1) * self.gap;
-        let parent_size = parent.get_size();
-        let insets      = parent.get_insets();
+        let this_size   = this.get_size();
+        let insets      = this.get_insets();
         let inner_space = Dimension {
-            width: parent_size.width  - (insets.left + insets.right),
-            height: parent_size.height - (insets.top  + insets.bottom)
+            width: this_size.width  - (insets.left + insets.right),
+            height: this_size.height - (insets.top  + insets.bottom)
         };
         let comp_size   = (inner_space - total_gaps) / n_cells;
         let extra_space = (inner_space - (comp_size * n_cells + total_gaps)) / 2;
@@ -133,7 +132,7 @@ impl GridLayout {
         }
         else {
             for c in 0 .. n_cells.width {
-                let x = parent_size.width - insets.right - comp_size.width - extra_space.width
+                let x = this_size.width - insets.right - comp_size.width - extra_space.width
                       - (comp_size.width + self.gap.width) * c;
 
                 for r in 0 .. n_cells.height {
@@ -155,13 +154,15 @@ impl GridLayout {
 }
 
 impl Layout for GridLayout {
-    fn validate(&mut self, parent: &dyn Component) {
+    fn validate(&mut self, this: &dyn Component, this_ref: &ComponentRef<dyn Component>) {
         if !self.is_valid {
-            self.do_layout(parent);
+            self.do_layout(this);
             self.is_valid = true;
         }
-        for child in self.components.iter() {
-            child.borrow_mut().validate();
+        for child_ in self.components.iter() {
+            let mut child = child_.borrow_mut();
+            child.set_parent(Some(this_ref));
+            child.validate(child_);
         }
     }
 
@@ -169,7 +170,7 @@ impl Layout for GridLayout {
         self.is_valid = false;
     }
 
-    fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Rc<RefCell<dyn Component>>> + 'a> {
+    fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a ComponentRef<dyn Component>> + 'a> {
         Box::new(self.components.iter())
     }
 

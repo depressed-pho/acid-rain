@@ -77,7 +77,7 @@ pub fn is_utf8_locale() -> bool {
 }
 
 pub struct Ctk {
-    root: RootWindow
+    root: ComponentRef<RootWindow>
 }
 
 impl Ctk {
@@ -158,7 +158,7 @@ impl Ctk {
 
         /* Done the initial configuration. */
         let tk = Ctk {
-            root: RootWindow::new(stdscr, layout)
+            root: RootWindow::new(stdscr, layout).into_ref()
         };
         Ok(tk)
     }
@@ -202,9 +202,10 @@ impl Ctk {
     }
 
     async fn update_graphics(&mut self) {
-        self.root.validate();
-        self.root.paint();
-        self.root.refresh(&self.root, Point::zero());
+        let mut root = self.root.borrow_mut();
+        root.validate(&self.root.clone().unsize());
+        root.paint();
+        root.refresh(&root, Point::zero());
 
         // ncurses::doupdate() may block if stdout is blocked.
         task::spawn_blocking(|| {
@@ -228,7 +229,7 @@ impl Ctk {
                 ncurses::WchResult::KeyCode(ncurses::KEY_RESIZE) => {
                     // Recursively resize all the windows by resizing
                     // the root window.
-                    self.root.resize();
+                    self.root.borrow_mut().resize();
                     self.update_graphics().await;
                 }
                 _ => {

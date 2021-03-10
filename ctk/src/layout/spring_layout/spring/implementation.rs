@@ -1,11 +1,12 @@
-use crate::Component;
+use crate::{
+    Component,
+    ComponentRef
+};
 use crate::dimension::{
     LengthRequirements
 };
 use lazy_static::lazy_static;
-use std::cell::RefCell;
 use std::fmt::{self, Debug};
-use std::rc::Rc;
 use super::{Spring, SpringImpl, SpringSet};
 
 lazy_static! {
@@ -59,12 +60,12 @@ impl SpringImpl for StaticSpring {
 /// component.
 #[derive(Clone)]
 pub struct WidthSpring {
-    of: Rc<RefCell<dyn Component>>,
+    of: ComponentRef<dyn Component>,
     length: Option<i32>
 }
 
 impl WidthSpring {
-    pub fn new(of: Rc<RefCell<dyn Component>>) -> Spring {
+    pub fn new(of: ComponentRef<dyn Component>) -> Spring {
         Spring::wrap(Self { of, length: None })
     }
 }
@@ -72,7 +73,7 @@ impl WidthSpring {
 impl Debug for WidthSpring {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("WidthSpring")
-            .field("of", &self.of.borrow())
+            .field("of", &self.of)
             .field("length", &self.length)
             .finish()
     }
@@ -103,12 +104,12 @@ impl SpringImpl for WidthSpring {
 /// component.
 #[derive(Clone)]
 pub struct HeightSpring {
-    of: Rc<RefCell<dyn Component>>,
+    of: ComponentRef<dyn Component>,
     length: Option<i32>
 }
 
 impl HeightSpring {
-    pub fn new(of: Rc<RefCell<dyn Component>>) -> Spring {
+    pub fn new(of: ComponentRef<dyn Component>) -> Spring {
         Spring::wrap(Self { of, length: None })
     }
 }
@@ -116,7 +117,7 @@ impl HeightSpring {
 impl Debug for HeightSpring {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("HeightSpring")
-            .field("of", &self.of.borrow())
+            .field("of", &self.of)
             .field("length", &self.length)
             .finish()
     }

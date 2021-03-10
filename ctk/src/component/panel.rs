@@ -44,7 +44,7 @@ impl Component for Panel {
         self.parent.as_ref().map(|p| p.upgrade().unwrap())
     }
 
-    fn set_parent(&mut self, p: Option<ComponentRef<dyn Component>>) {
+    fn set_parent(&mut self, p: Option<&ComponentRef<dyn Component>>) {
         self.parent = p.map(|p| p.downgrade());
     }
 
@@ -66,8 +66,8 @@ impl Component for Panel {
         }
     }
 
-    fn validate(&mut self) {
-        self.layout.borrow_mut().validate(self);
+    fn validate(&mut self, this: &ComponentRef<dyn Component>) {
+        self.layout.borrow_mut().validate(self, this);
     }
 
     fn get_bounds(&self) -> Rectangle {

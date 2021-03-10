@@ -23,16 +23,17 @@ use std::cell::RefCell;
 use std::fmt::Debug;
 use std::ops::{Deref, DerefMut};
 use std::rc::{Rc, Weak};
+use weak_table::traits::WeakElement;
 
 pub trait Component: Debug {
     /// Wrap the component in a smart component pointer.
-    fn into_ref(self) -> ComponentRef<Self> where Self: Sized {
+    fn into_ref(self) -> ComponentRef<Self> where Self: Sized + 'static {
         ComponentRef::new(self)
     }
 
     fn get_parent(&self) -> Option<ComponentRef<dyn Component>>;
 
-    fn set_parent(&mut self, p: Option<ComponentRef<dyn Component>>);
+    fn set_parent(&mut self, parent: Option<&ComponentRef<dyn Component>>);
 
     /// Paint the content of the graphics context if it might not have
     /// the desired content. This method must recursively repaint
@@ -51,8 +52,9 @@ pub trait Component: Debug {
     /// [validate()](crate::layout::Layout::validate()) method on the
     /// layout manager. Otherwise it should do nothing. The default
     /// implementation does nothing as if the component was not a
-    /// container.
-    fn validate(&mut self) {}
+    /// container. The argument `this` must be a reference to self.
+    #[allow(unused)]
+    fn validate(&mut self, this: &ComponentRef<dyn Component>) {}
 
     /// Get the bounds of this component. The bounds specify this
     /// component's width, height, and location relative to its
@@ -124,10 +126,17 @@ pub struct ComponentRef<T: Component + ?Sized> {
     ptr: Rc<RefCell<T>>
 }
 
-impl<T: Component> ComponentRef<T> {
+impl<T: Component + 'static> ComponentRef<T> {
     pub fn new(component: T) -> Self {
         Self {
             ptr: Rc::new(RefCell::new(component))
+        }
+    }
+
+    /// This is needed because CoerceUnsized is still not stabilized.
+    pub fn unsize(self) -> ComponentRef<dyn Component> {
+        ComponentRef {
+            ptr: self.ptr
         }
     }
 }
@@ -147,6 +156,26 @@ impl<T: Component + ?Sized> ComponentRef<T> {
             ptr: Rc::downgrade(&self.ptr)
         }
     }
+
+    pub fn ptr_eq(&self, rhs: &Self) -> bool {
+        Rc::ptr_eq(&self.ptr, &rhs.ptr)
+    }
+}
+
+impl<T: Component + ?Sized> Clone for ComponentRef<T> {
+    fn clone(&self) -> Self {
+        Self {
+            ptr: Rc::clone(&self.ptr)
+        }
+    }
+}
+
+impl<T: Component + ?Sized> Deref for ComponentRef<T> {
+    type Target = RefCell<T>;
+
+    fn deref(&self) -> &Self::Target {
+        self.ptr.deref()
+    }
 }
 
 /// Weak pointer to a component. This may be removed in the future.
@@ -158,5 +187,29 @@ pub struct WeakComponentRef<T: Component + ?Sized> {
 impl<T: Component + ?Sized> WeakComponentRef<T> {
     pub fn upgrade(&self) -> Option<ComponentRef<T>> {
         self.ptr.upgrade().map(|ptr| ComponentRef { ptr })
+    }
+}
+
+impl<T: Component + ?Sized> Clone for WeakComponentRef<T> {
+    fn clone(&self) -> Self {
+        Self {
+            ptr: Clone::clone(&self.ptr)
+        }
+    }
+}
+
+impl<T: Component + ?Sized> WeakElement for WeakComponentRef<T> {
+    type Strong = ComponentRef<T>;
+
+    fn new(view: &Self::Strong) -> Self {
+        view.downgrade()
+    }
+
+    fn view(&self) -> Option<Self::Strong> {
+        self.upgrade()
+    }
+
+    fn clone(view: &Self::Strong) -> Self::Strong {
+        view.clone()
     }
 }

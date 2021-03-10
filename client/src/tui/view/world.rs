@@ -173,7 +173,7 @@ impl<W: World> Component for WorldView<W> {
         self.parent.as_ref().map(|p| p.upgrade().unwrap())
     }
 
-    fn set_parent(&mut self, p: Option<ComponentRef<dyn Component>>) {
+    fn set_parent(&mut self, p: Option<&ComponentRef<dyn Component>>) {
         self.parent = p.map(|p| p.downgrade());
     }
 
