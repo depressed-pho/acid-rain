@@ -1,10 +1,12 @@
 use crate::{
     Border,
     Component,
+    ComponentRef,
     Graphics,
     HorizontalAlignment::{self, self as HA},
     RootWindow,
-    VerticalAlignment::{self, self as VA}
+    VerticalAlignment::{self, self as VA},
+    WeakComponentRef
 };
 use crate::border::ButtonBorder;
 use crate::dimension::{
@@ -24,6 +26,7 @@ use crate::util::{
 
 #[derive(Debug)]
 pub struct Button {
+    parent: Option<WeakComponentRef<dyn Component>>,
     graphics: Graphics,
     bounds: Rectangle,
     size_req: SizeRequirements,
@@ -47,6 +50,7 @@ impl Button {
         });
 
         Button {
+            parent: None,
             graphics: Graphics::new(),
             bounds: Rectangle::default(),
             size_req,
@@ -71,6 +75,14 @@ impl Button {
 }
 
 impl Component for Button {
+    fn get_parent(&self) -> Option<ComponentRef<dyn Component>> {
+        self.parent.as_ref().map(|p| p.upgrade().unwrap())
+    }
+
+    fn set_parent(&mut self, p: Option<ComponentRef<dyn Component>>) {
+        self.parent = p.map(|p| p.downgrade());
+    }
+
     fn paint(&mut self) {
         if self.dirty {
             self.border.paint(&mut self.graphics);

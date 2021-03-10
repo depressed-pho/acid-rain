@@ -19,9 +19,21 @@ use crate::dimension::{
     SizeRequirements
 };
 use num_traits::Zero;
+use std::cell::RefCell;
 use std::fmt::Debug;
+use std::ops::{Deref, DerefMut};
+use std::rc::{Rc, Weak};
 
 pub trait Component: Debug {
+    /// Wrap the component in a smart component pointer.
+    fn into_ref(self) -> ComponentRef<Self> where Self: Sized {
+        ComponentRef::new(self)
+    }
+
+    fn get_parent(&self) -> Option<ComponentRef<dyn Component>>;
+
+    fn set_parent(&mut self, p: Option<ComponentRef<dyn Component>>);
+
     /// Paint the content of the graphics context if it might not have
     /// the desired content. This method must recursively repaint
     /// sub-components if the component is a container.
@@ -102,5 +114,49 @@ pub trait Component: Debug {
             pos: Point::zero(),
             size: self.get_size()
         }.shrink(self.get_insets())
+    }
+}
+
+/// This is a smart pointer containing a component. It is currently
+/// reference-counted, but this may change in future (i.e. GC).
+#[derive(Debug)]
+pub struct ComponentRef<T: Component + ?Sized> {
+    ptr: Rc<RefCell<T>>
+}
+
+impl<T: Component> ComponentRef<T> {
+    pub fn new(component: T) -> Self {
+        Self {
+            ptr: Rc::new(RefCell::new(component))
+        }
+    }
+}
+
+impl<T: Component + ?Sized> ComponentRef<T> {
+    pub fn borrow(&self) -> impl Deref<Target = T> + '_ {
+        self.ptr.borrow()
+    }
+
+    pub fn borrow_mut(&self) -> impl DerefMut<Target = T> + '_ {
+        self.ptr.borrow_mut()
+    }
+
+    /// This may be removed in the future.
+    pub fn downgrade(&self) -> WeakComponentRef<T> {
+        WeakComponentRef {
+            ptr: Rc::downgrade(&self.ptr)
+        }
+    }
+}
+
+/// Weak pointer to a component. This may be removed in the future.
+#[derive(Debug)]
+pub struct WeakComponentRef<T: Component + ?Sized> {
+    ptr: Weak<RefCell<T>>
+}
+
+impl<T: Component + ?Sized> WeakComponentRef<T> {
+    pub fn upgrade(&self) -> Option<ComponentRef<T>> {
+        self.ptr.upgrade().map(|ptr| ComponentRef { ptr })
     }
 }

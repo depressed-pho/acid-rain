@@ -1,8 +1,10 @@
 use ctk::{
     Border,
     Component,
+    ComponentRef,
     Graphics,
     RootWindow,
+    WeakComponentRef,
     is_utf8_locale
 };
 use ctk::attribute::Attribute;
@@ -24,6 +26,7 @@ use uuid::Uuid;
 
 #[derive(Debug)]
 pub struct WorldView<W: World> {
+    parent: Option<WeakComponentRef<dyn Component>>,
     graphics: Graphics,
     bounds: Rectangle,
     border: Box<dyn Border>,
@@ -40,6 +43,7 @@ pub struct WorldView<W: World> {
 impl<W: World> WorldView<W> {
     pub fn new(world: Arc<RwLock<W>>, player: Uuid) -> Self {
         Self {
+            parent: None,
             graphics: Graphics::new(),
             bounds: Rectangle::default(),
             border: Box::new(NullBorder::default()),
@@ -165,6 +169,14 @@ impl<W: World> WorldView<W> {
 }
 
 impl<W: World> Component for WorldView<W> {
+    fn get_parent(&self) -> Option<ComponentRef<dyn Component>> {
+        self.parent.as_ref().map(|p| p.upgrade().unwrap())
+    }
+
+    fn set_parent(&mut self, p: Option<ComponentRef<dyn Component>>) {
+        self.parent = p.map(|p| p.downgrade());
+    }
+
     fn paint(&mut self) {
         if self.dirty {
             self.border.paint(&mut self.graphics);

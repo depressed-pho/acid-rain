@@ -1,10 +1,12 @@
 use crate::{
     Border,
     Component,
+    ComponentRef,
     Graphics,
     HorizontalAlignment::{self, self as HA},
     RootWindow,
     VerticalAlignment::{self, self as VA},
+    WeakComponentRef
 };
 use crate::border::NullBorder;
 use crate::dimension::{
@@ -19,6 +21,7 @@ use crate::util::{
 
 #[derive(Debug)]
 pub struct Label {
+    parent: Option<WeakComponentRef<dyn Component>>,
     graphics: Graphics,
     bounds: Rectangle,
     size_req: SizeRequirements,
@@ -35,6 +38,7 @@ impl Label {
         let size_req = SizeRequirements::exactly(
             smallest_area_to_draw_text(&text_));
         Label {
+            parent: None,
             graphics: Graphics::new(),
             bounds: Rectangle::default(),
             size_req,
@@ -58,6 +62,14 @@ impl Label {
 }
 
 impl Component for Label {
+    fn get_parent(&self) -> Option<ComponentRef<dyn Component>> {
+        self.parent.as_ref().map(|p| p.upgrade().unwrap())
+    }
+
+    fn set_parent(&mut self, p: Option<ComponentRef<dyn Component>>) {
+        self.parent = p.map(|p| p.downgrade());
+    }
+
     fn paint(&mut self) {
         if self.dirty {
             self.border.paint(&mut self.graphics);

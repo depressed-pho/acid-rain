@@ -127,7 +127,7 @@ fn decode_char(c: ncurses::winttype) -> KeyEvent {
         // indistinguishable from regular keys.
         0x00 => KeyEvent { mods: ctrl   , key: Action(Space ) },
         0x09 => KeyEvent { mods: no_mods, key: Action(Tab   ) }, // No Ctrl-I for you.
-        0x15 => KeyEvent { mods: no_mods, key: Action(Return) }, // No Ctrl-M.
+        0x0D => KeyEvent { mods: no_mods, key: Action(Return) }, // No Ctrl-M.
         // ESC is the most problematic key in this terrible world. C-[
         // is also eaten by it.
         0x1B => KeyEvent { mods: no_mods, key: Action(Escape) },

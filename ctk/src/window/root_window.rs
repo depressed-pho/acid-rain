@@ -1,6 +1,7 @@
 use crate::{
     Border,
     Component,
+    ComponentRef,
     Graphics,
     Layout
 };
@@ -64,6 +65,14 @@ impl RootWindow {
 }
 
 impl Component for RootWindow {
+    fn get_parent(&self) -> Option<ComponentRef<dyn Component>> {
+        None
+    }
+
+    fn set_parent(&mut self, _: Option<ComponentRef<dyn Component>>) {
+        panic!("The root window cannot have any parents.")
+    }
+
     fn paint(&mut self) {
         if self.dirty {
             self.border.paint(&mut self.graphics);

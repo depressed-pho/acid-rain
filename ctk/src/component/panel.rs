@@ -1,9 +1,11 @@
 use crate::{
     Border,
     Component,
+    ComponentRef,
     Graphics,
     Layout,
     RootWindow,
+    WeakComponentRef
 };
 use crate::border::NullBorder;
 use crate::dimension::{
@@ -16,6 +18,7 @@ use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct Panel {
+    parent: Option<WeakComponentRef<dyn Component>>,
     graphics: Graphics,
     bounds: Rectangle,
     layout: Rc<RefCell<dyn Layout>>,
@@ -26,6 +29,7 @@ pub struct Panel {
 impl Panel {
     pub fn new(layout: Rc<RefCell<dyn Layout>>) -> Panel {
         Panel {
+            parent: None,
             graphics: Graphics::new(),
             bounds: Rectangle::default(),
             layout,
@@ -36,6 +40,14 @@ impl Panel {
 }
 
 impl Component for Panel {
+    fn get_parent(&self) -> Option<ComponentRef<dyn Component>> {
+        self.parent.as_ref().map(|p| p.upgrade().unwrap())
+    }
+
+    fn set_parent(&mut self, p: Option<ComponentRef<dyn Component>>) {
+        self.parent = p.map(|p| p.downgrade());
+    }
+
     fn paint(&mut self) {
         if self.dirty {
             self.border.paint(&mut self.graphics);
