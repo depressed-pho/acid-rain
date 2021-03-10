@@ -25,7 +25,7 @@ empty ∷ TileRegistry
 empty = TileRegistry HM.empty
 
 -- | Register a tile to the registry.
-register ∷ (MonadThrow m, Tile τ) ⇒ TileRegistry → τ → m TileRegistry
+register ∷ (MonadThrow μ, Tile τ) ⇒ TileRegistry → τ → μ TileRegistry
 register (TileRegistry reg) tile
   = let tid = tileID tile
     in
@@ -34,7 +34,7 @@ register (TileRegistry reg) tile
         False → return $ TileRegistry $ HM.insert tid (SomeTile tile) reg
 
 -- | Lookup a tile by its ID.
-find ∷ MonadThrow m ⇒ TileID → TileRegistry → m SomeTile
+find ∷ MonadThrow μ ⇒ TileID → TileRegistry → μ SomeTile
 find tid (TileRegistry reg)
   = case HM.lookup tid reg of
       Just tile → return tile

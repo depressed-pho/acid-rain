@@ -26,12 +26,17 @@ class Tile τ where
 -- | A type-erased 'Tile'.
 data SomeTile = ∀τ. Tile τ ⇒ SomeTile τ
 
+instance Tile SomeTile where
+  tileID (SomeTile t) = tileID t
+  defaultStateValue (SomeTile t) = defaultStateValue t
+  appearance (SomeTile t) = appearance t
+
 -- | TileState is a type containing a type-erased 'Tile' and a single
 -- integral state value. The interpretation of the state value depends
 -- on the corresponding tile.
 data TileState = TileState
-    { tile  ∷ !SomeTile
-    , value ∷ !TileStateValue
+    { tsTile  ∷ !SomeTile
+    , tsValue ∷ !TileStateValue
     }
 
 type TileStateValue = Word32

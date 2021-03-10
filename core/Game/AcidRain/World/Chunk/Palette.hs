@@ -61,14 +61,14 @@ insert tid p
           }
 
 -- | Find a tile index by a tile ID.
-indexOf ∷ MonadThrow m ⇒ TileID → ChunkPalette → m TileIndex
+indexOf ∷ MonadThrow μ ⇒ TileID → ChunkPalette → μ TileIndex
 indexOf tid p
   = case HM.lookup tid $ indexOf' p of
       Just idx → return idx
       Nothing  → throwM $ UnknownTileIDException tid
 
 -- | Find a tile ID by tile index.
-idOf ∷ MonadThrow m ⇒ TileIndex → ChunkPalette → m TileID
+idOf ∷ MonadThrow μ ⇒ TileIndex → ChunkPalette → μ TileID
 idOf idx p
   = case M.lookup idx $ idOf' p of
       Just tid → return tid

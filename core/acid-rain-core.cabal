@@ -14,7 +14,9 @@ extra-source-files:  CHANGELOG.md
 library
   exposed-modules:
     Game.AcidRain.TUI
+    Game.AcidRain.World.Chunk
     Game.AcidRain.World.Chunk.Palette
+    Game.AcidRain.World.Position
     Game.AcidRain.World.Tile
     Game.AcidRain.World.Tile.Registry
 
@@ -23,10 +25,13 @@ library
 
   build-depends:
     base ^>= 4.13.0.0,
+    base-unicode-symbols == 0.2.*,
     containers           == 0.6.*,
+    convertible          == 1.1.*,
     exceptions           == 0.10.*,
     text                 == 1.2.*,
     unordered-containers == 0.2.*,
+    vector               == 0.12.*,
     vty                  == 5.33.*
 
   -- hs-source-dirs:
