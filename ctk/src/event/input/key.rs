@@ -105,6 +105,7 @@ fn decode_keycode(c: i32) -> KeyEvent {
         ncurses::KEY_IC        => KeyEvent { mods: no_mods, key: Action(Insert    ) },
         ncurses::KEY_NPAGE     => KeyEvent { mods: no_mods, key: Action(PageDown  ) },
         ncurses::KEY_PPAGE     => KeyEvent { mods: no_mods, key: Action(PageUp    ) },
+        ncurses::KEY_BTAB      => KeyEvent { mods: shifted, key: Action(Tab       ) },
         ncurses::KEY_END       => KeyEvent { mods: no_mods, key: Action(End       ) },
         ncurses::KEY_SDC       => KeyEvent { mods: shifted, key: Action(Delete    ) },
         ncurses::KEY_SEND      => KeyEvent { mods: shifted, key: Action(End       ) },

@@ -1,4 +1,5 @@
 use self::Instruction::*;
+use std::fmt;
 use std::rc::{Rc, Weak};
 use std::cell::RefCell;
 
@@ -77,6 +78,12 @@ impl<T> EventBus<T> {
             }
         }
         Proceed
+    }
+}
+
+impl<T: 'static> fmt::Debug for EventBus<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_fmt(format_args!("EventBus<{:?}> {{ .. }}", std::any::TypeId::of::<T>()))
     }
 }
 
