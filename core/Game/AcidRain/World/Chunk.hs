@@ -24,7 +24,7 @@ import Game.AcidRain.World.Position (WorldPos(..))
 import Game.AcidRain.World.Tile (Tile(..), TileState(..), TileStateValue)
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
 import qualified Game.AcidRain.World.Tile.Registry as Reg
-import Prelude.Unicode
+import Prelude.Unicode ((⋅))
 
 
 -- | Unlike Minecraft our chunks are only two blocks tall so we can

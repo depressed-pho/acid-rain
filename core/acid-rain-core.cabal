@@ -14,8 +14,11 @@ extra-source-files:  CHANGELOG.md
 library
   exposed-modules:
     Game.AcidRain.TUI
+    Game.AcidRain.World
     Game.AcidRain.World.Chunk
+    Game.AcidRain.World.Chunk.Position
     Game.AcidRain.World.Chunk.Palette
+    Game.AcidRain.World.Player
     Game.AcidRain.World.Position
     Game.AcidRain.World.Tile
     Game.AcidRain.World.Tile.Registry
@@ -31,6 +34,7 @@ library
     exceptions           == 0.10.*,
     text                 == 1.2.*,
     unordered-containers == 0.2.*,
+    uuid                 == 1.3.*,
     vector               == 0.12.*,
     vty                  == 5.33.*
 
