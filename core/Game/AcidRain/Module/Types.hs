@@ -20,6 +20,9 @@ import Game.AcidRain.World.Tile.Registry (TileRegistry)
 type ModuleID = Text
 
 class Module α where
+  -- | Erase the type of the module.
+  upcastModule ∷ α → SomeModule
+  upcastModule = SomeModule
   -- | Get the ID of the module.
   modID ∷ α → ModuleID
   -- | Load the module. Note that modules are loaded per world, not
@@ -32,12 +35,14 @@ class Module α where
 data SomeModule = ∀α. Module α ⇒ SomeModule α
 
 instance Module SomeModule where
+  upcastModule = id
   modID (SomeModule m) = modID m
   load (SomeModule m) = load m
 
 -- | A collection of modules, indexed by their IDs.
 type ModuleMap = HashMap ModuleID SomeModule
 
+-- | An opaque data structure representing a state of module loading.
 data LoaderContext
   = LoaderContext
     { -- | Modules that have been fully loaded. This doesn't include a

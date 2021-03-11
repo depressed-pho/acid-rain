@@ -1,3 +1,6 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GeneralisedNewtypeDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Tile.Registry
   ( TileRegistry
@@ -13,15 +16,25 @@ import Control.Exception (Exception)
 import Control.Monad.Catch (MonadThrow, throwM)
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
+import Data.MonoTraversable
+  ( Element, MonoFunctor, MonoFoldable, MonoTraversable, GrowingAppend
+  , otraverse )
 import Game.AcidRain.World.Tile (Tile(..), TileID, SomeTile(..))
 import Prelude hiding (lookup)
-
 
 -- | The tile registry is struct that contains immutable Tile
 -- objects. It is constructed while loading a world, and becomes
 -- immutable afterwards.
 newtype TileRegistry = TileRegistry (HashMap TileID SomeTile)
-  deriving (Show)
+  deriving ( Show, MonoFunctor, MonoFoldable, GrowingAppend, Semigroup
+           , Monoid )
+
+-- GeneralisedNewtypeDeriving can't derive MonoTraversable for us due
+-- to a limitation of the compiler. So we do it manually.
+instance MonoTraversable TileRegistry where
+  otraverse f (TileRegistry reg) = TileRegistry <$> traverse f reg
+
+type instance Element TileRegistry = SomeTile
 
 -- | Create an empty registry.
 empty ∷ TileRegistry
@@ -35,7 +48,7 @@ register tile (TileRegistry reg)
     in
       case HM.member tid reg of
         True  → throwM $ ConflictingTileIDException tid
-        False → return $ TileRegistry $ HM.insert tid (SomeTile tile) reg
+        False → return $ TileRegistry $ HM.insert tid (upcastTile tile) reg
 
 -- | Lookup a tile by its ID.
 lookup ∷ TileID → TileRegistry → Maybe SomeTile

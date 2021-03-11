@@ -15,13 +15,16 @@ import Game.AcidRain.TUI (Appearance)
 type TileID = Text
 
 class Show τ ⇒ Tile τ where
-    -- | Get the tile ID such as @acid-rain:dirt@.
-    tileID ∷ τ → TileID
-    -- | Get the default state value of the tile.
-    defaultStateValue ∷ τ → TileStateValue
-    defaultStateValue _ = 0
-    -- | Get the appearance of the tile for the given state.
-    appearance ∷ τ → TileStateValue → Appearance
+  -- | Erase the type of the tile.
+  upcastTile ∷ τ → SomeTile
+  upcastTile = SomeTile
+  -- | Get the tile ID such as @acid-rain:dirt@.
+  tileID ∷ τ → TileID
+  -- | Get the default state value of the tile.
+  defaultStateValue ∷ τ → TileStateValue
+  defaultStateValue _ = 0
+  -- | Get the appearance of the tile for the given state.
+  appearance ∷ τ → TileStateValue → Appearance
 
 -- | A type-erased 'Tile'.
 data SomeTile = ∀τ. Tile τ ⇒ SomeTile τ
@@ -30,6 +33,7 @@ instance Show SomeTile where
   show (SomeTile t) = show t
 
 instance Tile SomeTile where
+  upcastTile = id
   tileID (SomeTile t) = tileID t
   defaultStateValue (SomeTile t) = defaultStateValue t
   appearance (SomeTile t) = appearance t
