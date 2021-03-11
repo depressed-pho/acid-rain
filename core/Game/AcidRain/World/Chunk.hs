@@ -23,7 +23,7 @@ import Game.AcidRain.World.Chunk.Palette (ChunkPalette, TileIndex, indexOf, idOf
 import Game.AcidRain.World.Position (WorldPos(..))
 import Game.AcidRain.World.Tile (Tile(..), TileState(..), TileStateValue)
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
-import qualified Game.AcidRain.World.Tile.Registry as Reg
+import qualified Game.AcidRain.World.Tile.Registry as TR
 import Prelude.Unicode ((⋅))
 
 
@@ -38,12 +38,11 @@ chunkHeight = 2
 -- | This is a variant of 'TileState' which has 'TileIndex' instead of
 -- Tile itself. This representation is used both on disk and in memory
 -- chunk data to save space.
-data IndexedTileState = IndexedTileState
-  { itsIndex ∷ !TileIndex
-  , itsValue ∷ !TileStateValue
-  } deriving (Show, Eq)
-
-
+data IndexedTileState
+  = IndexedTileState
+    { itsIndex ∷ !TileIndex
+    , itsValue ∷ !TileStateValue
+    } deriving (Show, Eq)
 
 toIndexed ∷ MonadThrow μ ⇒ ChunkPalette → TileState → μ IndexedTileState
 toIndexed palette ts
@@ -54,11 +53,12 @@ toIndexed palette ts
          }
 
 -- | This is an offset to a tile in a chunk, convertible from 'WorldPos'.
-data TileOffset = TileOffset
-  { x ∷ !Word8
-  , y ∷ !Word8
-  , z ∷ !Word8
-  } deriving (Show)
+data TileOffset
+  = TileOffset
+    { x ∷ !Word8
+    , y ∷ !Word8
+    , z ∷ !Word8
+    } deriving (Show)
 
 instance Convertible WorldPos TileOffset where
   safeConvert (WorldPos { x, y, z })
@@ -93,11 +93,12 @@ instance GV.Vector UV.Vector IndexedTileState where
     = do (idx, val) ← GV.basicUnsafeIndexM v i
          return $ IndexedTileState idx val
 
-data Chunk = Chunk
-  { registry ∷ !TileRegistry
-  , palette  ∷ !ChunkPalette
-  , tiles    ∷ !(UV.Vector IndexedTileState)
-  }
+data Chunk
+  = Chunk
+    { registry ∷ !TileRegistry
+    , palette  ∷ !ChunkPalette
+    , tiles    ∷ !(UV.Vector IndexedTileState)
+    }
 
 -- | Create a chunk filled with a single specific tile which is
 -- usually @acid-rain:air@.
@@ -122,7 +123,7 @@ tileStateAt (TileOffset { x, y, z }) chunk
         its = tiles chunk GV.! (z' ⋅ chunkHeight ⋅ chunkSize + y' ⋅ chunkSize + x')
     in
       do tid  ← idOf (itsIndex its) (palette chunk)
-         tile ← Reg.find tid (registry chunk)
+         tile ← TR.get tid (registry chunk)
          return $ TileState
            { tsTile  = tile
            , tsValue = itsValue its

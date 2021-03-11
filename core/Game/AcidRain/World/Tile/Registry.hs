@@ -3,7 +3,8 @@ module Game.AcidRain.World.Tile.Registry
   ( TileRegistry
   , empty
   , register
-  , find
+  , lookup
+  , get
   , ConflictingTileIDException(..)
   , UnknownTileIDException(..)
   ) where
@@ -13,20 +14,23 @@ import Control.Monad.Catch (MonadThrow, throwM)
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import Game.AcidRain.World.Tile (Tile(..), TileID, SomeTile(..))
+import Prelude hiding (lookup)
 
 
 -- | The tile registry is struct that contains immutable Tile
 -- objects. It is constructed while loading a world, and becomes
 -- immutable afterwards.
 newtype TileRegistry = TileRegistry (HashMap TileID SomeTile)
+  deriving (Show)
 
 -- | Create an empty registry.
 empty ∷ TileRegistry
 empty = TileRegistry HM.empty
 
--- | Register a tile to the registry.
-register ∷ (MonadThrow μ, Tile τ) ⇒ TileRegistry → τ → μ TileRegistry
-register (TileRegistry reg) tile
+-- | Register a tile to the registry. Throws if it's already been
+-- registered.
+register ∷ (MonadThrow μ, Tile τ) ⇒ τ → TileRegistry → μ TileRegistry
+register tile (TileRegistry reg)
   = let tid = tileID tile
     in
       case HM.member tid reg of
@@ -34,9 +38,14 @@ register (TileRegistry reg) tile
         False → return $ TileRegistry $ HM.insert tid (SomeTile tile) reg
 
 -- | Lookup a tile by its ID.
-find ∷ MonadThrow μ ⇒ TileID → TileRegistry → μ SomeTile
-find tid (TileRegistry reg)
-  = case HM.lookup tid reg of
+lookup ∷ TileID → TileRegistry → Maybe SomeTile
+lookup tid (TileRegistry reg)
+  = HM.lookup tid reg
+
+-- | Get a tile by its ID. Throws if it doesn't exist.
+get ∷ MonadThrow μ ⇒ TileID → TileRegistry → μ SomeTile
+get tid reg
+  = case lookup tid reg of
       Just tile → return tile
       Nothing   → throwM $ UnknownTileIDException tid
 

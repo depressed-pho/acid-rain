@@ -14,7 +14,7 @@ import Game.AcidRain.TUI (Appearance)
 
 type TileID = Text
 
-class Tile τ where
+class Show τ ⇒ Tile τ where
     -- | Get the tile ID such as @acid-rain:dirt@.
     tileID ∷ τ → TileID
     -- | Get the default state value of the tile.
@@ -25,6 +25,9 @@ class Tile τ where
 
 -- | A type-erased 'Tile'.
 data SomeTile = ∀τ. Tile τ ⇒ SomeTile τ
+
+instance Show SomeTile where
+  show (SomeTile t) = show t
 
 instance Tile SomeTile where
   tileID (SomeTile t) = tileID t
