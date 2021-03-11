@@ -1,11 +1,19 @@
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Chunk.Palette
-  ( TileIndex
+  ( -- * Types
+    TileIndex
   , ChunkPalette
+
+    -- * Constructing palettes
   , empty
+  , fromRegistry
+
+    -- * Manipulating palettes
   , insert
   , indexOf
   , idOf
+
+    -- * Exceptions
   , UnknownTileIndexException(..)
   ) where
 
@@ -15,14 +23,26 @@ import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
+import Data.MonoTraversable (ofoldl')
 import Data.Word (Word32)
-import Game.AcidRain.World.Tile (TileID)
-import Game.AcidRain.World.Tile.Registry (UnknownTileIDException(..))
+import Game.AcidRain.World.Tile (TileID, tileID)
+import Game.AcidRain.World.Tile.Registry
+  ( TileRegistry, UnknownTileIDException(..) )
 
 
+-- | Numerical index for tiles. We use an unsigned 32-bits word as an
+-- index so we can have at most @2^32@ tiles.
+--
+-- While using 32 bits might seem overkill, a tile in a chunk is a
+-- pair of 'TileIndex' and 'TileStateValue' so even if we were to use
+-- only 16 bits for indices we would be consuming 48 bits per tile
+-- (because 'TileStateValue' is also a 'Word32'). Dunno if unboxed
+-- vectors pad elements to align them but if they didn't that would
+-- lead to unaligned reads and writes. So we are probably not wasting
+-- any space.
 type TileIndex = Word32
 
--- | A chunk palette is a bidirectional map between tile ID from/to
+-- | Chunk palette is a bidirectional map between tile ID and
 -- numerical tile index. It is used for compressing chunk data both in
 -- memory and on disk. The same palette is shared between all the
 -- chunks in a world.
@@ -44,8 +64,15 @@ data ChunkPalette = ChunkPalette
 empty ∷ ChunkPalette
 empty = ChunkPalette HM.empty M.empty
 
--- | Insert a tile ID to the palette. Inserting the same ID twice is
--- not an error. It will just be ignored.
+-- | Construct a palette out of a tile registry by assigning a unique
+-- index for each registered tile. This is only useful while creating
+-- a fresh new world, as indices must match with any existing chunks.
+fromRegistry ∷ TileRegistry → ChunkPalette
+fromRegistry = ofoldl' (\p t → insert (tileID t) p) empty
+
+-- | Insert a tile ID to the palette and assign a new index for
+-- it. Inserting the same ID twice is not an error. It will just be
+-- ignored.
 insert ∷ TileID → ChunkPalette → ChunkPalette
 insert tid p
   = case HM.member tid $ indexOf' p of
@@ -67,7 +94,7 @@ indexOf tid p
       Just idx → return idx
       Nothing  → throwM $ UnknownTileIDException tid
 
--- | Find a tile ID by tile index.
+-- | Find a tile ID by a tile index.
 idOf ∷ MonadThrow μ ⇒ TileIndex → ChunkPalette → μ TileID
 idOf idx p
   = case M.lookup idx $ idOf' p of
