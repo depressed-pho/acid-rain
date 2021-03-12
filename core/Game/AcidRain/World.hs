@@ -14,20 +14,21 @@ import Game.AcidRain.World.Player (Player, PlayerID)
 
 -- | There are several types of worlds:
 --
--- * LocalWorld is a server-side world which is owned by a server. The
---   server accesses the world data directly.
+-- * 'LocalWorld' is a server-side world which is owned by a
+--   server. The server accesses the world data directly.
 --
--- * SemiLocalWorld is a client-side world which is owned by a
+-- * 'SemiLocalWorld' is a client-side world which is owned by a
 --   builtin server in a stand-alone setup. The server and the client
 --   run on separate threads and communicate by message passing.
 --
--- * RemoteWorld is a client-side world which is owned by a remote
+-- * 'RemoteWorld' is a client-side world which is owned by a remote
 --   server. The server and the client communicate on network.
 --
 class World α where
-  -- | Get the chunk at a certain position if it's
-  -- available. Otherwise an event ChunkArrived will fire later.
-  getChunk ∷ MonadIO μ ⇒ ChunkPos → α → μ (Maybe Chunk)
+  -- | Lookup a chunk at a certain position if it's available. This
+  -- does not block. If the chunk isn't available yet, an event
+  -- ChunkArrived will fire later.
+  lookupChunk ∷ MonadIO μ ⇒ ChunkPos → α → μ (Maybe Chunk)
   -- FIXME: Remove this later.
   ensureChunkExists ∷ MonadIO μ ⇒ ChunkPos → α → μ ()
   -- | Get the root player of the world.

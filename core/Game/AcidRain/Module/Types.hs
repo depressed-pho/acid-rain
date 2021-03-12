@@ -47,7 +47,7 @@ data LoaderContext
   = LoaderContext
     { -- | Modules that have been fully loaded. This doesn't include a
       -- module that is currently being loaded.
-      lcMods  ∷ ModuleMap
+      lcMods  ∷ !ModuleMap
       -- | The tile registry that is being constructed.
-    , lcTiles ∷ TileRegistry
+    , lcTiles ∷ !TileRegistry
     }

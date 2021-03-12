@@ -19,9 +19,9 @@ import qualified Data.Vector.Generic as GV
 import qualified Data.Vector.Generic.Mutable as GMV
 import qualified Data.Vector.Unboxed as UV
 import Data.Word (Word8)
-import Game.AcidRain.World.Chunk.Palette (ChunkPalette, TileIndex, indexOf, idOf)
+import Game.AcidRain.World.Chunk.Palette (TilePalette, TileIndex, indexOf, idOf)
 import Game.AcidRain.World.Position (WorldPos(..))
-import Game.AcidRain.World.Tile (Tile(..), TileState(..), TileStateValue)
+import Game.AcidRain.World.Tile (Tile(..), TileState(..), TileStateValue, SomeTileState)
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
 import qualified Game.AcidRain.World.Tile.Registry as TR
 import Prelude.Unicode ((⋅))
@@ -40,24 +40,24 @@ chunkHeight = 2
 -- chunk data to save space.
 data IndexedTileState
   = IndexedTileState
-    { itsIndex ∷ !TileIndex
-    , itsValue ∷ !TileStateValue
+    { itsIndex ∷ {-# UNPACK #-} !TileIndex
+    , itsValue ∷ {-# UNPACK #-} !TileStateValue
     } deriving (Show, Eq)
 
-toIndexed ∷ MonadThrow μ ⇒ ChunkPalette → TileState → μ IndexedTileState
-toIndexed palette ts
-  = do idx ← indexOf (tileID $ tsTile ts) palette
+toIndexed ∷ MonadThrow μ ⇒ TilePalette → TileState τ → μ IndexedTileState
+toIndexed palette (TileState { tsTile, tsValue })
+  = do idx ← indexOf (tileID tsTile) palette
        return $ IndexedTileState
          { itsIndex = idx
-         , itsValue = tsValue ts
+         , itsValue = tsValue
          }
 
 -- | This is an offset to a tile in a chunk, convertible from 'WorldPos'.
 data TileOffset
   = TileOffset
-    { x ∷ !Word8
-    , y ∷ !Word8
-    , z ∷ !Word8
+    { x ∷ {-# UNPACK #-} !Word8
+    , y ∷ {-# UNPACK #-} !Word8
+    , z ∷ {-# UNPACK #-} !Word8
     } deriving (Show)
 
 instance Convertible WorldPos TileOffset where
@@ -96,13 +96,13 @@ instance GV.Vector UV.Vector IndexedTileState where
 data Chunk
   = Chunk
     { registry ∷ !TileRegistry
-    , palette  ∷ !ChunkPalette
+    , palette  ∷ !TilePalette
     , tiles    ∷ !(UV.Vector IndexedTileState)
     }
 
 -- | Create a chunk filled with a single specific tile which is
 -- usually @acid-rain:air@.
-new ∷ MonadThrow μ ⇒ TileRegistry → ChunkPalette → TileState → μ Chunk
+new ∷ MonadThrow μ ⇒ TileRegistry → TilePalette → TileState τ → μ Chunk
 new registry palette fill
   = do its ← toIndexed palette fill
        return $ Chunk
@@ -112,7 +112,7 @@ new registry palette fill
          }
 
 -- | Get a tile state at a given offset in a tile.
-tileStateAt ∷ MonadThrow μ ⇒ TileOffset → Chunk → μ TileState
+tileStateAt ∷ MonadThrow μ ⇒ TileOffset → Chunk → μ SomeTileState
 tileStateAt (TileOffset { x, y, z }) chunk
   = assert (x < chunkSize) $
     assert (y < chunkSize) $

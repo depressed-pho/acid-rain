@@ -1,8 +1,8 @@
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Chunk.Palette
   ( -- * Types
-    TileIndex
-  , ChunkPalette
+    TilePalette
+  , TileIndex
 
     -- * Constructing palettes
   , empty
@@ -42,10 +42,11 @@ import Game.AcidRain.World.Tile.Registry
 -- any space.
 type TileIndex = Word32
 
--- | Chunk palette is a bidirectional map between tile ID and
+-- | Tile palette is a bidirectional map between 'TileID' and
 -- numerical tile index. It is used for compressing chunk data both in
 -- memory and on disk. The same palette is shared between all the
--- chunks in a world.
+-- chunks in a world. A palette is constructed while loading a world,
+-- and becomes immutable afterwards.
 --
 -- A palette saved on disk may contain tiles that no longer
 -- exist. When we load a palette and find some tiles are missing, we
@@ -53,27 +54,27 @@ type TileIndex = Word32
 -- contains missing tiles, we replace them with acid-rain:air or
 -- something equivalently convincing.
 --
--- A palette is constructed while loading a world, and becomes
--- immutable afterwards.
-data ChunkPalette = ChunkPalette
+-- This type is not even a 'Monoid' because merging two palettes can
+-- fail due to duplicating tile IDs or indices.
+data TilePalette = TilePalette
   { indexOf' ∷ !(HashMap TileID TileIndex)
   , idOf'    ∷ !(Map TileIndex TileID) -- We can't use IntMap because it's not Int.
   } deriving (Show)
 
 -- | Create an empty palette.
-empty ∷ ChunkPalette
-empty = ChunkPalette HM.empty M.empty
+empty ∷ TilePalette
+empty = TilePalette HM.empty M.empty
 
 -- | Construct a palette out of a tile registry by assigning a unique
 -- index for each registered tile. This is only useful while creating
 -- a fresh new world, as indices must match with any existing chunks.
-fromRegistry ∷ TileRegistry → ChunkPalette
+fromRegistry ∷ TileRegistry → TilePalette
 fromRegistry = ofoldl' (\p t → insert (tileID t) p) empty
 
 -- | Insert a tile ID to the palette and assign a new index for
 -- it. Inserting the same ID twice is not an error. It will just be
 -- ignored.
-insert ∷ TileID → ChunkPalette → ChunkPalette
+insert ∷ TileID → TilePalette → TilePalette
 insert tid p
   = case HM.member tid $ indexOf' p of
       True  → p
@@ -82,20 +83,20 @@ insert tid p
                     Just (maxIdx, _) → maxIdx + 1
                     Nothing          → 0
         in
-          ChunkPalette
+          TilePalette
           { indexOf' = HM.insert tid idx $ indexOf' p
           , idOf'    = M.insert idx tid $ idOf' p
           }
 
 -- | Find a tile index by a tile ID.
-indexOf ∷ MonadThrow μ ⇒ TileID → ChunkPalette → μ TileIndex
+indexOf ∷ MonadThrow μ ⇒ TileID → TilePalette → μ TileIndex
 indexOf tid p
   = case HM.lookup tid $ indexOf' p of
       Just idx → return idx
       Nothing  → throwM $ UnknownTileIDException tid
 
 -- | Find a tile ID by a tile index.
-idOf ∷ MonadThrow μ ⇒ TileIndex → ChunkPalette → μ TileID
+idOf ∷ MonadThrow μ ⇒ TileIndex → TilePalette → μ TileID
 idOf idx p
   = case M.lookup idx $ idOf' p of
       Just tid → return tid

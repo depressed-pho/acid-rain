@@ -1,4 +1,5 @@
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Tile
   ( Tile(..)
@@ -6,6 +7,8 @@ module Game.AcidRain.World.Tile
   , SomeTile(..)
   , TileState(..)
   , TileStateValue
+  , SomeTileState
+  , defaultState
   ) where
 
 import Data.Text (Text)
@@ -38,12 +41,23 @@ instance Tile SomeTile where
   defaultStateValue (SomeTile t) = defaultStateValue t
   appearance (SomeTile t) = appearance t
 
--- | TileState is a type containing a type-erased 'Tile' and a single
--- integral state value. The interpretation of the state value depends
--- on the corresponding tile.
-data TileState = TileState
-    { tsTile  ∷ !SomeTile
-    , tsValue ∷ !TileStateValue
+-- | TileState is a type containing a 'Tile' and a single integral
+-- state value. The interpretation of the state value depends on the
+-- corresponding tile.
+data TileState τ where
+  TileState ∷ Tile τ ⇒
+    { tsTile  ∷ !τ
+    , tsValue ∷ {-# UNPACK #-} !TileStateValue
+    } → TileState τ
+
+-- | A type-erased version of 'TileState'.
+type SomeTileState = TileState SomeTile
+
+defaultState ∷ Tile τ ⇒ τ → TileState τ
+defaultState t
+  = TileState
+    { tsTile  = t
+    , tsValue = defaultStateValue t
     }
 
 type TileStateValue = Word32

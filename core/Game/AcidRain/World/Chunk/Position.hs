@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
@@ -9,9 +10,11 @@ module Game.AcidRain.World.Chunk.Position
   ) where
 
 import Data.Convertible.Base (Convertible(..))
+import Data.Hashable (Hashable)
 import Data.Int (Int8, Int32)
 import Game.AcidRain.World.Position (WorldPos(..))
 import Game.AcidRain.World.Chunk (chunkSize)
+import GHC.Generics (Generic)
 import Prelude.Unicode ((⋅))
 
 
@@ -19,9 +22,11 @@ import Prelude.Unicode ((⋅))
 -- space. It is computed by dividing 'WorldPos' by 'chunkSize' and
 -- rounding towards negative infinity.
 data ChunkPos = ChunkPos
-  { x ∷ !Int32
-  , y ∷ !Int32
-  } deriving (Eq, Show)
+  { x ∷ {-# UNPACK #-} !Int32
+  , y ∷ {-# UNPACK #-} !Int32
+  } deriving (Eq, Show, Generic)
+
+instance Hashable ChunkPos
 
 instance Convertible WorldPos ChunkPos where
   safeConvert (WorldPos { x, y, .. })
