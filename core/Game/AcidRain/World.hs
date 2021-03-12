@@ -1,6 +1,7 @@
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World
   ( World(..)
+  , WorldMode(..)
   , UnknownPlayerIDException(..)
   ) where
 
@@ -15,11 +16,9 @@ import Game.AcidRain.World.Player (Player, PlayerID)
 -- | There are several types of worlds:
 --
 -- * 'LocalWorld' is a server-side world which is owned by a
---   server. The server accesses the world data directly.
---
--- * 'SemiLocalWorld' is a client-side world which is owned by a
---   builtin server in a stand-alone setup. The server and the client
---   run on separate threads and communicate by message passing.
+--   server. The server accesses the world data directly. It is used
+--   both in single player mode and multi player mode. In single
+--   player mode the server and the client run on separate threads.
 --
 -- * 'RemoteWorld' is a client-side world which is owned by a remote
 --   server. The server and the client communicate on network.
@@ -31,10 +30,13 @@ class World α where
   lookupChunk ∷ MonadIO μ ⇒ ChunkPos → α → μ (Maybe Chunk)
   -- FIXME: Remove this later.
   ensureChunkExists ∷ MonadIO μ ⇒ ChunkPos → α → μ ()
-  -- | Get the root player of the world.
-  getRootPlayer ∷ MonadIO μ ⇒ α → μ Player
   -- | Get a player in the world having a given ID.
   getPlayer ∷ (MonadIO μ, MonadThrow μ) ⇒ PlayerID → α → μ Player
+
+data WorldMode
+  = SinglePlayer
+  | MultiPlayer
+  deriving (Show, Eq)
 
 -- | An exception to be thrown when there was no player having the
 -- given ID.
