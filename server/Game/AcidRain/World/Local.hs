@@ -6,7 +6,7 @@ module Game.AcidRain.World.Local
   , newWorld
   ) where
 
-import Control.Concurrent (ThreadId, forkIO)
+import Control.Concurrent (ThreadId, forkIO, threadDelay)
 import Control.Concurrent.STM.TVar (TVar, newTVarIO, readTVar, writeTVar)
 import Control.Exception (SomeException, handle, toException)
 import Control.Monad (void)
@@ -49,13 +49,22 @@ data RunningState
     , rsPlayers ∷ !LocalPlayerManager
     } deriving Show
 
--- Assume the world is running. Not exposed to anywhere.
+-- Assume the world is running or throw an exception. Not exposed to
+-- anywhere.
 assumeRunning ∷ LocalWorld → STM RunningState
 assumeRunning lw
   = do ws ← readTVar $ lwState lw
        case ws of
          Running rs → return rs
          _          → throwSTM $ WorldNotRunningException ws
+
+-- Keep running a supplied IO action while the world is running.
+repeatWhileRunning ∷ LocalWorld → (RunningState → IO ()) → IO ()
+repeatWhileRunning lw f
+  = do ws ← atomically $ readTVar $ lwState lw
+       case ws of
+         Running rs → f rs >> repeatWhileRunning lw f
+         _          → return ()
 
 instance World LocalWorld where
   type RunningStateT LocalWorld = RunningState
@@ -121,7 +130,9 @@ newWorld wm mods
            -- can of course fail.
            lc  ← loadModules mods
            -- From now on we enter into an STM transaction. In order
-           -- to construct the LCM, we need a tile palette.
+           -- to construct the LCM, we need a tile
+           -- palette. Constructing a tile palette never fails because
+           -- we are doing it from scratch.
            let tReg = lcTiles lc
                tPal = Pal.fromRegistry tReg
            lcm ← LCM.new tReg tPal
@@ -134,6 +145,9 @@ newWorld wm mods
                     , rsPlayers = lpm
                     }
            void $ newPlayer U.nil Administrator rs
+           -- Okay, now we can run the world but before that we change
+           -- the state.
+           writeTVar (lwState lw) $ Running rs
 
 catchWhileLoading ∷ LocalWorld → IO () → IO ()
 catchWhileLoading lw a
@@ -142,9 +156,21 @@ catchWhileLoading lw a
     f ∷ SomeException → IO ()
     f = atomically ∘ writeTVar (lwState lw) ∘ LoadFailed ∘ toException
 
+catchWhileRunning ∷ LocalWorld → IO () → IO ()
+catchWhileRunning lw a
+  = handle f a
+  where
+    f ∷ SomeException → IO ()
+    f = atomically ∘ writeTVar (lwState lw) ∘ Closed ∘ Just ∘ toException
+
 runWorld ∷ LocalWorld → IO ()
-runWorld _lw
-  = error "FIXME: runWorld"
+runWorld lw
+  = repeatWhileRunning lw runWorld'
+  where
+    runWorld' ∷ RunningState → IO ()
+    runWorld' _rs
+      = catchWhileRunning lw $
+        do threadDelay 10000000 -- FIXME
 
 -- | Get the coordinate of the initial spawn.
 initialSpawn ∷ RunningState → STM WorldPos

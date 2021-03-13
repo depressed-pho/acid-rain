@@ -63,7 +63,7 @@ data WorldState rs
     -- | The world is running.
   | Running !rs
     -- | The world has been closed.
-  | Closed
+  | Closed !(Maybe SomeException)
   deriving Show
 
 -- | An exception to be thrown when a certain operation assuming the
