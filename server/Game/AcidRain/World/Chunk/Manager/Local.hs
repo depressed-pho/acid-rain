@@ -23,6 +23,7 @@ import Game.AcidRain.World.Tile (defaultState)
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
 import qualified Game.AcidRain.World.Tile.Registry as TR
 import Prelude hiding (lcm, lookup)
+import Prelude.Unicode ((∘))
 
 
 -- | This is a server-side chunk manager. When a chunk is requested, it
@@ -37,8 +38,19 @@ data LocalChunkManager
   = LocalChunkManager
     { lcmTiles   ∷ !TileRegistry
     , lcmPalette ∷ !TilePalette
+    -- FIXME: Switch to http://hackage.haskell.org/package/stm-containers
     , lcmLoaded  ∷ !(TVar (HashMap ChunkPos Chunk))
     }
+
+instance Show LocalChunkManager where
+  showsPrec d lcm
+    = showParen (d > appPrec) $
+      showString "LocalChunkManager " ∘
+      showString "{ lcmTiles = " ∘ showsPrec (appPrec + 1) (lcmTiles lcm) ∘
+      showString ", lcmPalette = " ∘ showsPrec (appPrec + 1) (lcmPalette lcm) ∘
+      showString ", .. }"
+    where
+      appPrec = 10
 
 -- | Construct a new chunk manager out of a tile registry and a
 -- properly populated tile palette. Care must be taken because if the
