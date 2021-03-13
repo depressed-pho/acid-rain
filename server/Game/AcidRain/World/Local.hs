@@ -2,6 +2,7 @@
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Local
   ( LocalWorld
+  , WorldState(..)
   , newWorld
   ) where
 
@@ -14,6 +15,7 @@ import Game.AcidRain.World.Chunk (Chunk)
 import Game.AcidRain.World.Chunk.Manager.Local (LocalChunkManager)
 import qualified Game.AcidRain.World.Chunk.Manager.Local as LCM
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
+import Game.AcidRain.Module (SomeModule)
 import Game.AcidRain.World.Player.Manager.Local (LocalPlayerManager)
 import Game.AcidRain.World.Player (Player(..), Permission(..), PlayerID)
 import Game.AcidRain.World.Position (WorldPos(..))
@@ -30,6 +32,9 @@ data LocalWorld
     , lwPlayers ∷ !LocalPlayerManager
     }
 
+data WorldState
+-- FIXME
+
 instance World LocalWorld where
   lookupChunk ∷ MonadIO μ ⇒ ChunkPos → LocalWorld → μ (Maybe Chunk)
   lookupChunk pos lw
@@ -45,12 +50,8 @@ instance World LocalWorld where
     where
       get' | U.null pid = case lwMode lw of
                             SinglePlayer →
-                              do pl' ← LPM.lookup pid $ lwPlayers lw
-                                 case pl' of
-                                   -- The Nil player already exists.
-                                   Just pl → return pl
-                                   -- Create the Nil player.
-                                   Nothing → newPlayer U.nil Administrator lw
+                              -- The Nil player must have been spawned.
+                              LPM.get pid $ lwPlayers lw
                             MultiPlayer →
                               -- Nil player can't exist in multi
                               -- player mode.
@@ -66,8 +67,9 @@ instance World LocalWorld where
                               LPM.get pid $ lwPlayers lw
 
 -- | Create a new world out of thin air.
-newWorld ∷ WorldMode → a
+newWorld ∷ Foldable f ⇒ WorldMode → f SomeModule → a
 newWorld = error "FIXME"
+  -- newPlayer U.nil Administrator lw
 
 -- | Get the coordinate of the initial spawn.
 initialSpawn ∷ LocalWorld → STM WorldPos

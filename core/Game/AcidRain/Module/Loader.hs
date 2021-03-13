@@ -11,7 +11,10 @@ module Game.AcidRain.Module.Loader
   , getTile
 
   -- * Loading modules
+  , ModuleMap
   , loadModules
+  , lcMods
+  , lcTiles
   ) where
 
 import Control.Monad.Catch (MonadThrow)

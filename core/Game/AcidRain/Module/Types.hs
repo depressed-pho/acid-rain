@@ -45,9 +45,9 @@ type ModuleMap = HashMap ModuleID SomeModule
 -- | An opaque data structure representing a state of module loading.
 data LoaderContext
   = LoaderContext
-    { -- | Modules that have been fully loaded. This doesn't include a
-      -- module that is currently being loaded.
+    { -- | Extract modules that have been fully loaded. This doesn't
+      -- include a module that is currently being loaded.
       lcMods  ∷ !ModuleMap
-      -- | The tile registry that is being constructed.
+      -- | Extract the tile registry that has been constructed.
     , lcTiles ∷ !TileRegistry
     }
