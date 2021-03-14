@@ -1,4 +1,5 @@
 packages:
-    builtin
+    bin,
+    builtin,
     core,
     server
