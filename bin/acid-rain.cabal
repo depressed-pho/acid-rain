@@ -20,8 +20,7 @@ executable acid-rain
     base               ==  4.*,
     acid-rain-core     ^>= 0.1.0.0,
     acid-rain-builtin  ^>= 0.1.0.0,
-    acid-rain-server   ^>= 0.1.0.0,
-    data-default-class ^>= 0.1.2.0
+    acid-rain-server   ^>= 0.1.0.0
 
   default-language:    Haskell2010
   ghc-options:

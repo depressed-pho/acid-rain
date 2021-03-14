@@ -1,5 +1,5 @@
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE UnicodeSyntax #-}
@@ -9,21 +9,19 @@ module Game.AcidRain.Module.Builtin
 
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.State.Strict (MonadState)
-import Data.Default.Class (Default)
+import Data.Proxy (Proxy)
 import Game.AcidRain.Module (Module(..), ModuleID)
 import Game.AcidRain.Module.Builtin.Loader.Tile (loadTiles)
 import Game.AcidRain.Module.Loader (LoaderContext)
-import GHC.Generics (Generic)
 
 
 -- | This is a built-in module of Acid Rain whose existence is,
 -- strictly speaking, not mandatory but realistically is.
-data BuiltinModule = BuiltinModule deriving (Generic)
-instance Default BuiltinModule
+data BuiltinModule
 
-instance Module BuiltinModule where
-  modID ∷ BuiltinModule → ModuleID
+instance Module (Proxy BuiltinModule) where
+  modID ∷ Proxy BuiltinModule → ModuleID
   modID _ = "acid-rain"
 
-  load ∷ (MonadState LoaderContext μ, MonadThrow μ) ⇒ α → μ ()
+  load ∷ (MonadState LoaderContext μ, MonadThrow μ) ⇒ Proxy BuiltinModule → μ ()
   load _ = loadTiles

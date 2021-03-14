@@ -19,6 +19,10 @@ import Game.AcidRain.World.Tile.Registry (TileRegistry)
 -- @acid-rain:dirt@. @acid-rain@ is the module ID in this case.
 type ModuleID = Text
 
+-- | This class defines a module of the game. A module is a collection
+-- of assets such as tiles, recipes, world-gen hooks, and so on. An
+-- instance of 'Module' typically has no values, and implements
+-- 'Module' on 'Data.Proxy.Proxy' instead.
 class Module α where
   -- | Erase the type of the module.
   upcastModule ∷ α → SomeModule
