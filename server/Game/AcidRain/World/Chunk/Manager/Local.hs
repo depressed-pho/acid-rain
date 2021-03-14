@@ -12,9 +12,6 @@ module Game.AcidRain.World.Chunk.Manager.Local
 
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.STM (STM)
-import Control.Concurrent.STM.TVar (TVar, newTVar, readTVar, writeTVar)
-import Data.HashMap.Strict (HashMap)
-import qualified Data.HashMap.Strict as HM
 import Game.AcidRain.World.Chunk (Chunk)
 import qualified Game.AcidRain.World.Chunk as C
 import Game.AcidRain.World.Chunk.Palette (TilePalette)
@@ -24,6 +21,8 @@ import Game.AcidRain.World.Tile.Registry (TileRegistry)
 import qualified Game.AcidRain.World.Tile.Registry as TR
 import Prelude hiding (lcm, lookup)
 import Prelude.Unicode ((∘))
+import StmContainers.Map (Map)
+import qualified StmContainers.Map as SM
 
 
 -- | This is a server-side chunk manager. When a chunk is requested, it
@@ -38,8 +37,9 @@ data LocalChunkManager
   = LocalChunkManager
     { lcmTiles   ∷ !TileRegistry
     , lcmPalette ∷ !TilePalette
-    -- FIXME: Switch to http://hackage.haskell.org/package/stm-containers
-    , lcmLoaded  ∷ !(TVar (HashMap ChunkPos Chunk))
+      -- | Note that this is an STM map. Accessing it requires an STM
+      -- transaction.
+    , lcmLoaded  ∷ !(Map ChunkPos Chunk)
     }
 
 instance Show LocalChunkManager where
@@ -58,7 +58,7 @@ instance Show LocalChunkManager where
 -- even chunk corruptions!) but not immediately.
 new ∷ TileRegistry → TilePalette → STM LocalChunkManager
 new tiles palette
-  = do loaded ← newTVar HM.empty
+  = do loaded ← SM.new
        return $ LocalChunkManager
          { lcmTiles   = tiles
          , lcmPalette = palette
@@ -78,16 +78,16 @@ generate _pos lcm
 -- no side effects.
 lookup ∷ ChunkPos → LocalChunkManager → STM (Maybe Chunk)
 lookup pos lcm
-  -- Smells like a point-free opportunity, but I also don't like
-  -- unreadable code.
-  = do chunks ← readTVar $ lcmLoaded lcm
-       return $ HM.lookup pos chunks
+  -- Smells like a point-free opportunity, but I don't like unreadable
+  -- code.
+  = SM.lookup pos $ lcmLoaded lcm
 
 -- FIXME: Remove this later.
 ensureChunkExists ∷ ChunkPos → LocalChunkManager → STM ()
 ensureChunkExists pos lcm
-  = do chunks ← readTVar $ lcmLoaded lcm
-       if HM.member pos chunks
-         then return ()
-         else do chunk ← generate pos lcm
-                 writeTVar (lcmLoaded lcm) $ HM.insert pos chunk chunks
+  = do chunk' ← SM.lookup pos $ lcmLoaded lcm
+       case chunk' of
+         Just _  → return ()
+         Nothing →
+           do chunk ← generate pos lcm
+              SM.insert chunk pos $ lcmLoaded lcm
