@@ -12,6 +12,7 @@ module Game.AcidRain.World
 import Control.Exception (Exception, SomeException)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO)
+import Data.Kind (Type)
 import Game.AcidRain.World.Chunk (Chunk)
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
 import Game.AcidRain.World.Player (Player, PlayerID)
@@ -31,7 +32,7 @@ import Prelude.Unicode ((∘))
 class World α where
   -- | The type of the running state of this world. It's usually an
   -- opaque type.
-  type RunningStateT α ∷ *
+  type RunningStateT α ∷ Type
   -- | Get the state of the world. State changes are also reported via
   -- WorldStateChanged events. Unless explicitly stated, most of the
   -- other methods of this class throws exceptions when invoked at a
