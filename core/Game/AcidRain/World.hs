@@ -41,11 +41,11 @@ class World α where
   -- | Lookup a chunk at a certain position if it's available. This
   -- does not block. If the chunk isn't available yet, an event
   -- ChunkArrived will fire later.
-  lookupChunk ∷ MonadIO μ ⇒ ChunkPos → α → μ (Maybe Chunk)
+  lookupChunk ∷ MonadIO μ ⇒ α → ChunkPos → μ (Maybe Chunk)
   -- FIXME: Remove this later.
-  ensureChunkExists ∷ MonadIO μ ⇒ ChunkPos → α → μ ()
+  ensureChunkExists ∷ MonadIO μ ⇒ α → ChunkPos → μ ()
   -- | Get a player in the world having a given ID.
-  getPlayer ∷ (MonadIO μ, MonadThrow μ) ⇒ PlayerID → α → μ Player
+  getPlayer ∷ (MonadIO μ, MonadThrow μ) ⇒ α → PlayerID → μ Player
 
 data WorldMode
   = SinglePlayer

@@ -73,20 +73,20 @@ instance World LocalWorld where
   getWorldState
     = liftIO ∘ atomically ∘ readTVar ∘ lwState
 
-  lookupChunk ∷ MonadIO μ ⇒ ChunkPos → LocalWorld → μ (Maybe Chunk)
-  lookupChunk pos lw
+  lookupChunk ∷ MonadIO μ ⇒ LocalWorld → ChunkPos → μ (Maybe Chunk)
+  lookupChunk lw pos
     = liftIO $ atomically $
       do rs ← assumeRunning lw
          LCM.lookup pos $ rsChunks rs
 
   -- FIXME: Remove this later.
-  ensureChunkExists pos lw
+  ensureChunkExists lw pos
     = liftIO $ atomically $
       do rs ← assumeRunning lw
          LCM.ensureChunkExists pos $ rsChunks rs
 
-  getPlayer ∷ (MonadIO μ, MonadThrow μ) ⇒ PlayerID → LocalWorld → μ Player
-  getPlayer pid lw
+  getPlayer ∷ (MonadIO μ, MonadThrow μ) ⇒ LocalWorld → PlayerID → μ Player
+  getPlayer lw pid
     = liftIO $ atomically $ assumeRunning lw >>= get'
     where
       get' rs | U.null pid = case lwMode lw of
