@@ -6,6 +6,7 @@ module Game.AcidRain.World
     World(..)
   , WorldMode(..)
   , WorldState(..)
+  , SomeWorld(..)
 
     -- * Events
   , WorldStateChanged(..)
@@ -36,26 +37,48 @@ import Prelude.Unicode ((∘))
 -- * 'RemoteWorld' is a client-side world which is owned by a remote
 --   server. The server and the client communicate on network.
 --
-class World α where
+class World w where
   -- | The type of the running state of this world. It's usually an
   -- opaque type.
-  type RunningStateT α ∷ Type
+  type RunningStateT w ∷ Type
+  -- | Erase the type of the world.
+  upcastWorld ∷ w → SomeWorld
+  upcastWorld = SomeWorld
   -- | Get the state of the world. State changes are also reported via
   -- 'WorldStateChanged' events. Unless explicitly stated, most of the
   -- other methods of this class throws exceptions when invoked at a
   -- wrong state.
-  getWorldState ∷ MonadIO μ ⇒ α → μ (WorldState (RunningStateT α))
+  getWorldState ∷ MonadIO μ ⇒ w → μ (WorldState (RunningStateT w))
   -- | Block until the next world event is fired, or return 'Nothing'
   -- if these is no chance that any more events can ever fire.
-  waitForEvent ∷ MonadIO μ ⇒ α → μ (Maybe SomeEvent)
+  waitForEvent ∷ MonadIO μ ⇒ w → μ (Maybe SomeEvent)
   -- | Lookup a chunk at a certain position if it's available. This
   -- does not block. If the chunk isn't available yet, an event
   -- ChunkArrived will fire later.
-  lookupChunk ∷ MonadIO μ ⇒ α → ChunkPos → μ (Maybe Chunk)
+  lookupChunk ∷ MonadIO μ ⇒ w → ChunkPos → μ (Maybe Chunk)
   -- FIXME: Remove this later.
-  ensureChunkExists ∷ MonadIO μ ⇒ α → ChunkPos → μ ()
+  ensureChunkExists ∷ MonadIO μ ⇒ w → ChunkPos → μ ()
   -- | Get a player in the world having a given ID.
-  getPlayer ∷ (MonadIO μ, MonadThrow μ) ⇒ α → PlayerID → μ Player
+  getPlayer ∷ (MonadIO μ, MonadThrow μ) ⇒ w → PlayerID → μ Player
+
+-- | A type-erased 'World'.
+data SomeWorld = ∀w. World w ⇒ SomeWorld w
+
+instance World SomeWorld where
+  type RunningStateT SomeWorld = ()
+  upcastWorld = id
+  getWorldState (SomeWorld w) = eraseRunningState <$> getWorldState w
+    where
+      eraseRunningState ∷ WorldState rs → WorldState ()
+      eraseRunningState Loading        = Loading
+      eraseRunningState LoadPending    = LoadPending
+      eraseRunningState (LoadFailed e) = LoadFailed e
+      eraseRunningState (Running _)    = Running ()
+      eraseRunningState (Closed e)     = Closed e
+  waitForEvent (SomeWorld w) = waitForEvent w
+  lookupChunk (SomeWorld w) = lookupChunk w
+  ensureChunkExists (SomeWorld w) = ensureChunkExists w
+  getPlayer (SomeWorld w) = getPlayer w
 
 data WorldMode
   = SinglePlayer

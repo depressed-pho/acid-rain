@@ -1,5 +1,6 @@
 packages:
     bin,
     builtin,
+    client,
     core,
     server

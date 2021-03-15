@@ -7,8 +7,8 @@ module Game.AcidRain.World.Local
   ) where
 
 import Control.Concurrent (forkIO, threadDelay)
-import Control.Concurrent.STM.TQueue
-  ( TQueue, newTQueueIO, readTQueue, writeTQueue )
+import Control.Concurrent.STM.TBQueue
+  ( TBQueue, newTBQueueIO, readTBQueue, writeTBQueue )
 import Control.Concurrent.STM.TVar (TVar, newTVarIO, readTVar, writeTVar)
 import Control.Exception (SomeException, handle, toException)
 import Control.Monad (void)
@@ -31,6 +31,7 @@ import Game.AcidRain.World.Player.Manager.Local (LocalPlayerManager)
 import Game.AcidRain.World.Player (Player(..), Permission(..), PlayerID)
 import Game.AcidRain.World.Position (WorldPos(..))
 import qualified Game.AcidRain.World.Player.Manager.Local as LPM
+import Numeric.Natural (Natural)
 import Prelude hiding (lcm)
 import Prelude.Unicode ((∘))
 
@@ -41,8 +42,11 @@ data LocalWorld
   = LocalWorld
     { lwMode   ∷ !WorldMode
     , lwState  ∷ !(TVar (WorldState RunningState))
-    , lwEvents ∷ !(TQueue SomeEvent)
+    , lwEvents ∷ !(TBQueue SomeEvent)
     }
+
+eventQueueCapacity ∷ Natural
+eventQueueCapacity = 256
 
 -- The state of running world. Not exposed to anywhere.
 data RunningState
@@ -71,7 +75,7 @@ repeatWhileRunning lw f
 -- Fire a world event.
 fireEvent ∷ Event e ⇒ LocalWorld → e → STM ()
 fireEvent lw e
-  = writeTQueue (lwEvents lw) (upcastEvent e)
+  = writeTBQueue (lwEvents lw) (upcastEvent e)
 
 -- Change the world state.
 changeState ∷ LocalWorld → WorldState RunningState → STM ()
@@ -93,7 +97,7 @@ instance World LocalWorld where
          case ws of
            LoadFailed _ → return Nothing
            Closed     _ → return Nothing
-           _            → Just <$> (readTQueue $ lwEvents lw)
+           _            → Just <$> (readTBQueue $ lwEvents lw)
 
   lookupChunk ∷ MonadIO μ ⇒ LocalWorld → ChunkPos → μ (Maybe Chunk)
   lookupChunk lw pos
@@ -136,7 +140,7 @@ newWorld ∷ (MonadIO μ, Foldable f) ⇒ WorldMode → f SomeModule → μ Loca
 newWorld wm mods
   = liftIO $
     do ws ← newTVarIO Loading
-       es ← newTQueueIO
+       es ← newTBQueueIO eventQueueCapacity
        let lw = LocalWorld
                 { lwMode   = wm
                 , lwState  = ws
