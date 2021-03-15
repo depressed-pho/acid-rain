@@ -47,7 +47,7 @@ class Show τ ⇒ Tile τ where
 data SomeTile = ∀τ. Tile τ ⇒ SomeTile τ
 
 instance Show SomeTile where
-  show (SomeTile t) = show t
+  showsPrec d (SomeTile t) = showsPrec d t
 
 instance Tile SomeTile where
   upcastTile = id

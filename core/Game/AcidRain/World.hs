@@ -2,9 +2,15 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World
-  ( World(..)
+  ( -- * The world class
+    World(..)
   , WorldMode(..)
   , WorldState(..)
+
+    -- * Events
+  , WorldStateChanged(..)
+
+    -- * Exceptions
   , WorldNotRunningException(..)
   , UnknownPlayerIDException(..)
   ) where
@@ -15,6 +21,7 @@ import Control.Monad.IO.Class (MonadIO)
 import Data.Kind (Type)
 import Game.AcidRain.World.Chunk (Chunk)
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
+import Game.AcidRain.World.Event (Event(..), SomeEvent)
 import Game.AcidRain.World.Player (Player, PlayerID)
 import Prelude.Unicode ((∘))
 
@@ -34,10 +41,13 @@ class World α where
   -- opaque type.
   type RunningStateT α ∷ Type
   -- | Get the state of the world. State changes are also reported via
-  -- WorldStateChanged events. Unless explicitly stated, most of the
+  -- 'WorldStateChanged' events. Unless explicitly stated, most of the
   -- other methods of this class throws exceptions when invoked at a
   -- wrong state.
   getWorldState ∷ MonadIO μ ⇒ α → μ (WorldState (RunningStateT α))
+  -- | Block until the next world event is fired, or return 'Nothing'
+  -- if these is no chance that any more events can ever fire.
+  waitForEvent ∷ MonadIO μ ⇒ α → μ (Maybe SomeEvent)
   -- | Lookup a chunk at a certain position if it's available. This
   -- does not block. If the chunk isn't available yet, an event
   -- ChunkArrived will fire later.
@@ -66,6 +76,12 @@ data WorldState rs
     -- | The world has been closed.
   | Closed !(Maybe SomeException)
   deriving Show
+
+-- | An event to be fired when the 'WorldState' changes.
+data WorldStateChanged rs = WorldStateChanged !(WorldState rs)
+  deriving Show
+
+instance Show rs ⇒ Event (WorldStateChanged rs)
 
 -- | An exception to be thrown when a certain operation assuming the
 -- world is running is attempted, but it was actually not running.

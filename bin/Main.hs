@@ -1,7 +1,6 @@
 {-# LANGUAGE UnicodeSyntax #-}
 module Main (main) where
 
-import Control.Concurrent (threadDelay)
 import Control.Monad (forever)
 import Data.Proxy (Proxy(..))
 import Game.AcidRain.Module (Module(..))
@@ -14,7 +13,6 @@ main ∷ IO ()
 main
   = do lw ← newWorld SinglePlayer [upcastModule (Proxy ∷ Proxy BuiltinModule)]
        forever $
-         do st ← getWorldState lw
-            putStrLn (show st)
+         do e ← waitForEvent lw
+            putStrLn (show e)
             ensureChunkExists lw (ChunkPos 0 0)
-            threadDelay 1000000
