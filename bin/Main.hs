@@ -2,7 +2,7 @@
 module Main (main) where
 
 import qualified Brick.AttrMap as A
-import Brick.Main (App(..), neverShowCursor, halt, defaultMain)
+import Brick.Main (App(..), neverShowCursor, continue, halt, customMain)
 import Brick.Types (BrickEvent(..), Widget, EventM, Next)
 import Control.Monad (forever, void)
 import Data.UUID (nil)
@@ -21,8 +21,12 @@ data Name = Name1
 main ∷ IO ()
 main
   = do lw ← newWorld SinglePlayer [upcastModule (Proxy ∷ Proxy BuiltinModule)]
-       let wv = worldView Name1 lw nil
-       void $ defaultMain theApp wv
+       let wv = worldView Name1 True lw nil
+
+       let buildVty = V.mkVty V.defaultConfig
+       initialVty ← buildVty
+       void $ customMain initialVty buildVty Nothing theApp wv
+
        return ()
        {-
        forever $
@@ -44,5 +48,5 @@ drawUI ∷ WorldView n → [Widget n]
 drawUI wv = [renderWorldView wv]
 
 appEvent ∷ WorldView n → BrickEvent n e → EventM n (Next (WorldView n))
-appEvent wv _e
-  = halt wv
+appEvent wv (VtyEvent (V.EvResize _ _)) = continue wv
+appEvent wv _ = halt wv

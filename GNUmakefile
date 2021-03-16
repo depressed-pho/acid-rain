@@ -1,4 +1,5 @@
 CABAL_BUILD_OPTS?= --enable-executable-dynamic
+export TERM=xterm-256color
 
 all:
 	cabal v2-build $(CABAL_BUILD_OPTS) all

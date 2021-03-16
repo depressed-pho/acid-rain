@@ -3,18 +3,21 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Chunk.Position
-  ( ChunkPos(..)
-  , toChunkPos
+  ( ChunkPos(..), cpX, cpY
+  , toWorldPos
   ) where
 
 import Data.Convertible.Base (Convertible(..))
 import Data.Hashable (Hashable)
 import Data.Int (Int8, Int32)
-import Game.AcidRain.World.Position (WorldPos(..))
+import Game.AcidRain.World.Position (WorldPos(..), wpX, wpY)
 import Game.AcidRain.World.Chunk (chunkSize)
 import GHC.Generics (Generic)
+import Lens.Micro ((^.))
+import Lens.Micro.TH (makeLenses)
 import Prelude.Unicode ((⋅))
 
 
@@ -22,25 +25,27 @@ import Prelude.Unicode ((⋅))
 -- space. It is computed by dividing 'WorldPos' by 'chunkSize' and
 -- rounding towards negative infinity.
 data ChunkPos = ChunkPos
-  { x ∷ {-# UNPACK #-} !Int32
-  , y ∷ {-# UNPACK #-} !Int32
+  { _cpX ∷ {-# UNPACK #-} !Int32
+  , _cpY ∷ {-# UNPACK #-} !Int32
   } deriving (Eq, Show, Generic)
+
+makeLenses ''ChunkPos
 
 instance Hashable ChunkPos
 
 instance Convertible WorldPos ChunkPos where
-  safeConvert (WorldPos { x, y, .. })
+  safeConvert wp
     = Right $ ChunkPos
-      { x = x `mod` chunkSize
-      , y = y `mod` chunkSize
+      { _cpX = wp^.wpX `div` chunkSize
+      , _cpY = wp^.wpY `div` chunkSize
       }
 
 -- | There is no instance of @'Convertible' 'WorldPos' 'ChunkPos'@
 -- because 'ChunkPos' has no @z@ component.
-toChunkPos ∷ Int8 → ChunkPos → WorldPos
-toChunkPos z (ChunkPos { x, y })
+toWorldPos ∷ ChunkPos → Int8 → WorldPos
+toWorldPos cp z
   = WorldPos
-    { x = x ⋅ chunkSize
-    , y = y ⋅ chunkSize
-    , z = z
+    { _wpX = cp^.cpX ⋅ chunkSize
+    , _wpY = cp^.cpY ⋅ chunkSize
+    , _wpZ = z
     }

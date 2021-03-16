@@ -21,7 +21,12 @@ library
     base                 ==  4.*,
     acid-rain-core       ^>= 0.1.0.0,
     base-unicode-symbols ^>= 0.2.4.2,
-    brick                ^>= 0.60.2
+    brick                ^>= 0.60.2,
+    convertible          ^>= 1.1.1.0,
+    exceptions           ^>= 0.10.4,
+    microlens            ^>= 0.4.12.0,
+    text                 ^>= 1.2.4.0,
+    vty                  ^>= 5.33
 
   default-language:    Haskell2010
   ghc-options:

@@ -20,10 +20,11 @@ import qualified Data.Vector.Generic.Mutable as GMV
 import qualified Data.Vector.Unboxed as UV
 import Data.Word (Word8)
 import Game.AcidRain.World.Chunk.Palette (TilePalette, TileIndex, indexOf, idOf)
-import Game.AcidRain.World.Position (WorldPos(..))
+import Game.AcidRain.World.Position (WorldPos(..), wpX, wpY, wpZ)
 import Game.AcidRain.World.Tile (Tile(..), TileState(..), TileStateValue, SomeTileState)
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
 import qualified Game.AcidRain.World.Tile.Registry as TR
+import Lens.Micro ((^.))
 import Prelude.Unicode ((⋅))
 
 
@@ -61,11 +62,11 @@ data TileOffset
     } deriving (Show)
 
 instance Convertible WorldPos TileOffset where
-  safeConvert (WorldPos { x, y, z })
+  safeConvert wp
     = Right $ TileOffset
-      { x = fromIntegral $ x `mod` chunkSize
-      , y = fromIntegral $ y `mod` chunkSize
-      , z = fromIntegral $ z `mod` chunkHeight
+      { x = fromIntegral $ wp^.wpX `mod` chunkSize
+      , y = fromIntegral $ wp^.wpY `mod` chunkSize
+      , z = fromIntegral $ wp^.wpZ `mod` chunkHeight
       }
 
 -- | The tile state vector.
@@ -112,8 +113,8 @@ new registry palette fill
          }
 
 -- | Get a tile state at a given offset in a tile.
-tileStateAt ∷ MonadThrow μ ⇒ TileOffset → Chunk → μ SomeTileState
-tileStateAt (TileOffset { x, y, z }) chunk
+tileStateAt ∷ MonadThrow μ ⇒ Chunk → TileOffset → μ SomeTileState
+tileStateAt chunk (TileOffset { x, y, z })
   = assert (x < chunkSize) $
     assert (y < chunkSize) $
     assert (z < chunkHeight) $
