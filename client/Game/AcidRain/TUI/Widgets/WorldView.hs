@@ -13,7 +13,7 @@ import Brick.Types
   ( Location(..), Widget(..), Size(..), Context, Result, RenderM
   , getContext, emptyResult, imageL, availWidthL, availHeightL, locL )
 import Brick.Widgets.Center (center)
-import Brick.Widgets.Core (Named(..), txtWrap)
+import Brick.Widgets.Core (Named(..), cached, txt, txtWrap)
 import Control.Exception (Handler(..), SomeException, catches)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO)
@@ -34,6 +34,10 @@ import Prelude.Unicode ((∘))
 import System.IO.Unsafe (unsafePerformIO)
 
 
+-- | This is a Brick widget to render some part of the world centered
+-- around a tracked player. Since this widget is really heavy-weight,
+-- it is cached under the given name. You need to invalidate the cache
+-- to have it redrawn.
 data WorldView n
   = WorldView
     { wvName    ∷ !n
@@ -49,7 +53,13 @@ data WorldView n
 instance Named (WorldView n) n where
   getName = wvName
 
-worldView ∷ World w ⇒ n → Bool → w → PlayerID → WorldView n
+-- | Create a world view.
+worldView ∷ World w
+          ⇒ n        -- ^ The name of this widget
+          → Bool     -- ^ Whether to use Unicode characters
+          → w        -- ^ The world to render
+          → PlayerID -- ^ The player to track
+          → WorldView n
 worldView n uni w pid
   = WorldView
     { wvName         = n
@@ -59,9 +69,11 @@ worldView n uni w pid
     , wvPlayerOffset = Location (0, 0)
     }
 
-renderWorldView ∷ ∀n. WorldView n → Widget n
+-- | Render a world view.
+renderWorldView ∷ ∀n. Ord n ⇒ WorldView n → Widget n
 renderWorldView wv
-  = Widget Greedy Greedy $
+  = cached (wvName wv) $
+    Widget Greedy Greedy $
     do ctx ← getContext
        unsafePerformIO $ render' ctx
   where
@@ -70,8 +82,8 @@ renderWorldView wv
     -- options.
     render' ∷ Context → IO (RenderM n (Result n))
     render' ctx
-      = flip catches [ Handler catchAll
-                     , Handler catchWNRE
+      = flip catches [ Handler catchWNRE
+                     , Handler catchAll
                      ] $
         do -- Draw all the tiles currently visible from the
            -- viewpoint. The easiest way to do this is to iterate on
@@ -167,10 +179,10 @@ catchAll = return ∘ render ∘ txtWrap ∘ pack ∘ show
 catchWNRE ∷ WorldNotRunningException → IO (RenderM n (Result n))
 catchWNRE (WorldNotRunningException ws)
   = let w = case ws of
-              Loading      → center $ txtWrap "Loading..."
-              LoadPending  → center $ txtWrap "FIXME: LoadPending"
-              LoadFailed e → center $ txtWrap $ "Load failed: " ⊕ pack (show e)
+              Loading      → center $ txt "Loading..."
+              LoadPending  → center $ txt "FIXME: LoadPending"
+              LoadFailed e → txtWrap $ "Load failed: " ⊕ pack (show e)
               Running _    → error "Impossible"
-              Closed e     → center $ txtWrap $ "World closed: " ⊕ pack (show e)
+              Closed e     → txtWrap $ "World closed: " ⊕ pack (show e)
     in
       return $ render w

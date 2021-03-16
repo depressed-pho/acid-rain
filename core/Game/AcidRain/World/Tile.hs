@@ -44,7 +44,7 @@ class Show τ ⇒ Tile τ where
   appearance ∷ τ → TileStateValue → Appearance
 
 -- | A type-erased 'Tile'.
-data SomeTile = ∀τ. Tile τ ⇒ SomeTile τ
+data SomeTile = ∀τ. Tile τ ⇒ SomeTile !τ
 
 instance Show SomeTile where
   showsPrec d (SomeTile t) = showsPrec d t

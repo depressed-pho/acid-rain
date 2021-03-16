@@ -44,7 +44,7 @@ class Module α where
   load ∷ (MonadState LoaderContext μ, MonadThrow μ) ⇒ α → μ ()
 
 -- | A type-erased 'Module'.
-data SomeModule = ∀α. Module α ⇒ SomeModule α
+data SomeModule = ∀α. Module α ⇒ SomeModule !α
 
 instance Module SomeModule where
   upcastModule = id

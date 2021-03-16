@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World
@@ -20,6 +20,7 @@ import Control.Exception (Exception, SomeException)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO)
 import Data.Kind (Type)
+import Data.Typeable (Typeable)
 import Game.AcidRain.World.Chunk (Chunk)
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
 import Game.AcidRain.World.Event (Event(..), SomeEvent)
@@ -62,7 +63,7 @@ class World w where
   getPlayer ∷ (MonadIO μ, MonadThrow μ) ⇒ w → PlayerID → μ Player
 
 -- | A type-erased 'World'.
-data SomeWorld = ∀w. World w ⇒ SomeWorld w
+data SomeWorld = ∀w. World w ⇒ SomeWorld !w
 
 instance World SomeWorld where
   type RunningStateT SomeWorld = ()
@@ -86,14 +87,14 @@ data WorldMode
   deriving (Show, Eq)
 
 data WorldState rs
-  = -- | The world is being loaded.
-    Loading -- THINKME: progress
+    -- | The world is being loaded.
+  = Loading
     -- | Concerns have been raised while loading the world. Players
     -- may choose to abort or continue loading the world, but until
     -- that the world waits for their input.
-  | LoadPending -- FIXME: reason
+  | LoadPending
     -- | Problems have arised while loading the world.
-  | LoadFailed SomeException
+  | LoadFailed !SomeException
     -- | The world is running.
   | Running !rs
     -- | The world has been closed.
@@ -101,21 +102,29 @@ data WorldState rs
   deriving Show
 
 -- | An event to be fired when the 'WorldState' changes.
-data WorldStateChanged rs = WorldStateChanged !(WorldState rs)
-  deriving Show
+data WorldStateChanged
+  = ∀rs. (Show rs, Typeable rs) ⇒ WorldStateChanged !(WorldState rs)
 
-instance Show rs ⇒ Event (WorldStateChanged rs)
+instance Show WorldStateChanged where
+  -- GHC can't derive Show for this, but why?
+  showsPrec d (WorldStateChanged rs)
+    = showParen (d > appPrec) $
+      showString "WorldStateChanged " ∘ showsPrec (appPrec + 1) rs
+    where
+      appPrec = 10
+
+instance Event WorldStateChanged
 
 -- | An exception to be thrown when a certain operation assuming the
 -- world is running is attempted, but it was actually not running.
-data WorldNotRunningException where
-  WorldNotRunningException ∷ Show rs ⇒ WorldState rs → WorldNotRunningException
+data WorldNotRunningException
+  = ∀rs. (Show rs, Typeable rs) ⇒ WorldNotRunningException !(WorldState rs)
 
 instance Show WorldNotRunningException where
   -- GHC can't derive Show for this, but why?
   showsPrec d (WorldNotRunningException rs)
     = showParen (d > appPrec) $
-      showString "WorldNotRunningException" ∘ showsPrec (appPrec + 1) rs
+      showString "WorldNotRunningException " ∘ showsPrec (appPrec + 1) rs
     where
       appPrec = 10
 
