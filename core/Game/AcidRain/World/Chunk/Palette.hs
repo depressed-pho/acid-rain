@@ -10,6 +10,8 @@ module Game.AcidRain.World.Chunk.Palette
 
     -- * Manipulating palettes
   , insert
+
+    -- * Querying palettes
   , indexOf
   , idOf
 
@@ -56,7 +58,8 @@ type TileIndex = Word32
 --
 -- This type is not even a 'Monoid' because merging two palettes can
 -- fail due to duplicating tile IDs or indices.
-data TilePalette = TilePalette
+data TilePalette =
+  TilePalette
   { indexOf' ∷ !(HashMap TileID TileIndex)
   , idOf'    ∷ !(Map TileIndex TileID) -- We can't use IntMap because it's not Int.
   } deriving (Show)

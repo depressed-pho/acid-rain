@@ -20,14 +20,13 @@ import Control.Monad.IO.Class (MonadIO)
 import Data.Convertible.Base (convert)
 import Data.Monoid.Unicode ((⊕))
 import Data.Text (pack)
-import Game.AcidRain.TUI (Appearance(..))
+import Game.AcidRain.TUI (Appearance(..), HasAppearance(..))
 import Game.AcidRain.World
   ( World(..), WorldState(..), SomeWorld, WorldNotRunningException(..) )
 import Game.AcidRain.World.Chunk (Chunk, tileStateAt)
 import Game.AcidRain.World.Chunk.Position (ChunkPos(..), cpX, cpY, toWorldPos)
 import Game.AcidRain.World.Player (PlayerID, plPos)
 import Game.AcidRain.World.Position (WorldPos(..), wpX, wpY, wpZ)
-import Game.AcidRain.World.Tile (Tile(..), TileState(..))
 import qualified Graphics.Vty as V
 import Lens.Micro ((&), (.~), (^.), (+~), (-~), (%~), _1, _2)
 import Prelude.Unicode ((∘))
@@ -134,7 +133,7 @@ renderWorldView wv
     renderAt ∷ MonadThrow μ ⇒ Chunk → WorldPos → μ V.Image
     renderAt chunk wpos
       = do ts ← tileStateAt chunk (convert wpos)
-           let appr = appearance (tsTile ts) (tsValue ts)
+           let appr = appearance ts
            return $ if wvUnicode wv
                     then V.text' (apAttr appr) (apUnicode appr)
                     else V.char  (apAttr appr) (apAscii   appr)

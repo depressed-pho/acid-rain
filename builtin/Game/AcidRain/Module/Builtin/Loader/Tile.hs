@@ -17,9 +17,10 @@ import Game.AcidRain.World.Tile (Tile(..))
 
 data Dirt
 instance Tile (Proxy Dirt) where
-  tileID     _   = "acid-rain:dirt"
-  appearance _ _ = begin ⊳ unicode "." ⊳ ascii '.' ⊳ fgColour (hsl 43.0 0.89 0.38) ⊳ end
-  -- The color is CSS3 darkgoldenrod
+  tileID _ = "acid-rain:dirt"
+  appearanceForState _ _
+    = begin ⊳ unicode "." ⊳ ascii '.' ⊳ fgColour (hsl 43.0 0.89 0.38) ⊳ end
+      -- The color is CSS3 darkgoldenrod
 
 loadTiles ∷ (MonadState LoaderContext μ, MonadThrow μ) ⇒ μ ()
 loadTiles

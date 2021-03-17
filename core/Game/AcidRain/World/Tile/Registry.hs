@@ -3,11 +3,20 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Tile.Registry
-  ( TileRegistry
+  ( -- * The registry type
+    TileRegistry
+
+    -- * Constructing registries
   , empty
+
+    -- * Manipulating registries
   , register
+
+    -- * Querying registries
   , lookup
   , get
+
+    -- * Exceptions
   , ConflictingTileIDException(..)
   , UnknownTileIDException(..)
   ) where
@@ -22,9 +31,9 @@ import Data.MonoTraversable
 import Game.AcidRain.World.Tile (Tile(..), TileID, SomeTile(..))
 import Prelude hiding (lookup)
 
--- | The tile registry is struct that contains immutable Tile
--- objects. It is constructed while loading a world, and becomes
--- immutable afterwards.
+-- | The tile registry is a data structure that contains immutable
+-- 'Tile' objects. It is constructed while loading a world, and
+-- becomes immutable afterwards.
 newtype TileRegistry = TileRegistry (HashMap TileID SomeTile)
   deriving ( Show, MonoFunctor, MonoFoldable, GrowingAppend, Semigroup
            , Monoid )
@@ -32,7 +41,8 @@ newtype TileRegistry = TileRegistry (HashMap TileID SomeTile)
 -- GeneralisedNewtypeDeriving can't derive MonoTraversable for us due
 -- to a limitation of the compiler. So we do it manually.
 instance MonoTraversable TileRegistry where
-  otraverse f (TileRegistry reg) = TileRegistry <$> traverse f reg
+  otraverse f (TileRegistry reg)
+    = TileRegistry <$> traverse f reg
 
 type instance Element TileRegistry = SomeTile
 
@@ -64,14 +74,14 @@ get tid reg
 
 -- | An exception to be thrown when two tiles with the same ID is
 -- being registered.
-data ConflictingTileIDException = ConflictingTileIDException TileID
+data ConflictingTileIDException = ConflictingTileIDException !TileID
   deriving Show
 
 instance Exception ConflictingTileIDException
 
 -- | An exception to be thrown when there was no tile having the given
 -- ID.
-data UnknownTileIDException = UnknownTileIDException TileID
+data UnknownTileIDException = UnknownTileIDException !TileID
   deriving Show
 
 instance Exception UnknownTileIDException

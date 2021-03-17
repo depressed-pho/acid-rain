@@ -2,21 +2,23 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.TUI
-  ( Appearance(..)
+  ( -- * The appearance type
+    Appearance(..)
+  , HasAppearance(..)
 
-  -- * Helper for building 'Appearance'
+    -- * Helper for building 'Appearance'
   , AppearanceBuilder
   , begin
   , end
   , (⊳)
   , (|>)
 
-  -- ** Setting fields
+    -- ** Setting fields
   , unicode
   , ascii
   , attr
 
-  -- ** Modifying attributes
+    -- ** Modifying attributes
   , standout
   , italic
   , strikethrough
@@ -34,12 +36,15 @@ module Game.AcidRain.TUI
   , hsl
   ) where
 
+import Control.Exception (assert)
 import Data.Text (Text)
 import Data.Colour (Colour)
 import qualified Data.Colour.RGBSpace.HSL as HSL
 import Data.Colour.SRGB (RGB(..), toSRGB24, sRGB)
 import Graphics.Vty.Attributes (Attr, withStyle)
-import qualified Graphics.Vty.Attributes as VA
+import qualified Graphics.Vty.Attributes as V
+import qualified Graphics.Vty.Image as V
+import Prelude.Unicode ((≢))
 
 
 -- | An appearance is an attributed character (styled and colored)
@@ -53,6 +58,10 @@ data Appearance
     , apAscii   ∷ !Char
     , apAttr    ∷ !Attr
     } deriving (Eq, Show)
+
+-- | Types satisfying 'HasAppearance', obviously, has an appearance.
+class HasAppearance α where
+  appearance ∷ α → Appearance
 
 -- THINKME: We should probably use Generics or TemplateHaskell rather
 -- than writing this builder down by hand.
@@ -84,7 +93,7 @@ instance OptionalField Attr Attr where
   fromOptional = id
 
 instance OptionalField Attr () where
-  fromOptional _ = VA.currentAttr
+  fromOptional _ = V.currentAttr
 
 -- | Declare the beginning of appearance builder.
 begin ∷ AppearanceBuilder () () ()
@@ -116,17 +125,23 @@ infixl 0 ⊳
 infixl 0 |>
 
 -- | Declare a value for the field 'apUnicode'. This must appear
--- exactly once in a builder, or it won't typecheck.
+-- exactly once in a builder, or it won't typecheck. Throws if the
+-- displayed width of the text is not exactly 1.
 unicode ∷ Text → AppearanceBuilder () ascii attr → AppearanceBuilder Text ascii attr
-unicode a ab = ab { abUnicode = a }
+unicode a ab
+  = assert (V.safeWctwidth a ≢ 1) $
+    ab { abUnicode = a }
 
--- | Declare a value for the field 'apAscii'. This must appear
--- exactly once in a builder, or it won't typecheck.
+-- | Declare a value for the field 'apAscii'. This must appear exactly
+-- once in a builder, or it won't typecheck. Throws if the displayed
+-- width of the character is not exactly 1.
 ascii ∷ Char → AppearanceBuilder unicode () attr → AppearanceBuilder unicode Char attr
-ascii a ab = ab { abAscii = a }
+ascii a ab
+  = assert (V.safeWcwidth a ≢ 1) $
+    ab { abAscii = a }
 
 -- | Declare a value for the field 'apAttr'. This is optional and is
--- defaulted to 'VA.currentAttr'. But if it exists, it must not occur
+-- defaulted to 'V.currentAttr'. But if it exists, it must not occur
 -- after any field constructors declaring a value for the field.
 attr ∷ Attr → AppearanceBuilder unicode ascii () → AppearanceBuilder unicode ascii Attr
 attr a ab = ab { abAttr = a }
@@ -137,21 +152,21 @@ standout, italic, strikethrough, underline, reverseVideo, blink, dim, bold
   ∷ OptionalField Attr attr
   ⇒ AppearanceBuilder unicode ascii attr
   → AppearanceBuilder unicode ascii Attr
-standout      ab = ab { abAttr = (fromOptional $ abAttr ab) `withStyle` VA.standout      }
-italic        ab = ab { abAttr = (fromOptional $ abAttr ab) `withStyle` VA.italic        }
-strikethrough ab = ab { abAttr = (fromOptional $ abAttr ab) `withStyle` VA.strikethrough }
-underline     ab = ab { abAttr = (fromOptional $ abAttr ab) `withStyle` VA.underline     }
-reverseVideo  ab = ab { abAttr = (fromOptional $ abAttr ab) `withStyle` VA.reverseVideo  }
-blink         ab = ab { abAttr = (fromOptional $ abAttr ab) `withStyle` VA.blink         }
-dim           ab = ab { abAttr = (fromOptional $ abAttr ab) `withStyle` VA.dim           }
-bold          ab = ab { abAttr = (fromOptional $ abAttr ab) `withStyle` VA.bold          }
+standout      ab = ab { abAttr = (fromOptional $ abAttr ab) `withStyle` V.standout      }
+italic        ab = ab { abAttr = (fromOptional $ abAttr ab) `withStyle` V.italic        }
+strikethrough ab = ab { abAttr = (fromOptional $ abAttr ab) `withStyle` V.strikethrough }
+underline     ab = ab { abAttr = (fromOptional $ abAttr ab) `withStyle` V.underline     }
+reverseVideo  ab = ab { abAttr = (fromOptional $ abAttr ab) `withStyle` V.reverseVideo  }
+blink         ab = ab { abAttr = (fromOptional $ abAttr ab) `withStyle` V.blink         }
+dim           ab = ab { abAttr = (fromOptional $ abAttr ab) `withStyle` V.dim           }
+bold          ab = ab { abAttr = (fromOptional $ abAttr ab) `withStyle` V.bold          }
 
 -- | This is a class to accept any types that can be converted to
--- 'VA.Color'.
+-- 'V.Color'.
 class ColourVariant α where
-  toVtyColour ∷ α → VA.Color
+  toVtyColour ∷ α → V.Color
 
-instance ColourVariant VA.Color where
+instance ColourVariant V.Color where
   toVtyColour = id
 
 instance (Floating e, RealFrac e) ⇒ ColourVariant (Colour e) where
@@ -161,7 +176,7 @@ instance (Floating e, RealFrac e) ⇒ ColourVariant (Colour e) where
   -- END.
   toVtyColour c
     = case toSRGB24 c of
-        RGB r g b → VA.rgbColor r g b
+        RGB r g b → V.rgbColor r g b
 
 -- | Set the foreground or background color of the attributes. Both of
 -- these are optional.
@@ -170,8 +185,8 @@ fgColour, bgColour
   ⇒ α
   → AppearanceBuilder unicode ascii attr
   → AppearanceBuilder unicode ascii Attr
-fgColour c ab = ab { abAttr = (fromOptional $ abAttr ab) `VA.withForeColor` toVtyColour c }
-bgColour c ab = ab { abAttr = (fromOptional $ abAttr ab) `VA.withBackColor` toVtyColour c }
+fgColour c ab = ab { abAttr = (fromOptional $ abAttr ab) `V.withForeColor` toVtyColour c }
+bgColour c ab = ab { abAttr = (fromOptional $ abAttr ab) `V.withBackColor` toVtyColour c }
 
 -- Is this really a correct way to convert RGB to Colour…?
 sRGBToColour ∷ (Floating e, Ord e) ⇒ RGB e → Colour e

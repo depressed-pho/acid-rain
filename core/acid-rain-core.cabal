@@ -20,6 +20,9 @@ library
     Game.AcidRain.World.Chunk
     Game.AcidRain.World.Chunk.Position
     Game.AcidRain.World.Chunk.Palette
+    Game.AcidRain.World.Entity
+    Game.AcidRain.World.Entity.Catalogue
+    Game.AcidRain.World.Entity.Registry
     Game.AcidRain.World.Event
     Game.AcidRain.World.Player
     Game.AcidRain.World.Position
