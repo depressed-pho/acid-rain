@@ -16,6 +16,7 @@ import Game.AcidRain.World.Chunk (Chunk)
 import qualified Game.AcidRain.World.Chunk as C
 import Game.AcidRain.World.Chunk.Palette (TilePalette)
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
+import Game.AcidRain.World.Entity.Catalogue (EntityCatalogue)
 import Game.AcidRain.World.Tile (defaultState)
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
 import qualified Game.AcidRain.World.Tile.Registry as TR
@@ -35,8 +36,9 @@ import qualified StmContainers.Map as SM
 -- therefore not an LRU.
 data LocalChunkManager
   = LocalChunkManager
-    { lcmTiles   ∷ !TileRegistry
-    , lcmPalette ∷ !TilePalette
+    { lcmTiles    ∷ !TileRegistry
+    , lcmPalette  ∷ !TilePalette
+    , lcmEntities ∷ !EntityCatalogue
       -- | Note that this is an STM map. Accessing it requires an STM
       -- transaction.
     , lcmLoaded  ∷ !(Map ChunkPos Chunk)
@@ -48,21 +50,23 @@ instance Show LocalChunkManager where
       showString "LocalChunkManager " ∘
       showString "{ lcmTiles = " ∘ showsPrec (appPrec + 1) (lcmTiles lcm) ∘
       showString ", lcmPalette = " ∘ showsPrec (appPrec + 1) (lcmPalette lcm) ∘
+      showString ", lcmEntities = " ∘ showsPrec (appPrec + 1) (lcmEntities lcm) ∘
       showString ", .. }"
     where
       appPrec = 10
 
--- | Construct a new chunk manager out of a tile registry and a
--- properly populated tile palette. Care must be taken because if the
--- palette is somehow invalid it will later result in exceptions (or
--- even chunk corruptions!) but not immediately.
-new ∷ TileRegistry → TilePalette → STM LocalChunkManager
-new tiles palette
+-- | Construct a new chunk manager out of a tile registry, and a
+-- properly populated tile palette and catalogues. Care must be taken
+-- because if the palette is somehow invalid it will later result in
+-- exceptions (or even chunk corruptions!) but not immediately.
+new ∷ TileRegistry → TilePalette → EntityCatalogue → STM LocalChunkManager
+new tReg tPal eCat
   = do loaded ← SM.new
        return $ LocalChunkManager
-         { lcmTiles   = tiles
-         , lcmPalette = palette
-         , lcmLoaded  = loaded
+         { lcmTiles    = tReg
+         , lcmPalette  = tPal
+         , lcmEntities = eCat
+         , lcmLoaded   = loaded
          }
 
 -- | Generate a chunk. Since chunk generation is a time consuming

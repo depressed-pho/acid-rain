@@ -13,6 +13,7 @@ import Control.Monad.Catch (MonadThrow)
 import Control.Monad.State.Strict (MonadState)
 import Data.HashMap.Strict (HashMap)
 import Data.Text (Text)
+import Game.AcidRain.World.Entity.Registry (EntityRegistry)
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
 
 -- | A module ID is used for things like prefixes of tiles such as
@@ -59,7 +60,9 @@ data LoaderContext
   = LoaderContext
     { -- | Extract modules that have been fully loaded. This doesn't
       -- include a module that is currently being loaded.
-      lcMods  ∷ !ModuleMap
+      lcMods        ∷ !ModuleMap
       -- | Extract the tile registry that has been constructed.
-    , lcTiles ∷ !TileRegistry
+    , lcTiles       ∷ !TileRegistry
+      -- | Extract the entity registry that has been constructed.
+    , lcEntityTypes ∷ !EntityRegistry
     }

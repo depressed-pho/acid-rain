@@ -15,8 +15,8 @@ import Game.AcidRain.Module.Builtin.Loader.Tile (loadTiles)
 import Game.AcidRain.Module.Loader (LoaderContext)
 
 
--- | This is a built-in module of Acid Rain whose existence is,
--- strictly speaking, not mandatory but realistically is.
+-- | This is a built-in module of Acid Rain whose existence is
+-- mandatory because it's used by the base game logic.
 data BuiltinModule
 
 instance Module (Proxy BuiltinModule) where

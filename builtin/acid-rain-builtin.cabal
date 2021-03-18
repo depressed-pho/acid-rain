@@ -16,6 +16,7 @@ library
     Game.AcidRain.Module.Builtin
 
   other-modules:
+    Game.AcidRain.Module.Builtin.Loader.Entity
     Game.AcidRain.Module.Builtin.Loader.Tile
 
   build-depends:

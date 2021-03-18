@@ -17,7 +17,7 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.STM (STM, atomically, throwSTM)
 import qualified Data.UUID as U
 import Game.AcidRain.Module (SomeModule)
-import Game.AcidRain.Module.Loader (loadModules, lcTiles)
+import Game.AcidRain.Module.Loader (loadModules, lcTiles, lcEntityTypes)
 import Game.AcidRain.World
   ( World(..), WorldMode(..), WorldState(..), WorldStateChanged(..)
   , WorldNotRunningException(..), UnknownPlayerIDException(..) )
@@ -26,6 +26,7 @@ import Game.AcidRain.World.Chunk.Manager.Local (LocalChunkManager)
 import qualified Game.AcidRain.World.Chunk.Manager.Local as LCM
 import qualified Game.AcidRain.World.Chunk.Palette as Pal
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
+import qualified Game.AcidRain.World.Entity.Catalogue as ECat
 import Game.AcidRain.World.Event (Event(..), SomeEvent)
 import Game.AcidRain.World.Player.Manager.Local (LocalPlayerManager)
 import Game.AcidRain.World.Player (Player(..), Permission(..), PlayerID)
@@ -162,7 +163,10 @@ newWorld wm mods
            -- we are doing it from scratch.
            let tReg = lcTiles lc
                tPal = Pal.fromRegistry tReg
-           lcm ← LCM.new tReg tPal
+               -- And we also need an entity catalogue.
+               eReg = lcEntityTypes lc
+               eCat = ECat.fromRegistry eReg
+           lcm ← LCM.new tReg tPal eCat
            -- And then create an empty LPM.
            lpm ← LPM.new
            -- If we are in single player mode, create the Nil player
