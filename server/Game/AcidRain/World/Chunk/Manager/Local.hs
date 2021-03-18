@@ -7,11 +7,17 @@ module Game.AcidRain.World.Chunk.Manager.Local
   ( LocalChunkManager
   , new
   , lookup
-  , ensureChunkExists
+  , get
+  , modify
   ) where
 
+import Control.Concurrent (forkIO)
+import Control.Exception (SomeException, catch)
+import Control.Monad (void)
 import Control.Monad.Catch (MonadThrow)
-import Control.Monad.STM (STM)
+import Control.Monad.STM (STM, atomically, retry, throwSTM)
+import qualified Focus as F
+import GHC.Conc (unsafeIOToSTM)
 import Game.AcidRain.World.Chunk (Chunk)
 import qualified Game.AcidRain.World.Chunk as C
 import Game.AcidRain.World.Chunk.Palette (TilePalette)
@@ -25,6 +31,14 @@ import Prelude.Unicode ((∘))
 import StmContainers.Map (Map)
 import qualified StmContainers.Map as SM
 
+
+data ChunkCell
+  = Loaded !Chunk
+  | LoadFailed !SomeException
+
+evalCell ∷ ChunkCell → STM Chunk
+evalCell (Loaded c    ) = return c
+evalCell (LoadFailed e) = throwSTM e
 
 -- | This is a server-side chunk manager. When a chunk is requested, it
 -- searches for the chunk in the loaded chunk map, or loads the chunk
@@ -41,15 +55,15 @@ data LocalChunkManager
     , lcmEntities ∷ !EntityCatalogue
       -- | Note that this is an STM map. Accessing it requires an STM
       -- transaction.
-    , lcmLoaded  ∷ !(Map ChunkPos Chunk)
+    , lcmCells    ∷ !(Map ChunkPos ChunkCell)
     }
 
 instance Show LocalChunkManager where
   showsPrec d lcm
     = showParen (d > appPrec) $
       showString "LocalChunkManager " ∘
-      showString "{ lcmTiles = " ∘ showsPrec (appPrec + 1) (lcmTiles lcm) ∘
-      showString ", lcmPalette = " ∘ showsPrec (appPrec + 1) (lcmPalette lcm) ∘
+      showString "{ lcmTiles = "    ∘ showsPrec (appPrec + 1) (lcmTiles    lcm) ∘
+      showString ", lcmPalette = "  ∘ showsPrec (appPrec + 1) (lcmPalette  lcm) ∘
       showString ", lcmEntities = " ∘ showsPrec (appPrec + 1) (lcmEntities lcm) ∘
       showString ", .. }"
     where
@@ -61,12 +75,12 @@ instance Show LocalChunkManager where
 -- exceptions (or even chunk corruptions!) but not immediately.
 new ∷ TileRegistry → TilePalette → EntityCatalogue → STM LocalChunkManager
 new tReg tPal eCat
-  = do loaded ← SM.new
+  = do cells ← SM.new
        return $ LocalChunkManager
          { lcmTiles    = tReg
          , lcmPalette  = tPal
          , lcmEntities = eCat
-         , lcmLoaded   = loaded
+         , lcmCells    = cells
          }
 
 -- | Generate a chunk. Since chunk generation is a time consuming
@@ -84,14 +98,42 @@ lookup ∷ ChunkPos → LocalChunkManager → STM (Maybe Chunk)
 lookup pos lcm
   -- Smells like a point-free opportunity, but I don't like unreadable
   -- code.
-  = SM.lookup pos $ lcmLoaded lcm
+  = mapM evalCell =<< (SM.lookup pos $ lcmCells lcm)
 
--- FIXME: Remove this later.
-ensureChunkExists ∷ ChunkPos → LocalChunkManager → STM ()
-ensureChunkExists pos lcm
-  = do chunk' ← SM.lookup pos $ lcmLoaded lcm
+-- | Get the chunk at a certain position. If it's
+-- not already loaded, a chunk will be loaded or generated on a
+-- separate thread and the transaction will be retried.
+get ∷ ChunkPos → LocalChunkManager → STM Chunk
+get pos lcm
+  -- Loading chunks involves I/O, but we can't safely do that in an
+  -- STM transaction. So we do it outside of a transaction and discard
+  -- it if a race condition happens.
+  = do chunk' ← SM.lookup pos (lcmCells lcm)
        case chunk' of
-         Just _  → return ()
+         Just cell → evalCell cell
          Nothing →
-           do chunk ← generate pos lcm
-              SM.insert chunk pos $ lcmLoaded lcm
+           do void $ unsafeIOToSTM $ forkIO $
+                do cell ← (Loaded <$> loadOrGenerate)
+                          `catch`
+                          (return ∘ LoadFailed)
+                   atomically $ SM.focus (focIns cell) pos (lcmCells lcm)
+              retry
+  where
+    loadOrGenerate ∷ IO Chunk
+    loadOrGenerate = generate pos lcm -- FIXME: load
+
+    focIns ∷ ChunkCell → F.Focus ChunkCell STM ()
+    focIns cell
+      = do raced ← F.member
+           if raced
+             then return ()
+             else F.insert cell
+
+-- | Apply a modification to the chunk at a certain position. If it's
+-- not already loaded, a chunk will be loaded or generated on a
+-- separate thread and the transaction will be retried.
+modify ∷ (Chunk → Chunk) → ChunkPos → LocalChunkManager → STM ()
+modify f pos lcm
+  = do chunk ← get pos lcm
+       error (show (f chunk))
+       SM.insert (Loaded (f chunk)) pos (lcmCells lcm)

@@ -132,7 +132,7 @@ renderWorldView wv
 
     renderAt ∷ MonadThrow μ ⇒ Chunk → WorldPos → μ V.Image
     renderAt chunk wpos
-      = do ts ← tileStateAt chunk (convert wpos)
+      = do ts ← tileStateAt (convert wpos) chunk
            let appr = appearance ts
            return $ if wvUnicode wv
                     then V.text' (apAttr appr) (apUnicode appr)

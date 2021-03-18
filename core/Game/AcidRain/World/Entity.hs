@@ -1,4 +1,3 @@
-{-# LANGUAGE ConstrainedClassMethods #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -50,7 +49,7 @@ type EntityTypeID = Text
 --   entityID _ = "acid-rain:player"
 --   ..
 -- @
-class (τ ~ EntityTypeOf (EntityOf τ), Entity (EntityOf τ), Show τ) ⇒ EntityType τ where
+class Show τ ⇒ EntityType τ where
   -- | The entity instance of this entity type. It has to be in the
   -- class 'Entity'.
   type EntityOf τ ∷ Type
@@ -59,8 +58,6 @@ class (τ ~ EntityTypeOf (EntityOf τ), Entity (EntityOf τ), Show τ) ⇒ Entit
   upcastEntityType = SomeEntityType
   -- | Get the entity type ID such as @acid-rain:player@.
   entityTypeID ∷ τ → EntityTypeID
-  -- | Spawn an entity of this type.
-  spawnEntity ∷ τ → EntityOf τ -- FIXME: more data
 
 -- | A type-erased 'EntityType'.
 data SomeEntityType = ∀τ. EntityType τ ⇒ SomeEntityType !τ
@@ -72,22 +69,24 @@ instance EntityType SomeEntityType where
   type EntityOf SomeEntityType = SomeEntity
   upcastEntityType = id
   entityTypeID (SomeEntityType t) = entityTypeID t
-  spawnEntity (SomeEntityType t) = SomeEntity (spawnEntity t)
 
 -- | An instance of this class defines an entity in the game. It is
 -- instantiated through an associated type 'EntityT'.
-class HasAppearance ε ⇒ Entity ε where
+class (EntityType (EntityTypeOf ε), HasAppearance ε, Show ε) ⇒ Entity ε where
   -- | The entity type of this entity. It has to be in the class
   -- 'EntityType'.
   type EntityTypeOf ε ∷ Type
   -- | Erase the type of the entity.
-  upcastEntity ∷ EntityType (EntityTypeOf ε) ⇒ ε → SomeEntity
+  upcastEntity ∷ ε → SomeEntity
   upcastEntity = SomeEntity
   -- | Get the type of this entity.
-  entityType ∷ EntityType (EntityTypeOf ε) ⇒ ε → EntityTypeOf ε
+  entityType ∷ ε → EntityTypeOf ε
 
 -- | A type-erased 'Entity'.
-data SomeEntity = ∀ε. (EntityType (EntityTypeOf ε), Entity ε) ⇒ SomeEntity !ε
+data SomeEntity = ∀ε. Entity ε ⇒ SomeEntity !ε
+
+instance Show SomeEntity where
+  showsPrec d (SomeEntity t) = showsPrec d t
 
 instance HasAppearance SomeEntity where
   appearance (SomeEntity e) = appearance e

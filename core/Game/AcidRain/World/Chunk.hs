@@ -1,6 +1,8 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Chunk
@@ -8,24 +10,37 @@ module Game.AcidRain.World.Chunk
   , Chunk
   , chunkSize
   , chunkHeight
+
+    -- * Constructing chunks
   , new
+  , putEntity
+  , deleteEntity
+
+    -- * Querying chunks
   , tileStateAt
+  , entityAt
   ) where
 
 import Control.Exception (assert)
 import Control.Monad.Catch (MonadThrow)
 import Data.Convertible.Base (Convertible(..))
+import Data.Hashable (Hashable)
+import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HM
 import qualified Data.Vector.Generic as GV
 import qualified Data.Vector.Generic.Mutable as GMV
 import qualified Data.Vector.Unboxed as UV
 import Data.Word (Word8)
+import GHC.Generics (Generic)
 import Game.AcidRain.World.Chunk.Palette (TilePalette, TileIndex, indexOf, idOf)
+import Game.AcidRain.World.Entity (Entity(..), SomeEntity)
 import Game.AcidRain.World.Position (WorldPos(..), wpX, wpY, wpZ)
 import Game.AcidRain.World.Tile (Tile(..), TileState(..), TileStateValue, SomeTileState)
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
 import qualified Game.AcidRain.World.Tile.Registry as TR
-import Lens.Micro ((^.))
-import Prelude.Unicode ((⋅))
+import Lens.Micro ((&), (^.), (%~))
+import Lens.Micro.TH (makeLenses)
+import Prelude.Unicode ((∘), (⋅))
 
 
 -- | Unlike Minecraft our chunks are only two blocks tall so we can
@@ -59,7 +74,9 @@ data TileOffset
     { x ∷ {-# UNPACK #-} !Word8
     , y ∷ {-# UNPACK #-} !Word8
     , z ∷ {-# UNPACK #-} !Word8
-    } deriving (Show)
+    } deriving (Show, Eq, Generic)
+
+instance Hashable TileOffset
 
 instance Convertible WorldPos TileOffset where
   safeConvert wp
@@ -68,6 +85,13 @@ instance Convertible WorldPos TileOffset where
       , y = fromIntegral $ wp^.wpY `mod` chunkSize
       , z = fromIntegral $ wp^.wpZ `mod` chunkHeight
       }
+
+-- Assert that a given offset is valid.
+assertValidOffset ∷ TileOffset → α → α
+assertValidOffset (TileOffset { x, y, z })
+  = assert (x < chunkSize) ∘
+    assert (y < chunkSize) ∘
+    assert (z < chunkHeight)
 
 -- | The tile state vector.
 newtype instance UV.MVector σ IndexedTileState = MV_ITS (UV.MVector σ (TileIndex, TileStateValue))
@@ -96,36 +120,67 @@ instance GV.Vector UV.Vector IndexedTileState where
 
 data Chunk
   = Chunk
-    { registry ∷ !TileRegistry
-    , palette  ∷ !TilePalette
-    , tiles    ∷ !(UV.Vector IndexedTileState)
+    { _cTileReg  ∷ !TileRegistry
+    , _cTilePal  ∷ !TilePalette
+    , _cTiles    ∷ !(UV.Vector IndexedTileState)
+    , _cEntities ∷ !(HashMap TileOffset SomeEntity)
     }
+
+makeLenses ''Chunk
+
+instance Show Chunk where
+  showsPrec d c
+    = showParen (d > appPrec) $
+      showString "Chunk " ∘
+      showString "{ _cTileReg = "  ∘ showsPrec (appPrec + 1) (c^.cTileReg ) ∘
+      showString ", _cTilePal = "  ∘ showsPrec (appPrec + 1) (c^.cTilePal ) ∘
+      showString ", _cEntities = " ∘ showsPrec (appPrec + 1) (c^.cEntities) ∘
+      showString ", .. }"
+    where
+      appPrec = 10
 
 -- | Create a chunk filled with a single specific tile which is
 -- usually @acid-rain:air@.
 new ∷ MonadThrow μ ⇒ TileRegistry → TilePalette → TileState τ → μ Chunk
-new registry palette fill
-  = do its ← toIndexed palette fill
+new tReg tPal fill
+  = do its ← toIndexed tPal fill
        return $ Chunk
-         { registry
-         , palette
-         , tiles = GV.replicate (chunkSize ⋅ chunkSize ⋅ chunkHeight) its
+         { _cTileReg  = tReg
+         , _cTilePal  = tPal
+         , _cTiles    = GV.replicate (chunkSize ⋅ chunkSize ⋅ chunkHeight) its
+         , _cEntities = HM.empty
          }
 
--- | Get a tile state at a given offset in a tile.
-tileStateAt ∷ MonadThrow μ ⇒ Chunk → TileOffset → μ SomeTileState
-tileStateAt chunk (TileOffset { x, y, z })
-  = assert (x < chunkSize) $
-    assert (y < chunkSize) $
-    assert (z < chunkHeight) $
+-- | Place an entity at a given offset in a chunk.
+putEntity ∷ Entity ε ⇒ TileOffset → ε → Chunk → Chunk
+putEntity off e c
+  = assertValidOffset off $
+    c & cEntities %~ HM.insert off (upcastEntity e)
+
+-- | Remove an entity at a given offset in a chunk if any.
+deleteEntity ∷ TileOffset → Chunk → Chunk
+deleteEntity off c
+  = assertValidOffset off $
+    c & cEntities %~ HM.delete off
+
+-- | Get a tile state at a given offset in a chunk.
+tileStateAt ∷ MonadThrow μ ⇒ TileOffset → Chunk → μ SomeTileState
+tileStateAt off@(TileOffset { x, y, z }) c
+  = assertValidOffset off $
     let x'  = fromIntegral x ∷ Int
         y'  = fromIntegral y ∷ Int
         z'  = fromIntegral z ∷ Int
-        its = tiles chunk GV.! (z' ⋅ chunkHeight ⋅ chunkSize + y' ⋅ chunkSize + x')
+        its = (c^.cTiles) GV.! (z' ⋅ chunkHeight ⋅ chunkSize + y' ⋅ chunkSize + x')
     in
-      do tid  ← idOf (itsIndex its) (palette chunk)
-         tile ← TR.get tid (registry chunk)
+      do tid  ← idOf (itsIndex its) (c^.cTilePal)
+         tile ← TR.get tid (c^.cTileReg)
          return $ TileState
            { tsTile  = tile
            , tsValue = itsValue its
            }
+
+-- | Lookup an entity possibly located at a given offset in a chunk.
+entityAt ∷ TileOffset → Chunk → Maybe SomeEntity
+entityAt off c
+  = assertValidOffset off $
+    HM.lookup off (c^.cEntities)
