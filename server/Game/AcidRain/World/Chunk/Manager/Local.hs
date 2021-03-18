@@ -90,7 +90,7 @@ generate _pos lcm
   -- FIXME: Do it properly.
   = do let reg = lcmTiles lcm
        dirt ← TR.get "acid-rain:dirt" reg
-       C.new reg (lcmPalette lcm) (defaultState dirt)
+       C.new reg (lcmPalette lcm) (lcmEntities lcm) (defaultState dirt)
 
 -- | Get the chunk at a certain position if it's available. This has
 -- no side effects.

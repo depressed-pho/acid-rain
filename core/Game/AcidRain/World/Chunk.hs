@@ -33,7 +33,8 @@ import qualified Data.Vector.Unboxed as UV
 import Data.Word (Word8)
 import GHC.Generics (Generic)
 import Game.AcidRain.World.Chunk.Palette (TilePalette, TileIndex, indexOf, idOf)
-import Game.AcidRain.World.Entity (Entity(..), SomeEntity)
+import Game.AcidRain.World.Entity (EntityType(..), Entity(..), SomeEntity)
+import Game.AcidRain.World.Entity.Catalogue (EntityCatalogue, (∈))
 import Game.AcidRain.World.Position (WorldPos(..), wpX, wpY, wpZ)
 import Game.AcidRain.World.Tile (Tile(..), TileState(..), TileStateValue, SomeTileState)
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
@@ -86,13 +87,6 @@ instance Convertible WorldPos TileOffset where
       , z = fromIntegral $ wp^.wpZ `mod` chunkHeight
       }
 
--- Assert that a given offset is valid.
-assertValidOffset ∷ TileOffset → α → α
-assertValidOffset (TileOffset { x, y, z })
-  = assert (x < chunkSize) ∘
-    assert (y < chunkSize) ∘
-    assert (z < chunkHeight)
-
 -- | The tile state vector.
 newtype instance UV.MVector σ IndexedTileState = MV_ITS (UV.MVector σ (TileIndex, TileStateValue))
 newtype instance UV.Vector    IndexedTileState = V_ITS  (UV.Vector    (TileIndex, TileStateValue))
@@ -123,6 +117,7 @@ data Chunk
     { _cTileReg  ∷ !TileRegistry
     , _cTilePal  ∷ !TilePalette
     , _cTiles    ∷ !(UV.Vector IndexedTileState)
+    , _cEntCat   ∷ !EntityCatalogue
     , _cEntities ∷ !(HashMap TileOffset SomeEntity)
     }
 
@@ -139,15 +134,33 @@ instance Show Chunk where
     where
       appPrec = 10
 
+-- Assert that the given offset is valid.
+assertValidOffset ∷ TileOffset → α → α
+assertValidOffset (TileOffset { x, y, z })
+  = assert (x < chunkSize) ∘
+    assert (y < chunkSize) ∘
+    assert (z < chunkHeight)
+
+-- Assert that the given entity is in the catalogue.
+assertValidEntity ∷ Entity ε ⇒ ε → Chunk → α → α
+assertValidEntity e c
+  = assert (entityTypeID (entityType e) ∈ c^.cEntCat)
+
 -- | Create a chunk filled with a single specific tile which is
 -- usually @acid-rain:air@.
-new ∷ MonadThrow μ ⇒ TileRegistry → TilePalette → TileState τ → μ Chunk
-new tReg tPal fill
+new ∷ MonadThrow μ
+    ⇒ TileRegistry
+    → TilePalette
+    → EntityCatalogue
+    → TileState τ
+    → μ Chunk
+new tReg tPal eCat fill
   = do its ← toIndexed tPal fill
        return $ Chunk
          { _cTileReg  = tReg
          , _cTilePal  = tPal
          , _cTiles    = GV.replicate (chunkSize ⋅ chunkSize ⋅ chunkHeight) its
+         , _cEntCat   = eCat
          , _cEntities = HM.empty
          }
 
@@ -155,6 +168,7 @@ new tReg tPal fill
 putEntity ∷ Entity ε ⇒ TileOffset → ε → Chunk → Chunk
 putEntity off e c
   = assertValidOffset off $
+    assertValidEntity e c $
     c & cEntities %~ HM.insert off (upcastEntity e)
 
 -- | Remove an entity at a given offset in a chunk if any.

@@ -10,6 +10,10 @@ module Game.AcidRain.World.Entity.Catalogue
 
     -- * Manipulating catalogues
   , insert
+
+    -- * Querying catalogues
+  , member
+  , (∈)
   ) where
 
 import Data.HashSet (HashSet)
@@ -17,7 +21,7 @@ import qualified Data.HashSet as HS
 import Data.MonoTraversable (ofoldl')
 import Game.AcidRain.World.Entity (EntityType(..), EntityTypeID)
 import Game.AcidRain.World.Entity.Registry (EntityRegistry)
-import Lens.Micro ((&), (%~))
+import Lens.Micro ((&), (%~), (^.))
 import Lens.Micro.TH (makeLenses)
 
 
@@ -45,5 +49,15 @@ fromRegistry = ofoldl' (\c et → insert (entityTypeID et) c) empty
 -- | Insert an entity type ID in the catalogue. Inserting the same ID
 -- twice is not an error. It will just be ignored.
 insert ∷ EntityTypeID → EntityCatalogue → EntityCatalogue
-insert eid cat
-  = cat & etids %~ HS.insert eid
+insert etid cat
+  = cat & etids %~ HS.insert etid
+
+-- | Test if a given type ID is in the catalogue.
+member ∷ EntityTypeID → EntityCatalogue → Bool
+member etid cat
+  = HS.member etid (cat^.etids)
+
+-- | An alias to 'member'.
+(∈) ∷ EntityTypeID → EntityCatalogue → Bool
+(∈) = member
+infix 4 ∈
