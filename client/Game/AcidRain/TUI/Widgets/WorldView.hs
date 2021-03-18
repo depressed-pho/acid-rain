@@ -13,7 +13,7 @@ import Brick.Types
   ( Location(..), Widget(..), Size(..), Context, Result, RenderM
   , getContext, emptyResult, imageL, availWidthL, availHeightL, locL )
 import Brick.Widgets.Center (center)
-import Brick.Widgets.Core (Named(..), cached, txt, txtWrap)
+import Brick.Widgets.Core (Named(..), txt, txtWrap)
 import Control.Exception (Handler(..), SomeException, catches)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO)
@@ -35,8 +35,8 @@ import System.IO.Unsafe (unsafePerformIO)
 
 -- | This is a Brick widget to render some part of the world centered
 -- around a tracked player. Since this widget is really heavy-weight,
--- it is cached under the given name. You need to invalidate the cache
--- to have it redrawn.
+-- it should really be 'Brick.Widgets.Core.cached' to suppress
+-- unneeded redrawing.
 data WorldView n
   = WorldView
     { wvName    ∷ !n
@@ -71,8 +71,7 @@ worldView n uni w pid
 -- | Render a world view.
 renderWorldView ∷ ∀n. Ord n ⇒ WorldView n → Widget n
 renderWorldView wv
-  = cached (wvName wv) $
-    Widget Greedy Greedy $
+  = Widget Greedy Greedy $
     do ctx ← getContext
        unsafePerformIO $ render' ctx
   where

@@ -135,5 +135,4 @@ get pos lcm
 modify ∷ (Chunk → Chunk) → ChunkPos → LocalChunkManager → STM ()
 modify f pos lcm
   = do chunk ← get pos lcm
-       error (show (f chunk))
        SM.insert (Loaded (f chunk)) pos (lcmCells lcm)

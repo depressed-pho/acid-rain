@@ -7,7 +7,7 @@ import Brick.BChan (BChan, newBChan, writeBChan)
 import Brick.Main (
   App(..), neverShowCursor, invalidateCacheEntry, continue, halt, customMain )
 import Brick.Types (BrickEvent(..), Widget, EventM, Next)
-import Brick.Widgets.Core (getName)
+import Brick.Widgets.Core (cached, getName)
 import Control.Concurrent (forkIO)
 import Control.Monad (void)
 import Data.UUID (nil)
@@ -74,7 +74,7 @@ theApp = App
          }
 
 drawUI ∷ Ord n ⇒ WorldView n → [Widget n]
-drawUI wv = [renderWorldView wv]
+drawUI wv = [cached (getName wv) (renderWorldView wv)]
 
 appEvent ∷ Ord n ⇒ WorldView n → BrickEvent n (AppEvent n) → EventM n (Next (WorldView n))
 appEvent wv (VtyEvent (V.EvResize _ _)) = continue wv
