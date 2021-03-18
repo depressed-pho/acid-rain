@@ -5,16 +5,17 @@ module Main (main) where
 import qualified Brick.AttrMap as A
 import Brick.BChan (BChan, newBChan, writeBChan)
 import Brick.Main (
-  App(..), neverShowCursor, invalidateCacheEntry, continue, halt, customMain )
+  App(..), neverShowCursor, continue, halt, customMain )
 import Brick.Types (BrickEvent(..), Widget, EventM, Next)
-import Brick.Widgets.Core (cached, getName)
+import Brick.Widgets.Core (getName)
 import Control.Concurrent (forkIO)
 import Control.Monad (void)
 import Data.UUID (nil)
 import Data.Proxy (Proxy(..))
 import Game.AcidRain.Module (Module(..))
 import Game.AcidRain.Module.Builtin (BuiltinModule)
-import Game.AcidRain.TUI.Widgets.WorldView (WorldView, worldView, renderWorldView)
+import Game.AcidRain.TUI.Widgets.WorldView
+  ( WorldView, worldView, renderWorldView, redrawWorldView )
 import Game.AcidRain.World (World(..), WorldMode(..){-, WorldStateChanged-})
 import Game.AcidRain.World.Event
   ( Event, EventDispatcher, EmptyConst, dispatcher, {-addHandler, -}dispatch )
@@ -35,6 +36,9 @@ main
        evChan ← newBChan 256
        let wv = worldView TheWorldView True lw nil
        void $ forkIO $ handleWorldEvents (getName wv) lw evChan
+
+       -- We don't need to send 'Redraw' to the channel here, because
+       -- we'll soon get a WorldStateChanged event.
 
        let buildVty = V.mkVty V.defaultConfig
        initialVty ← buildVty
@@ -74,9 +78,9 @@ theApp = App
          }
 
 drawUI ∷ Ord n ⇒ WorldView n → [Widget n]
-drawUI wv = [cached (getName wv) (renderWorldView wv)]
+drawUI wv = [renderWorldView wv]
 
 appEvent ∷ Ord n ⇒ WorldView n → BrickEvent n (AppEvent n) → EventM n (Next (WorldView n))
-appEvent wv (VtyEvent (V.EvResize _ _)) = continue wv
-appEvent wv (AppEvent (Redraw n)) = invalidateCacheEntry n *> continue wv
+appEvent wv (VtyEvent (V.EvResize _ _)) = redrawWorldView wv >>= continue
+appEvent wv (AppEvent (Redraw _      )) = redrawWorldView wv >>= continue
 appEvent wv _ = halt wv

@@ -2,55 +2,63 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.TUI.Widgets.WorldView
   ( WorldView
   , worldView
   , renderWorldView
+  , redrawWorldView
   ) where
 
+import Brick.Main (lookupExtent)
 import Brick.Types
-  ( Location(..), Widget(..), Size(..), Context, Result, RenderM
-  , getContext, emptyResult, imageL, availWidthL, availHeightL, locL )
+  ( Location(..), Widget(..), Size(..), EventM, Extent(..)
+  , availWidthL, availHeightL, emptyResult, getContext, imageL, locL )
 import Brick.Widgets.Center (center)
-import Brick.Widgets.Core (Named(..), txt, txtWrap)
+import Brick.Widgets.Core (Named(..), fill, reportExtent, txt, txtWrap)
 import Control.Exception (Handler(..), SomeException, catches)
 import Control.Monad.Catch (MonadThrow)
-import Control.Monad.IO.Class (MonadIO)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Convertible.Base (convert)
 import Data.Monoid.Unicode ((⊕))
 import Data.Text (pack)
 import Game.AcidRain.TUI (Appearance(..), HasAppearance(..))
 import Game.AcidRain.World
   ( World(..), WorldState(..), SomeWorld, WorldNotRunningException(..) )
-import Game.AcidRain.World.Chunk (Chunk, tileStateAt)
+import Game.AcidRain.World.Chunk (Chunk, TileOffset, entityAt, tileStateAt)
 import Game.AcidRain.World.Chunk.Position (ChunkPos(..), cpX, cpY, toWorldPos)
 import Game.AcidRain.World.Player (PlayerID, plPos)
 import Game.AcidRain.World.Position (WorldPos(..), wpX, wpY, wpZ)
 import qualified Graphics.Vty as V
-import Lens.Micro ((&), (.~), (^.), (+~), (-~), (%~), _1, _2)
+import Lens.Micro ((&), (.~), (^.), (+~), (-~), (%~), _1, _2, to)
+import Lens.Micro.TH (makeLenses)
 import Prelude.Unicode ((∘))
-import System.IO.Unsafe (unsafePerformIO)
 
 
 -- | This is a Brick widget to render some part of the world centered
--- around a tracked player. Since this widget is really heavy-weight,
--- it should really be 'Brick.Widgets.Core.cached' to suppress
--- unneeded redrawing.
+-- around a tracked player. Since we cannot do any I/O in 'RenderM',
+-- the 'V.Image' to be rendered is in fact reconstructed in
+-- 'redrawWorldView' but not in 'renderWorldView'.
 data WorldView n
   = WorldView
-    { wvName    ∷ !n
-    , wvUnicode ∷ !Bool
-    , wvWorld   ∷ !SomeWorld
+    { _wvName    ∷ !n
+    , _wvUnicode ∷ !Bool
+    , _wvWorld   ∷ !SomeWorld
       -- | The player to trac.
-    , wvPlayer  ∷ !PlayerID
+    , _wvPlayer  ∷ !PlayerID
       -- | The offset from the center of the widget where the player
       -- should be located.
-    , wvPlayerOffset ∷ !Location
+    , _wvPlayerOffset ∷ !Location
+      -- | The 'V.Image' to be rendered. It's 'Nothing' until it's
+      -- once rendered.
+    , _wvWidget  ∷ !(Maybe (Widget n))
     }
 
+makeLenses ''WorldView
+
 instance Named (WorldView n) n where
-  getName = wvName
+  getName = _wvName
 
 -- | Create a world view.
 worldView ∷ World w
@@ -61,26 +69,34 @@ worldView ∷ World w
           → WorldView n
 worldView n uni w pid
   = WorldView
-    { wvName         = n
-    , wvUnicode      = uni
-    , wvWorld        = upcastWorld w
-    , wvPlayer       = pid
-    , wvPlayerOffset = Location (0, 0)
+    { _wvName         = n
+    , _wvUnicode      = uni
+    , _wvWorld        = upcastWorld w
+    , _wvPlayer       = pid
+    , _wvPlayerOffset = Location (0, 0)
+    , _wvWidget       = Nothing
     }
 
 -- | Render a world view.
-renderWorldView ∷ ∀n. Ord n ⇒ WorldView n → Widget n
+renderWorldView ∷ Ord n ⇒ WorldView n → Widget n
 renderWorldView wv
-  = Widget Greedy Greedy $
-    do ctx ← getContext
-       unsafePerformIO $ render' ctx
+  = reportExtent (wv^.wvName) $
+    case wv^.wvWidget of
+      Just w  → w
+      Nothing → fill ' ' -- Take up all the available space.
+
+-- | Redraw a world view.
+redrawWorldView ∷ ∀n. Eq n ⇒ WorldView n → EventM n (WorldView n)
+redrawWorldView wv
+  = do ext ← lookupExtent (wv^.wvName)
+       w   ← mapM mkWidget ext
+       return $ wv & wvWidget .~ w
   where
-    -- RenderM currently isn't a MonadIO so we have to resort to
-    -- unsafePerformIO. This is actually quite unsafe but we have no
-    -- options.
-    render' ∷ Context → IO (RenderM n (Result n))
-    render' ctx
-      = flip catches [ Handler catchWNRE
+    mkWidget ∷ Extent n → EventM n (Widget n)
+    mkWidget ext
+      = liftIO $
+        -- Now we are in the IO monad.
+        flip catches [ Handler catchWNRE
                      , Handler catchAll
                      ] $
         do -- Draw all the tiles currently visible from the
@@ -89,9 +105,9 @@ renderWorldView wv
            -- tile there, but that would cause too many chunk lookups
            -- and would be terribly inefficient. So we iterate on
            -- visible chunks instead, and render their visible parts.
-           wTopLeft ← worldPosAt wv ctx $ Location (0, 0)
-           let wTopRight   = wTopLeft & wpX %~ \x → x + fromIntegral (ctx^.availWidthL ) - 1
-               wBottomLeft = wTopLeft & wpY %~ \y → y + fromIntegral (ctx^.availHeightL) - 1
+           wTopLeft ← worldPosAt wv ext $ Location (0, 0)
+           let wTopRight   = wTopLeft & wpX %~ \x → x + fromIntegral (ext^.to extentSize._1) - 1
+               wBottomLeft = wTopLeft & wpY %~ \y → y + fromIntegral (ext^.to extentSize._2) - 1
                cTopLeft    = convert wTopLeft
                cTopRight   = convert wTopRight
                cBottomLeft = convert wBottomLeft
@@ -101,12 +117,20 @@ renderWorldView wv
                             in renderChunk wTopLeft wTopRight wBottomLeft cPos
            cRows ← V.vertCat <$> mapM cRow [cTopLeft^.cpY .. cBottomLeft^.cpY]
 
-           return $ return $ emptyResult & imageL .~ cRows
+           -- The RenderM is required to fill up the entire space
+           -- reported by availWidthL and availHeightL, but the size
+           -- of extent doesn't necessarily match with it. So we need
+           -- to resize the image we just constructed.
+           return $
+             Widget Greedy Greedy $
+             do ctx ← getContext
+                let img = V.resize (ctx^.availWidthL) (ctx^.availHeightL) cRows
+                return $ emptyResult & imageL .~ img
 
     renderChunk ∷ (MonadThrow μ, MonadIO μ) ⇒ WorldPos → WorldPos → WorldPos → ChunkPos → μ V.Image
     renderChunk wTopLeft wTopRight wBottomLeft cPos
-      = do ensureChunkExists (wvWorld wv) cPos
-           chunk' ← lookupChunk (wvWorld wv) cPos
+      = do ensureChunkExists (wv^.wvWorld) cPos
+           chunk' ← lookupChunk (wv^.wvWorld) cPos
 
            -- Now the problem is how to determine the visible area of
            -- this chunk. For each chunk we know which area in the
@@ -125,29 +149,39 @@ renderWorldView wv
              Nothing    → return $ V.charFill V.defAttr ' ' (wxEnd - wxBegin) (wyEnd - wyBegin)
              Just chunk →
                let wRow wy    = V.horizCat <$> mapM (flip wCol wy) [wxBegin .. wxEnd]
-                   wCol wx wy = renderAt chunk $ WorldPos wx wy 0 -- FIXME: Z
+                   wCol wx wy = renderAt chunk $ convert $ WorldPos wx wy 0 -- FIXME: Z
                in
                  V.vertCat <$> mapM wRow [wyBegin .. wyEnd]
 
-    renderAt ∷ MonadThrow μ ⇒ Chunk → WorldPos → μ V.Image
-    renderAt chunk wpos
-      = do ts ← tileStateAt (convert wpos) chunk
-           let appr = appearance ts
-           return $ if wvUnicode wv
-                    then V.text' (apAttr appr) (apUnicode appr)
-                    else V.char  (apAttr appr) (apAscii   appr)
+    renderAt ∷ MonadThrow μ ⇒ Chunk → TileOffset → μ V.Image
+    renderAt chunk off
+      -- If there is an entity here, then it has the highest priority.
+      -- Next an item pile, then a tile.
+      = case entityAt off chunk of
+          Just e  → return $ renderAppr e
+          Nothing →
+            do ts ← tileStateAt off chunk
+               return $ renderAppr ts
+
+    renderAppr ∷ HasAppearance α ⇒ α → V.Image
+    renderAppr a
+      = let appr = appearance a
+        in
+          if wv^.wvUnicode
+          then V.text' (apAttr appr) (apUnicode appr)
+          else V.char  (apAttr appr) (apAscii   appr)
 
 
 -- Convert a point in the local coords to that of the world coords.
-worldPosAt ∷ WorldView n → Context → Location → IO WorldPos
-worldPosAt wv ctx lp
+worldPosAt ∷ WorldView n → Extent n → Location → IO WorldPos
+worldPosAt wv ext lp
   = do -- Get the player position
-       pl ← getPlayer (wvWorld wv) (wvPlayer wv)
+       pl ← getPlayer (wv^.wvWorld) (wv^.wvPlayer)
        let pposW  = plPos pl
 
        -- Get the player position in the widget coords.
-       let centerL = getCenter ctx
-           pposL   = centerL `addLoc` wvPlayerOffset wv
+       let centerL = getCenter ext
+           pposL   = centerL `addLoc` (wv^.wvPlayerOffset)
 
        -- Now that we have these, we know how these coords correspond
        -- to each other.
@@ -159,28 +193,26 @@ worldPosAt wv ctx lp
          , _wpZ = pposW^.wpZ
          }
 
-getCenter ∷ Context → Location
-getCenter ctx
-  = let x = (ctx^.availWidthL ) `div` 2
-        y = (ctx^.availHeightL) `div` 2
-    in
-      Location (x, y)
+getCenter ∷ Extent n → Location
+getCenter ext
+  = Location $
+    (ext^.to extentSize) & _1 %~ (`div` 2)
+                         & _2 %~ (`div` 2)
 
 addLoc ∷ Location → Location → Location
 addLoc a b
   = a & locL._1 +~ b^._1
       & locL._2 +~ b^._2
 
-catchAll ∷ SomeException → IO (RenderM n (Result n))
-catchAll = return ∘ render ∘ txtWrap ∘ pack ∘ show
+catchAll ∷ SomeException → IO (Widget n)
+catchAll = return ∘ txtWrap ∘ pack ∘ show
 
-catchWNRE ∷ WorldNotRunningException → IO (RenderM n (Result n))
+catchWNRE ∷ WorldNotRunningException → IO (Widget n)
 catchWNRE (WorldNotRunningException ws)
-  = let w = case ws of
-              Loading      → center $ txt "Loading..."
-              LoadPending  → center $ txt "FIXME: LoadPending"
-              LoadFailed e → txtWrap $ "Load failed: " ⊕ pack (show e)
-              Running _    → error "Impossible"
-              Closed e     → txtWrap $ "World closed: " ⊕ pack (show e)
-    in
-      return $ render w
+  = return $
+    case ws of
+      Loading      → center $ txt "Loading..."
+      LoadPending  → center $ txt "FIXME: LoadPending"
+      LoadFailed e → txtWrap $ "Load failed: " ⊕ pack (show e)
+      Running _    → error "Impossible"
+      Closed e     → txtWrap $ "World closed: " ⊕ pack (show e)

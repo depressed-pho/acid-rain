@@ -93,7 +93,7 @@ instance OptionalField Attr Attr where
   fromOptional = id
 
 instance OptionalField Attr () where
-  fromOptional _ = V.currentAttr
+  fromOptional _ = V.defAttr
 
 -- | Declare the beginning of appearance builder.
 begin ∷ AppearanceBuilder () () ()
