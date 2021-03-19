@@ -1,4 +1,5 @@
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Tile
@@ -14,6 +15,7 @@ module Game.AcidRain.World.Tile
 import Data.Text (Text)
 import Data.Word (Word32)
 import Game.AcidRain.TUI (Appearance, HasAppearance(..))
+import Game.AcidRain.World.Position (WorldPos)
 
 type TileID = Text
 
@@ -40,8 +42,9 @@ class Show τ ⇒ Tile τ where
   -- | Get the default state value of the tile.
   defaultStateValue ∷ τ → TileStateValue
   defaultStateValue _ = 0
-  -- | Get the appearance of the tile for the given state.
-  appearanceForState ∷ τ → TileStateValue → Appearance
+  -- | Get the appearance of the tile for the given state and
+  -- position.
+  appearanceFor ∷ τ → TileStateValue → WorldPos → Appearance
 
 -- | A type-erased 'Tile'.
 data SomeTile = ∀τ. Tile τ ⇒ SomeTile !τ
@@ -53,7 +56,7 @@ instance Tile SomeTile where
   upcastTile = id
   tileID (SomeTile t) = tileID t
   defaultStateValue (SomeTile t) = defaultStateValue t
-  appearanceForState (SomeTile t) = appearanceForState t
+  appearanceFor (SomeTile t) pos = appearanceFor t pos
 
 -- | TileState is a type containing a 'Tile' and a single integral
 -- state value. The interpretation of the state value depends on the
@@ -64,9 +67,9 @@ data TileState τ where
     , tsValue ∷ {-# UNPACK #-} !TileStateValue
     } → TileState τ
 
-instance Tile τ ⇒ HasAppearance (TileState τ) where
-  appearance ts
-    = appearanceForState (tsTile ts) (tsValue ts)
+instance Tile τ ⇒ HasAppearance (TileState τ, WorldPos) where
+  appearance (ts, pos)
+    = appearanceFor (tsTile ts) (tsValue ts) pos
 
 -- | A type-erased version of 'TileState'.
 type SomeTileState = TileState SomeTile

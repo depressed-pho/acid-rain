@@ -28,7 +28,7 @@ import Data.Text (pack)
 import Game.AcidRain.TUI (Appearance(..), HasAppearance(..))
 import Game.AcidRain.World
   ( World(..), WorldState(..), SomeWorld, WorldNotRunningException(..) )
-import Game.AcidRain.World.Chunk (Chunk, TileOffset, chunkHeight, entityAt, tileStateAt)
+import Game.AcidRain.World.Chunk (Chunk, chunkHeight, entityAt, tileStateAt)
 import Game.AcidRain.World.Chunk.Position (ChunkPos(..), cpX, cpY, toWorldPos)
 import Game.AcidRain.World.Player (PlayerID, plPos)
 import Game.AcidRain.World.Position (WorldPos(..), wpX, wpY, wpZ, lowestZ)
@@ -159,9 +159,9 @@ redrawWorldView wv
     renderXY chunk wx wy = go (lowestZ + chunkHeight - 1)
       where
         -- Search for a visible object from the highest Z to the
-        -- lowest. If nothing's found leave it blank.
-        go wz = do let off = convert $ WorldPos wx wy wz
-                   mi ← renderAt chunk off
+        -- lowest. If nothing's found leave there blank.
+        go wz = do let pos = WorldPos wx wy wz
+                   mi ← renderAt chunk pos
                    case mi of
                      Just i                 → return i
                      Nothing | wz > lowestZ → go (wz-1)
@@ -169,15 +169,16 @@ redrawWorldView wv
         blank ∷ V.Image
         blank = V.char V.defAttr ' '
 
-    renderAt ∷ MonadThrow μ ⇒ Chunk → TileOffset → μ (Maybe V.Image)
-    renderAt chunk off
+    renderAt ∷ MonadThrow μ ⇒ Chunk → WorldPos → μ (Maybe V.Image)
+    renderAt chunk pos
       -- If there is a visible entity here, then it has the highest
       -- priority.  Next an item pile, then a tile.
-      = case renderAppr <$> entityAt off chunk of
-          Just i  → return i
-          Nothing →
-            do ts ← tileStateAt off chunk
-               return $ renderAppr ts
+      = let off = convert pos
+        in case renderAppr <$> entityAt off chunk of
+             Just i  → return i
+             Nothing →
+               do ts ← tileStateAt off chunk
+                  return $ renderAppr (ts, pos)
 
     renderAppr ∷ HasAppearance α ⇒ α → Maybe V.Image
     renderAppr a
