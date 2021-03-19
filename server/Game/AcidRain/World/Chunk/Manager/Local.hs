@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE UnicodeSyntax #-}
 -- | This is an internal module used by
 -- 'Game.AcidRain.World.Local.LocalWorld' to delegate chunk
@@ -9,23 +9,24 @@ module Game.AcidRain.World.Chunk.Manager.Local
   , lookup
   , get
   , modify
+
+  , generate
   ) where
 
 import Control.Concurrent (forkIO)
 import Control.Exception (SomeException, catch)
 import Control.Monad (void)
 import Control.Monad.Catch (MonadThrow)
+import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.STM (STM, atomically, retry, throwSTM)
 import qualified Focus as F
 import GHC.Conc (unsafeIOToSTM)
 import Game.AcidRain.World.Chunk (Chunk)
-import qualified Game.AcidRain.World.Chunk as C
+import Game.AcidRain.World.Chunk.Generator (ChunkGenerator, generateChunk)
 import Game.AcidRain.World.Chunk.Palette (TilePalette)
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
 import Game.AcidRain.World.Entity.Catalogue (EntityCatalogue)
-import Game.AcidRain.World.Tile (defaultState)
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
-import qualified Game.AcidRain.World.Tile.Registry as TR
 import Prelude hiding (lcm, lookup)
 import Prelude.Unicode ((∘))
 import StmContainers.Map (Map)
@@ -53,6 +54,7 @@ data LocalChunkManager
     { lcmTiles    ∷ !TileRegistry
     , lcmPalette  ∷ !TilePalette
     , lcmEntities ∷ !EntityCatalogue
+    , lcmChunkGen ∷ !ChunkGenerator
       -- | Note that this is an STM map. Accessing it requires an STM
       -- transaction.
     , lcmCells    ∷ !(Map ChunkPos ChunkCell)
@@ -73,24 +75,16 @@ instance Show LocalChunkManager where
 -- properly populated tile palette and catalogues. Care must be taken
 -- because if the palette is somehow invalid it will later result in
 -- exceptions (or even chunk corruptions!) but not immediately.
-new ∷ TileRegistry → TilePalette → EntityCatalogue → STM LocalChunkManager
-new tReg tPal eCat
+new ∷ TileRegistry → TilePalette → EntityCatalogue → ChunkGenerator → STM LocalChunkManager
+new tReg tPal eCat cGen
   = do cells ← SM.new
        return $ LocalChunkManager
          { lcmTiles    = tReg
          , lcmPalette  = tPal
          , lcmEntities = eCat
+         , lcmChunkGen = cGen
          , lcmCells    = cells
          }
-
--- | Generate a chunk. Since chunk generation is a time consuming
--- task, callers are highly advised to do it in a separate thread.
-generate ∷ MonadThrow μ ⇒ ChunkPos → LocalChunkManager → μ Chunk
-generate _pos lcm
-  -- FIXME: Do it properly.
-  = do let reg = lcmTiles lcm
-       dirt ← TR.get "acid-rain:dirt" reg
-       C.new reg (lcmPalette lcm) (lcmEntities lcm) (defaultState dirt)
 
 -- | Get the chunk at a certain position if it's available. This has
 -- no side effects.
@@ -136,3 +130,9 @@ modify ∷ (Chunk → Chunk) → ChunkPos → LocalChunkManager → STM ()
 modify f pos lcm
   = do chunk ← get pos lcm
        SM.insert (Loaded (f chunk)) pos (lcmCells lcm)
+
+-- | Generate a chunk. Since chunk generation is a time consuming
+-- task, callers are highly advised to do it in a separate thread.
+generate ∷ (MonadThrow μ, MonadIO μ) ⇒ ChunkPos → LocalChunkManager → μ Chunk
+generate cPos (LocalChunkManager { .. })
+  = generateChunk lcmTiles lcmPalette lcmEntities lcmChunkGen cPos

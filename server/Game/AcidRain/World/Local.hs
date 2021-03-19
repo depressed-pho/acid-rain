@@ -19,7 +19,8 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.STM (STM, atomically, throwSTM)
 import qualified Data.UUID as U
 import Game.AcidRain.Module (SomeModule)
-import Game.AcidRain.Module.Loader (loadModules, lcTiles, lcEntityTypes)
+import Game.AcidRain.Module.Loader
+  ( loadModules, lcTiles, lcEntityTypes, lcChunkGen )
 import qualified Game.AcidRain.Module.Builtin.Entity as B
 import Game.AcidRain.World
   ( World(..), WorldMode(..), WorldState(..), WorldStateChanged(..)
@@ -36,6 +37,7 @@ import Game.AcidRain.World.Player.Manager.Local (LocalPlayerManager)
 import Game.AcidRain.World.Player (Player(..), Permission(..), PlayerID)
 import Game.AcidRain.World.Position (WorldPos(..))
 import qualified Game.AcidRain.World.Player.Manager.Local as LPM
+import Lens.Micro ((^.))
 import Numeric.Natural (Natural)
 import Prelude hiding (lcm)
 import Prelude.Unicode ((∘))
@@ -165,12 +167,14 @@ newWorld wm mods
                    -- order to construct the LCM, we need a tile
                    -- palette. Constructing a tile palette never fails
                    -- because we are doing it from scratch.
-                   let tReg = lcTiles lc
+                   let tReg = lc^.lcTiles
                        tPal = Pal.fromRegistry tReg
                        -- And we also need an entity catalogue.
-                       eReg = lcEntityTypes lc
+                       eReg = lc^.lcEntityTypes
                        eCat = ECat.fromRegistry eReg
-                   lcm ← LCM.new tReg tPal eCat
+                       -- And a chunk generator too.
+                       cGen = lc^.lcChunkGen
+                   lcm ← LCM.new tReg tPal eCat cGen
                    -- And then create an empty LPM.
                    lpm ← LPM.new
                    -- If we are in single player mode, create the Nil

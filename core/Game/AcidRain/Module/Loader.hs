@@ -17,41 +17,51 @@ module Game.AcidRain.Module.Loader
   , lookupEntityType
   , getEntityType
 
+  -- * Modifying chunk generator
+  , modifyChunkGenerator
+
   -- * Loading modules
   , ModuleMap
   , loadModules
   , lcMods
   , lcTiles
   , lcEntityTypes
+  , lcChunkGen
   ) where
 
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.State.Strict (MonadState, execStateT, modify', gets)
+import Data.Default (Default(..))
 import Data.Foldable (traverse_, toList)
 import qualified Data.HashMap.Strict as HM
-import Game.AcidRain.Module.Types (Module(..), SomeModule(..), ModuleMap, LoaderContext(..))
+import Game.AcidRain.Module.Types
+  ( Module(..), SomeModule(..), ModuleMap, LoaderContext(..)
+  , lcMods, lcTiles, lcEntityTypes, lcChunkGen )
+import Game.AcidRain.World.Chunk.Generator (ChunkGenerator)
 import Game.AcidRain.World.Entity (EntityType, EntityTypeID, SomeEntityType)
 import Game.AcidRain.World.Entity.Registry (EntityRegistry)
 import qualified Game.AcidRain.World.Entity.Registry as ER
 import Game.AcidRain.World.Tile (Tile, TileID, SomeTile)
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
 import qualified Game.AcidRain.World.Tile.Registry as TR
+import Lens.Micro ((%~), (.~))
 import Prelude.Unicode ((∘))
 
 -- | Create a new, empty context to begin with.
 empty ∷ LoaderContext
 empty
   = LoaderContext
-    { lcMods        = HM.empty
-    , lcTiles       = TR.empty
-    , lcEntityTypes = ER.empty
+    { _lcMods        = HM.empty
+    , _lcTiles       = TR.empty
+    , _lcEntityTypes = ER.empty
+    , _lcChunkGen    = def
     }
 
 -- | Load a single module.
 loadMod ∷ (Module α, MonadState LoaderContext μ, MonadThrow μ) ⇒ α → μ ()
 loadMod m
   = do load m
-       modify' $ \ctx → ctx { lcMods = insMod' $ lcMods ctx }
+       modify' $ lcMods %~ insMod'
   where
     insMod' ∷ ModuleMap → ModuleMap
     insMod' = HM.insert (modID m) (upcastModule m)
@@ -78,13 +88,13 @@ reorderMods = return . toList -- FIXME: Actually reorder it.
 -- don't need to use this directly. There are helper functions such as
 -- 'registerTile' to manipulate the tile registry in a loader.
 getTileRegistry ∷ MonadState LoaderContext μ ⇒ μ TileRegistry
-getTileRegistry = gets lcTiles
+getTileRegistry = gets _lcTiles
 
 -- | Put a tile registry to the context. Module loaders usually don't
 -- need to use this directly.
 putTileRegistry ∷ MonadState LoaderContext μ ⇒ TileRegistry → μ ()
 putTileRegistry tiles
-  = modify' $ \ctx → ctx { lcTiles = tiles }
+  = modify' $ lcTiles .~ tiles
 
 -- | Register a tile. Throws if it's already been registered.
 registerTile ∷ (MonadState LoaderContext μ, MonadThrow μ, Tile τ) ⇒ τ → μ ()
@@ -105,13 +115,13 @@ getTile tid
 -- don't need to use this directly. There are helper functions such as
 -- 'registerEntityType' to manipulate the entity registry in a loader.
 getEntityRegistry ∷ MonadState LoaderContext μ ⇒ μ EntityRegistry
-getEntityRegistry = gets lcEntityTypes
+getEntityRegistry = gets _lcEntityTypes
 
 -- | Put an entity registry to the context. Module loaders usually
 -- don't need to use this directly.
 putEntityRegistry ∷ MonadState LoaderContext μ ⇒ EntityRegistry → μ ()
 putEntityRegistry entities
-  = modify' $ \ctx → ctx { lcEntityTypes = entities }
+  = modify' $ lcEntityTypes .~ entities
 
 -- | Register an entity type. Throws if it's already been registered.
 registerEntityType ∷ (MonadState LoaderContext μ, MonadThrow μ, EntityType τ) ⇒ τ → μ ()
@@ -127,3 +137,8 @@ lookupEntityType etid
 getEntityType ∷ (MonadState LoaderContext μ, MonadThrow μ) ⇒ EntityTypeID → μ SomeEntityType
 getEntityType etid
   = getEntityRegistry >>= ER.get etid
+
+-- | Modify the chunk generator by applying a given function.
+modifyChunkGenerator ∷ MonadState LoaderContext μ ⇒ (ChunkGenerator → ChunkGenerator) → μ ()
+modifyChunkGenerator f
+  = modify' $ lcChunkGen %~ f

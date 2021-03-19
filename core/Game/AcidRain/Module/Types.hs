@@ -1,20 +1,23 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.Module.Types
   ( ModuleID
   , Module(..)
   , SomeModule(..)
   , ModuleMap
-  , LoaderContext(..)
+  , LoaderContext(..), lcMods, lcTiles, lcEntityTypes, lcChunkGen
   ) where
 
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.State.Strict (MonadState)
 import Data.HashMap.Strict (HashMap)
 import Data.Text (Text)
+import Game.AcidRain.World.Chunk.Generator (ChunkGenerator)
 import Game.AcidRain.World.Entity.Registry (EntityRegistry)
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
+import Lens.Micro.TH (makeLenses)
 
 -- | A module ID is used for things like prefixes of tiles such as
 -- @acid-rain:dirt@. @acid-rain@ is the module ID in this case.
@@ -60,9 +63,13 @@ data LoaderContext
   = LoaderContext
     { -- | Extract modules that have been fully loaded. This doesn't
       -- include a module that is currently being loaded.
-      lcMods        ∷ !ModuleMap
+      _lcMods        ∷ !ModuleMap
       -- | Extract the tile registry that has been constructed.
-    , lcTiles       ∷ !TileRegistry
+    , _lcTiles       ∷ !TileRegistry
       -- | Extract the entity registry that has been constructed.
-    , lcEntityTypes ∷ !EntityRegistry
+    , _lcEntityTypes ∷ !EntityRegistry
+      -- | Extract the chunk generator that has been composed.
+    , _lcChunkGen    ∷ !ChunkGenerator
     }
+
+makeLenses ''LoaderContext
