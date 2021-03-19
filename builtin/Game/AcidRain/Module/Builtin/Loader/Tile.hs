@@ -11,9 +11,14 @@ import Control.Monad.State.Strict (MonadState)
 import Data.Foldable (traverse_)
 import Data.Proxy (Proxy(..))
 import Game.AcidRain.Module.Loader (LoaderContext, registerTile)
-import Game.AcidRain.TUI (begin, end, (⊳), unicode, ascii, fgColour, hsl)
+import Game.AcidRain.TUI (Appearance(..), begin, end, (⊳), unicode, ascii, fgColour, hsl)
 import Game.AcidRain.World.Tile (Tile(..))
 
+
+data Air
+instance Tile (Proxy Air) where
+  tileID _ = "acid-rain:air"
+  appearanceForState _ _ = InvisibleAppearance
 
 data Dirt
 instance Tile (Proxy Dirt) where
@@ -25,5 +30,6 @@ instance Tile (Proxy Dirt) where
 loadTiles ∷ (MonadState LoaderContext μ, MonadThrow μ) ⇒ μ ()
 loadTiles
   = traverse_ registerTile
-    [ upcastTile (Proxy ∷ Proxy Dirt)
+    [ upcastTile (Proxy ∷ Proxy Air)
+    , upcastTile (Proxy ∷ Proxy Dirt)
     ]

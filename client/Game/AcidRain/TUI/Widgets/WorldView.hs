@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnicodeSyntax #-}
@@ -21,15 +22,16 @@ import Control.Exception (Handler(..), SomeException, catches)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Convertible.Base (convert)
+import Data.Int (Int32)
 import Data.Monoid.Unicode ((⊕))
 import Data.Text (pack)
 import Game.AcidRain.TUI (Appearance(..), HasAppearance(..))
 import Game.AcidRain.World
   ( World(..), WorldState(..), SomeWorld, WorldNotRunningException(..) )
-import Game.AcidRain.World.Chunk (Chunk, TileOffset, entityAt, tileStateAt)
+import Game.AcidRain.World.Chunk (Chunk, TileOffset, chunkHeight, entityAt, tileStateAt)
 import Game.AcidRain.World.Chunk.Position (ChunkPos(..), cpX, cpY, toWorldPos)
 import Game.AcidRain.World.Player (PlayerID, plPos)
-import Game.AcidRain.World.Position (WorldPos(..), wpX, wpY, wpZ)
+import Game.AcidRain.World.Position (WorldPos(..), wpX, wpY, wpZ, lowestZ)
 import qualified Graphics.Vty as V
 import Lens.Micro ((&), (.~), (^.), (+~), (-~), (%~), _1, _2, to)
 import Lens.Micro.TH (makeLenses)
@@ -149,27 +151,43 @@ redrawWorldView wv
              Nothing    → return $ V.charFill V.defAttr ' ' (wxEnd - wxBegin) (wyEnd - wyBegin)
              Just chunk →
                let wRow wy    = V.horizCat <$> mapM (flip wCol wy) [wxBegin .. wxEnd]
-                   wCol wx wy = renderAt chunk $ convert $ WorldPos wx wy 0 -- FIXME: Z
+                   wCol wx wy = renderXY chunk wx wy
                in
                  V.vertCat <$> mapM wRow [wyBegin .. wyEnd]
 
-    renderAt ∷ MonadThrow μ ⇒ Chunk → TileOffset → μ V.Image
+    renderXY ∷ MonadThrow μ ⇒ Chunk → Int32 → Int32 → μ V.Image
+    renderXY chunk wx wy = go (lowestZ + chunkHeight - 1)
+      where
+        -- Search for a visible object from the highest Z to the
+        -- lowest. If nothing's found leave it blank.
+        go wz = do let off = convert $ WorldPos wx wy wz
+                   mi ← renderAt chunk off
+                   case mi of
+                     Just i                 → return i
+                     Nothing | wz > lowestZ → go (wz-1)
+                             | otherwise    → return blank
+        blank ∷ V.Image
+        blank = V.char V.defAttr ' '
+
+    renderAt ∷ MonadThrow μ ⇒ Chunk → TileOffset → μ (Maybe V.Image)
     renderAt chunk off
-      -- If there is an entity here, then it has the highest priority.
-      -- Next an item pile, then a tile.
-      = case entityAt off chunk of
-          Just e  → return $ renderAppr e
+      -- If there is a visible entity here, then it has the highest
+      -- priority.  Next an item pile, then a tile.
+      = case renderAppr <$> entityAt off chunk of
+          Just i  → return i
           Nothing →
             do ts ← tileStateAt off chunk
                return $ renderAppr ts
 
-    renderAppr ∷ HasAppearance α ⇒ α → V.Image
+    renderAppr ∷ HasAppearance α ⇒ α → Maybe V.Image
     renderAppr a
-      = let appr = appearance a
-        in
-          if wv^.wvUnicode
-          then V.text' (apAttr appr) (apUnicode appr)
-          else V.char  (apAttr appr) (apAscii   appr)
+      = case appearance a of
+          VisibleAppearance { .. } →
+            Just $
+            if wv^.wvUnicode
+            then V.text' vaAttr vaUnicode
+            else V.char  vaAttr vaAscii
+          InvisibleAppearance → Nothing
 
 
 -- Convert a point in the local coords to that of the world coords.

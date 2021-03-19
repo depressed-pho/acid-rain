@@ -2,6 +2,7 @@
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Position
   ( WorldPos(..), wpX, wpY, wpZ
+  , lowestZ
   ) where
 
 import Data.Int (Int8, Int32)
@@ -15,5 +16,8 @@ data WorldPos = WorldPos
     -- | The z coordinate is either -1 or 0.
   , _wpZ ∷ {-# UNPACK #-} !Int8
   } deriving (Eq, Show)
+
+lowestZ ∷ Int8
+lowestZ = -1
 
 makeLenses ''WorldPos

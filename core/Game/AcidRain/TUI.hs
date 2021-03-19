@@ -6,7 +6,7 @@ module Game.AcidRain.TUI
     Appearance(..)
   , HasAppearance(..)
 
-    -- * Helper for building 'Appearance'
+    -- * Helper for building 'VisibleAppearance'
   , AppearanceBuilder
   , begin
   , end
@@ -51,13 +51,16 @@ import Prelude.Unicode ((≢))
 -- that represents a tile, an item, or an entity on a terminal. On
 -- Unicode capable terminals it may consist of several code points,
 -- but must still form a single grapheme cluster. Its displayed width
--- must be exactly 1.
+-- must be exactly 1. The constructor 'InvisibleAppearance' should be
+-- used when the object is invisible.
 data Appearance
-  = Appearance
-    { apUnicode ∷ !Text
-    , apAscii   ∷ !Char
-    , apAttr    ∷ !Attr
-    } deriving (Eq, Show)
+  = VisibleAppearance
+    { vaUnicode ∷ !Text
+    , vaAscii   ∷ !Char
+    , vaAttr    ∷ !Attr
+    }
+  | InvisibleAppearance
+  deriving (Eq, Show)
 
 -- | Types satisfying 'HasAppearance', obviously, has an appearance.
 class HasAppearance α where
@@ -66,8 +69,8 @@ class HasAppearance α where
 -- THINKME: We should probably use Generics or TemplateHaskell rather
 -- than writing this builder down by hand.
 
--- | 'Appearance' can be constructed with the regular record syntax,
--- but to ease constructing appearances this module provides a
+-- | 'VisibleAppearance' can be constructed with the regular record
+-- syntax, but to ease constructing appearances this module provides a
 -- type-safe record builder that can be used like this:
 --
 -- @
@@ -107,10 +110,10 @@ begin
 -- | Declare the end of appearance builder.
 end ∷ OptionalField Attr attr ⇒ AppearanceBuilder Text Char attr → Appearance
 end ab
-  = Appearance
-    { apUnicode = abUnicode ab
-    , apAscii   = abAscii ab
-    , apAttr    = fromOptional $ abAttr ab
+  = VisibleAppearance
+    { vaUnicode = abUnicode ab
+    , vaAscii   = abAscii ab
+    , vaAttr    = fromOptional $ abAttr ab
     }
 
 -- | Composition operator for appearance builder. This is defined as
@@ -124,7 +127,7 @@ infixl 0 ⊳
 (|>) = (⊳)
 infixl 0 |>
 
--- | Declare a value for the field 'apUnicode'. This must appear
+-- | Declare a value for the field 'vaUnicode'. This must appear
 -- exactly once in a builder, or it won't typecheck. Throws if the
 -- displayed width of the text is not exactly 1.
 unicode ∷ Text → AppearanceBuilder () ascii attr → AppearanceBuilder Text ascii attr
@@ -132,7 +135,7 @@ unicode a ab
   = assert (V.safeWctwidth a ≢ 1) $
     ab { abUnicode = a }
 
--- | Declare a value for the field 'apAscii'. This must appear exactly
+-- | Declare a value for the field 'vaAscii'. This must appear exactly
 -- once in a builder, or it won't typecheck. Throws if the displayed
 -- width of the character is not exactly 1.
 ascii ∷ Char → AppearanceBuilder unicode () attr → AppearanceBuilder unicode Char attr
@@ -140,7 +143,7 @@ ascii a ab
   = assert (V.safeWcwidth a ≢ 1) $
     ab { abAscii = a }
 
--- | Declare a value for the field 'apAttr'. This is optional and is
+-- | Declare a value for the field 'vaAttr'. This is optional and is
 -- defaulted to 'V.currentAttr'. But if it exists, it must not occur
 -- after any field constructors declaring a value for the field.
 attr ∷ Attr → AppearanceBuilder unicode ascii () → AppearanceBuilder unicode ascii Attr
