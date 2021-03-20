@@ -15,7 +15,7 @@ freeze:
 	cabal v2-freeze
 
 doc:
-	cabal v2-haddock all
+	cabal v2-haddock $(CABAL_BUILD_OPTS) all
 
 run:
 	env TERM=$(RUN_TERM) cabal v2-run $(CABAL_BUILD_OPTS) all

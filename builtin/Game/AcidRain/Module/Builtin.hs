@@ -16,7 +16,7 @@ import Game.AcidRain.Module.Builtin.Loader.Entity (loadEntities)
 import Game.AcidRain.Module.Builtin.Loader.Tile (loadTiles)
 import Game.AcidRain.Module.Loader (LoaderContext, modifyChunkGenerator)
 import Game.AcidRain.World.Chunk.Generator (terraform)
-import Lens.Micro ((.~))
+import Lens.Micro ((%~))
 
 
 -- | This is a built-in module of Acid Rain whose existence is
@@ -31,4 +31,4 @@ instance Module (Proxy BuiltinModule) where
   load _ = do loadTiles
               loadEntities
               modifyChunkGenerator $
-                terraform .~ CG.terraform
+                terraform %~ (>> CG.terraform)
