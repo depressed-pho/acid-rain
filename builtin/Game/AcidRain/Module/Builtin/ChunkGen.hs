@@ -1,10 +1,12 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.Module.Builtin.ChunkGen
   ( terraform
   ) where
 
-import Game.AcidRain.World.Chunk.Generator (ChunkGenM)
+import Control.Eff (Eff)
+import Game.AcidRain.World.Chunk.Generator (ChunkGen)
 
 
-terraform ∷ ChunkGenM ()
+terraform ∷ Eff '[ChunkGen] ()
 terraform = return ()

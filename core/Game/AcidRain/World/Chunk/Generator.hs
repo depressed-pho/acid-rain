@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -7,11 +8,13 @@
 module Game.AcidRain.World.Chunk.Generator
   ( ChunkGenerator(..), terraform, decorate
   , ChunkGenM
+  , ChunkGen
 
     -- * Running chunk generators
   , generateChunk
   ) where
 
+import Control.Eff (Eff, Lift, runLift)
 import Control.Monad.Catch (MonadCatch, MonadThrow)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Primitive (PrimMonad(..))
@@ -31,12 +34,14 @@ import Lens.Micro ((^.))
 import Lens.Micro.TH (makeLenses)
 import Prelude.Unicode ((∘))
 
-
 -- | The chunk generator monad is essentially a state monad for
 -- manipulating chunks efficiently.
 newtype ChunkGenM α
   = ChunkGenM { runChunkGenM ∷ StateT (ChunkGenState (PrimState IO)) IO α }
   deriving (Functor, Applicative, Monad, MonadFail, MonadThrow, MonadCatch)
+
+-- | The lifted chunk generator effect.
+type ChunkGen = Lift ChunkGenM
 
 -- For some reason GeneralisedNewtypeDeriving doesn't work for
 -- PrimMonad. It just emits a cryptic compilation error.
@@ -71,8 +76,8 @@ makeLenses ''ChunkGenState
 -- usually undesirable though.
 data ChunkGenerator
   = ChunkGenerator
-    { _terraform ∷ ChunkGenM ()
-    , _decorate  ∷ ChunkGenM ()
+    { _terraform ∷ Eff '[ChunkGen] ()
+    , _decorate  ∷ Eff '[ChunkGen] ()
     }
 
 makeLenses ''ChunkGenerator
@@ -101,6 +106,6 @@ generateChunk tReg tPal eCat cGen cPos
                  , _cgChunk = mc
                  }
        cgs' ← liftIO $ flip execStateT cgs $
-              do runChunkGenM $ cGen^.terraform
-                 runChunkGenM $ cGen^.decorate
+              do runChunkGenM $ runLift $ cGen^.terraform
+                 runChunkGenM $ runLift $ cGen^.decorate
        liftIO $ freezeChunk $ cgs'^.cgChunk
