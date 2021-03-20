@@ -44,7 +44,7 @@ import Data.Colour.SRGB (RGB(..), toSRGB24, sRGB)
 import Graphics.Vty.Attributes (Attr, withStyle)
 import qualified Graphics.Vty.Attributes as V
 import qualified Graphics.Vty.Image as V
-import Prelude.Unicode ((≢))
+import Prelude.Unicode ((≡))
 
 
 -- | An appearance is an attributed character (styled and colored)
@@ -132,7 +132,7 @@ infixl 0 |>
 -- displayed width of the text is not exactly 1.
 unicode ∷ Text → AppearanceBuilder () ascii attr → AppearanceBuilder Text ascii attr
 unicode a ab
-  = assert (V.safeWctwidth a ≢ 1) $
+  = assert (V.safeWctwidth a ≡ 1) $
     ab { abUnicode = a }
 
 -- | Declare a value for the field 'vaAscii'. This must appear exactly
@@ -140,7 +140,7 @@ unicode a ab
 -- width of the character is not exactly 1.
 ascii ∷ Char → AppearanceBuilder unicode () attr → AppearanceBuilder unicode Char attr
 ascii a ab
-  = assert (V.safeWcwidth a ≢ 1) $
+  = assert (V.safeWcwidth a ≡ 1) $
     ab { abAscii = a }
 
 -- | Declare a value for the field 'vaAttr'. This is optional and is

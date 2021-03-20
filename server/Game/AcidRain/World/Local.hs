@@ -9,7 +9,7 @@ module Game.AcidRain.World.Local
 
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.STM.TBQueue
-  ( TBQueue, newTBQueueIO, readTBQueue, writeTBQueue )
+  ( TBQueue, newTBQueueIO, tryReadTBQueue, readTBQueue, writeTBQueue )
 import Control.Concurrent.STM.TVar (TVar, newTVarIO, readTVar, writeTVar)
 import Data.Convertible.Base (convert)
 import Control.Exception (SomeException, handle, toException)
@@ -100,11 +100,15 @@ instance World LocalWorld where
   waitForEvent ∷ MonadIO μ ⇒ LocalWorld → μ (Maybe SomeEvent)
   waitForEvent lw
     = liftIO $ atomically $
-      do ws ← readTVar $ lwState lw
-         case ws of
-           LoadFailed _ → return Nothing
-           Closed     _ → return Nothing
-           _            → Just <$> (readTBQueue $ lwEvents lw)
+      do ev' ← tryReadTBQueue (lwEvents lw)
+         case ev' of
+           Just ev → return (Just ev)
+           Nothing →
+             do ws ← readTVar (lwState lw)
+                case ws of
+                  LoadFailed _ → return Nothing
+                  Closed     _ → return Nothing
+                  _            → Just <$> readTBQueue (lwEvents lw)
 
   lookupChunk ∷ MonadIO μ ⇒ LocalWorld → ChunkPos → μ (Maybe Chunk)
   lookupChunk lw pos

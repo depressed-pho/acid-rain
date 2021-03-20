@@ -17,6 +17,7 @@ library
     Game.AcidRain.Module.Builtin.Entity
 
   other-modules:
+    Game.AcidRain.Module.Builtin.ChunkGen
     Game.AcidRain.Module.Builtin.Loader.Entity
     Game.AcidRain.Module.Builtin.Loader.Tile
 

@@ -39,6 +39,7 @@ main
 
        -- We don't need to send 'Redraw' to the channel here, because
        -- we'll soon get a WorldStateChanged event.
+       --writeBChan evChan $ Redraw $ getName wv
 
        let buildVty = V.mkVty V.defaultConfig
        initialVty ← buildVty

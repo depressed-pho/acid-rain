@@ -32,8 +32,8 @@ import Lens.Micro.TH (makeLenses)
 import Prelude.Unicode ((∘))
 
 
--- | The chunk generator monad is essentially a state monad to
--- manipulate chunks efficiently.
+-- | The chunk generator monad is essentially a state monad for
+-- manipulating chunks efficiently.
 newtype ChunkGenM α
   = ChunkGenM { runChunkGenM ∷ StateT (ChunkGenState (PrimState IO)) IO α }
   deriving (Functor, Applicative, Monad, MonadFail, MonadThrow, MonadCatch)
