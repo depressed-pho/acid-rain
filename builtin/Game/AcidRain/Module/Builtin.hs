@@ -15,7 +15,6 @@ import qualified Game.AcidRain.Module.Builtin.ChunkGen as CG
 import Game.AcidRain.Module.Builtin.Loader.Entity (loadEntities)
 import Game.AcidRain.Module.Builtin.Loader.Tile (loadTiles)
 import Game.AcidRain.Module.Loader (LoaderContext, modifyChunkGenerator)
-import Game.AcidRain.World (WorldSeed)
 import Game.AcidRain.World.Chunk.Generator (terraform)
 import Lens.Micro ((%~))
 
@@ -30,9 +29,8 @@ instance Module (Proxy BuiltinModule) where
 
   load ∷ (MonadState LoaderContext μ, MonadThrow μ)
        ⇒ Proxy BuiltinModule
-       → WorldSeed
        → μ ()
-  load _ _seed
+  load _
     = do loadTiles
          loadEntities
          modifyChunkGenerator $

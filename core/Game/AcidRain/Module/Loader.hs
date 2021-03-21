@@ -3,6 +3,9 @@
 module Game.AcidRain.Module.Loader
   ( LoaderContext
 
+  -- * Querying world configuration
+  , getWorldSeed
+
   -- * Registering tiles
   , getTileRegistry
   , putTileRegistry
@@ -23,6 +26,7 @@ module Game.AcidRain.Module.Loader
   -- * Loading modules
   , ModuleMap
   , loadModules
+  , lcWorldSeed
   , lcMods
   , lcTiles
   , lcEntityTypes
@@ -36,7 +40,7 @@ import Data.Foldable (traverse_, toList)
 import qualified Data.HashMap.Strict as HM
 import Game.AcidRain.Module.Types
   ( Module(..), SomeModule(..), ModuleMap, LoaderContext(..)
-  , lcMods, lcTiles, lcEntityTypes, lcChunkGen )
+  , lcWorldSeed, lcMods, lcTiles, lcEntityTypes, lcChunkGen )
 import Game.AcidRain.World (WorldSeed)
 import Game.AcidRain.World.Chunk.Generator (ChunkGenerator)
 import Game.AcidRain.World.Entity (EntityType, EntityTypeID, SomeEntityType)
@@ -48,20 +52,21 @@ import qualified Game.AcidRain.World.Tile.Registry as TR
 import Lens.Micro ((%~), (.~))
 import Prelude.Unicode ((∘))
 
--- | Create a new, empty context to begin with.
-empty ∷ LoaderContext
-empty
+-- Create a new, empty context to begin with.
+empty ∷ WorldSeed → LoaderContext
+empty seed
   = LoaderContext
-    { _lcMods        = HM.empty
+    { _lcWorldSeed   = seed
+    , _lcMods        = HM.empty
     , _lcTiles       = TR.empty
     , _lcEntityTypes = ER.empty
     , _lcChunkGen    = def
     }
 
 -- | Load a single module.
-loadMod ∷ (Module α, MonadState LoaderContext μ, MonadThrow μ) ⇒ α → WorldSeed → μ ()
-loadMod m seed
-  = do load m seed
+loadMod ∷ (Module α, MonadState LoaderContext μ, MonadThrow μ) ⇒ α → μ ()
+loadMod m
+  = do load m
        modify' $ lcMods %~ insMod'
   where
     insMod' ∷ ModuleMap → ModuleMap
@@ -80,10 +85,15 @@ loadMod m seed
 loadModules ∷ (Foldable f, MonadThrow μ) ⇒ f SomeModule → WorldSeed → μ LoaderContext
 loadModules mods seed
   = do mods' ← reorderMods mods
-       execStateT (traverse_ (flip loadMod seed) mods') empty
+       execStateT (traverse_ loadMod mods') (empty seed)
 
 reorderMods ∷ (Foldable f, MonadThrow μ) ⇒ f SomeModule → μ [SomeModule]
 reorderMods = return . toList -- FIXME: Actually reorder it.
+
+-- | Get the seed of which the world that the modules are being loaded
+-- for.
+getWorldSeed ∷ MonadState LoaderContext μ ⇒ μ WorldSeed
+getWorldSeed = gets _lcWorldSeed
 
 -- | Get the tile registry from the context. Module loaders usually
 -- don't need to use this directly. There are helper functions such as

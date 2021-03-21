@@ -7,7 +7,7 @@ module Game.AcidRain.Module.Types
   , Module(..)
   , SomeModule(..)
   , ModuleMap
-  , LoaderContext(..), lcMods, lcTiles, lcEntityTypes, lcChunkGen
+  , LoaderContext(..), lcWorldSeed, lcMods, lcTiles, lcEntityTypes, lcChunkGen
   ) where
 
 import Control.Monad.Catch (MonadThrow)
@@ -46,7 +46,7 @@ class Module α where
   -- per the entire process. When a module is to be loaded, it is
   -- guaranteed that all the modules it depends on have already been
   -- loaded. FIXME: dependency resolution
-  load ∷ (MonadState LoaderContext μ, MonadThrow μ) ⇒ α → WorldSeed → μ ()
+  load ∷ (MonadState LoaderContext μ, MonadThrow μ) ⇒ α → μ ()
 
 -- | A type-erased 'Module'.
 data SomeModule = ∀α. Module α ⇒ SomeModule !α
@@ -62,9 +62,12 @@ type ModuleMap = HashMap ModuleID SomeModule
 -- | An opaque data structure representing a state of module loading.
 data LoaderContext
   = LoaderContext
-    { -- | Extract modules that have been fully loaded. This doesn't
+    { -- | Extract the world seed of which the world that the modules
+      -- are being loaded for.
+      _lcWorldSeed   ∷ !WorldSeed
+      -- | Extract modules that have been fully loaded. This doesn't
       -- include a module that is currently being loaded.
-      _lcMods        ∷ !ModuleMap
+    , _lcMods        ∷ !ModuleMap
       -- | Extract the tile registry that has been constructed.
     , _lcTiles       ∷ !TileRegistry
       -- | Extract the entity registry that has been constructed.
