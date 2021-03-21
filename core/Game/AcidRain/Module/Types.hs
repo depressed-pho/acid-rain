@@ -14,6 +14,7 @@ import Control.Monad.Catch (MonadThrow)
 import Control.Monad.State.Strict (MonadState)
 import Data.HashMap.Strict (HashMap)
 import Data.Text (Text)
+import Game.AcidRain.World (WorldSeed)
 import Game.AcidRain.World.Chunk.Generator (ChunkGenerator)
 import Game.AcidRain.World.Entity.Registry (EntityRegistry)
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
@@ -45,7 +46,7 @@ class Module α where
   -- per the entire process. When a module is to be loaded, it is
   -- guaranteed that all the modules it depends on have already been
   -- loaded. FIXME: dependency resolution
-  load ∷ (MonadState LoaderContext μ, MonadThrow μ) ⇒ α → μ ()
+  load ∷ (MonadState LoaderContext μ, MonadThrow μ) ⇒ α → WorldSeed → μ ()
 
 -- | A type-erased 'Module'.
 data SomeModule = ∀α. Module α ⇒ SomeModule !α

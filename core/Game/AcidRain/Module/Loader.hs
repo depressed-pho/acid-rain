@@ -37,6 +37,7 @@ import qualified Data.HashMap.Strict as HM
 import Game.AcidRain.Module.Types
   ( Module(..), SomeModule(..), ModuleMap, LoaderContext(..)
   , lcMods, lcTiles, lcEntityTypes, lcChunkGen )
+import Game.AcidRain.World (WorldSeed)
 import Game.AcidRain.World.Chunk.Generator (ChunkGenerator)
 import Game.AcidRain.World.Entity (EntityType, EntityTypeID, SomeEntityType)
 import Game.AcidRain.World.Entity.Registry (EntityRegistry)
@@ -58,9 +59,9 @@ empty
     }
 
 -- | Load a single module.
-loadMod ∷ (Module α, MonadState LoaderContext μ, MonadThrow μ) ⇒ α → μ ()
-loadMod m
-  = do load m
+loadMod ∷ (Module α, MonadState LoaderContext μ, MonadThrow μ) ⇒ α → WorldSeed → μ ()
+loadMod m seed
+  = do load m seed
        modify' $ lcMods %~ insMod'
   where
     insMod' ∷ ModuleMap → ModuleMap
@@ -76,10 +77,10 @@ loadMod m
 --
 -- This function only makes sense for client and server
 -- implementations. Modules shouldn't use this.
-loadModules ∷ (Foldable f, MonadThrow μ) ⇒ f SomeModule → μ LoaderContext
-loadModules mods
+loadModules ∷ (Foldable f, MonadThrow μ) ⇒ f SomeModule → WorldSeed → μ LoaderContext
+loadModules mods seed
   = do mods' ← reorderMods mods
-       execStateT (traverse_ loadMod mods') empty
+       execStateT (traverse_ (flip loadMod seed) mods') empty
 
 reorderMods ∷ (Foldable f, MonadThrow μ) ⇒ f SomeModule → μ [SomeModule]
 reorderMods = return . toList -- FIXME: Actually reorder it.

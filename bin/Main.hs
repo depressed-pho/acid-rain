@@ -31,7 +31,8 @@ data AppEvent n
 
 main ∷ IO ()
 main
-  = do lw ← newWorld SinglePlayer [upcastModule (Proxy ∷ Proxy BuiltinModule)]
+  = do let seed = 666
+       lw ← newWorld SinglePlayer [upcastModule (Proxy ∷ Proxy BuiltinModule)] seed
 
        evChan ← newBChan 256
        let wv = worldView TheWorldView True lw nil

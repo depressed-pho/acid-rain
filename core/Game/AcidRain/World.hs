@@ -6,6 +6,7 @@ module Game.AcidRain.World
     World(..)
   , WorldMode(..)
   , WorldState(..)
+  , WorldSeed
   , SomeWorld(..)
 
     -- * Events
@@ -20,6 +21,7 @@ import Control.Exception (Exception, SomeException)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO)
 import Data.Kind (Type)
+import Data.Int (Int64)
 import Data.Typeable (Typeable)
 import Game.AcidRain.World.Chunk (Chunk)
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
@@ -100,6 +102,10 @@ data WorldState rs
     -- | The world has been closed.
   | Closed !(Maybe SomeException)
   deriving Show
+
+-- | World seed is a 64-bit signed integer. Chunks generate randomly
+-- but deterministically depending on the seed.
+type WorldSeed = Int64
 
 -- | An event to be fired when the 'WorldState' changes.
 data WorldStateChanged

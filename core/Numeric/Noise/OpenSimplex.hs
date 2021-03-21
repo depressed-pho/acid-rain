@@ -66,15 +66,17 @@ class (Default α, Floating (BaseType α), RealFrac (BaseType α), UV.Unbox (Bas
              → BaseType α -- ^ δy
              → α
 
--- | An output of 2D OpenSimplex noise which is a 1D scalar value @[-1,
--- 1]@.
-newtype Scalar r = Scalar { _scalar ∷ r }
+-- | An output of 2D OpenSimplex noise: scalar value @[-1, 1]@.
+newtype Scalar r
+  = Scalar
+    { _scalar ∷ r
+    }
   deriving (Show, Eq)
 
 makeLenses ''Scalar
 
--- | An output of 2D OpenSimplex noise which is a 2D coordinate within a
--- unit disk, rather than a scalar value.
+-- | An output of 2D OpenSimplex noise: 2D coordinate within a unit
+-- disk.
 data Disk r
   = Disk
     { _diskX ∷ !r
@@ -83,8 +85,8 @@ data Disk r
 
 makeLenses ''Disk
 
--- | An output of 2D OpenSimplex noise which is a first derivative of
--- 2D points.
+-- | An output of 2D OpenSimplex noise: the first derivative of 2D
+-- gradients.
 data Derivative r
   = Derivative
     { _dx ∷ !r
@@ -478,7 +480,7 @@ lookup3D = runST $
 
 -- | Construct an OpenSimplex noise generator with a given 64-bits
 -- seed. Since this is a quite expensive operation, one should reuse
--- generators as possible as they can.
+-- generators as far as possible.
 mkSimplexGen ∷ Int64 → SimplexGen
 mkSimplexGen seed
   = runST $

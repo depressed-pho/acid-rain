@@ -23,7 +23,7 @@ import Game.AcidRain.Module.Loader
   ( loadModules, lcTiles, lcEntityTypes, lcChunkGen )
 import qualified Game.AcidRain.Module.Builtin.Entity as B
 import Game.AcidRain.World
-  ( World(..), WorldMode(..), WorldState(..), WorldStateChanged(..)
+  ( World(..), WorldMode(..), WorldState(..), WorldSeed, WorldStateChanged(..)
   , WorldNotRunningException(..), UnknownPlayerIDException(..) )
 import Game.AcidRain.World.Chunk (Chunk, putEntity)
 import Game.AcidRain.World.Chunk.Manager.Local (LocalChunkManager)
@@ -48,6 +48,7 @@ import Prelude.Unicode ((∘))
 data LocalWorld
   = LocalWorld
     { lwMode   ∷ !WorldMode
+    , lwSeed   ∷ !WorldSeed
     , lwState  ∷ !(TVar (WorldState RunningState))
     , lwEvents ∷ !(TBQueue SomeEvent)
     }
@@ -147,13 +148,14 @@ instance World LocalWorld where
 
 -- | Create a new world out of thin air. The world will be
 -- asynchronously created on a separate thread.
-newWorld ∷ (MonadIO μ, Foldable f) ⇒ WorldMode → f SomeModule → μ LocalWorld
-newWorld wm mods
+newWorld ∷ (MonadIO μ, Foldable f) ⇒ WorldMode → f SomeModule → WorldSeed → μ LocalWorld
+newWorld wm mods seed
   = liftIO $
     do ws ← newTVarIO Loading
        es ← newTBQueueIO eventQueueCapacity
        let lw = LocalWorld
                 { lwMode   = wm
+                , lwSeed   = seed
                 , lwState  = ws
                 , lwEvents = es
                 }
@@ -166,7 +168,7 @@ newWorld wm mods
         do rs ← atomically $
                 do -- The first thing we need to do is to load
                    -- modules. This can of course fail.
-                   lc  ← loadModules mods
+                   lc  ← loadModules mods seed
                    -- From now on we enter into an STM transaction. In
                    -- order to construct the LCM, we need a tile
                    -- palette. Constructing a tile palette never fails
