@@ -1,25 +1,23 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE GeneralisedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Chunk.Generator
   ( ChunkGenerator(..), terraform, decorate
-  , ChunkGenM
-  , ChunkGen
+  , ChunkGenState
 
     -- * Running chunk generators
   , generateChunk
   ) where
 
-import Control.Eff (Eff, Lift, runLift)
-import Control.Monad.Catch (MonadCatch, MonadThrow)
-import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Eff (Eff, Lift, Lifted, Member, lift, runLift)
+import Control.Eff.Exception (Exc)
+import Control.Eff.State.Strict (State, execState)
+import Control.Exception (SomeException)
 import Control.Monad.Primitive (PrimMonad(..))
-import Control.Monad.Trans.State.Strict (StateT, execStateT)
-import Control.Monad.Trans.Class (lift)
 import Data.Default (Default(..))
 import qualified Game.AcidRain.World.Chunk as C
 import Game.AcidRain.World.Chunk.Types (freezeChunk, thawChunk)
@@ -32,27 +30,11 @@ import Game.AcidRain.World.Tile.Registry (TileRegistry)
 import qualified Game.AcidRain.World.Tile.Registry as TR
 import Lens.Micro ((^.))
 import Lens.Micro.TH (makeLenses)
-import Prelude.Unicode ((∘))
 
--- | The chunk generator monad is essentially a state monad for
--- manipulating chunks efficiently.
-newtype ChunkGenM α
-  = ChunkGenM { runChunkGenM ∷ StateT (ChunkGenState (PrimState IO)) IO α }
-  deriving (Functor, Applicative, Monad, MonadFail, MonadThrow, MonadCatch)
-
--- | The lifted chunk generator effect.
-type ChunkGen = Lift ChunkGenM
-
--- For some reason GeneralisedNewtypeDeriving doesn't work for
--- PrimMonad. It just emits a cryptic compilation error.
-instance PrimMonad ChunkGenM where
-  type PrimState ChunkGenM = PrimState (StateT (ChunkGenState (PrimState IO)) IO)
-  primitive = ChunkGenM ∘ lift ∘ primitive
-
-data ChunkGenState σ
+data ChunkGenState
   = ChunkGenState
     { _cgPos   ∷ ChunkPos
-    , _cgChunk ∷ MutableChunk σ
+    , _cgChunk ∷ MutableChunk (PrimState IO)
     }
 
 makeLenses ''ChunkGenState
@@ -76,8 +58,8 @@ makeLenses ''ChunkGenState
 -- usually undesirable though.
 data ChunkGenerator
   = ChunkGenerator
-    { _terraform ∷ Eff '[ChunkGen] ()
-    , _decorate  ∷ Eff '[ChunkGen] ()
+    { _terraform ∷ Eff '[State (ChunkGenState), Lift IO] ()
+    , _decorate  ∷ Eff '[State (ChunkGenState), Lift IO] ()
     }
 
 makeLenses ''ChunkGenerator
@@ -90,22 +72,22 @@ instance Default ChunkGenerator where
 
 -- | Generate a chunk by running a chunk generator. Only useful for
 -- server implementations.
-generateChunk ∷ (MonadThrow μ, MonadIO μ)
+generateChunk ∷ (Member (Exc SomeException) r, Lifted IO r)
               ⇒ TileRegistry
               → TilePalette
               → EntityCatalogue
               → ChunkGenerator
               → ChunkPos
-              → μ Chunk
+              → Eff r Chunk
 generateChunk tReg tPal eCat cGen cPos
   = do air  ← TR.get "acid-rain:dirt" tReg
        c    ← C.new tReg tPal eCat (defaultState air)
-       mc   ← liftIO $ thawChunk c
+       mc   ← lift $ thawChunk c
        let cgs = ChunkGenState
                  { _cgPos   = cPos
                  , _cgChunk = mc
                  }
-       cgs' ← liftIO $ flip execStateT cgs $
-              do runChunkGenM $ runLift $ cGen^.terraform
-                 runChunkGenM $ runLift $ cGen^.decorate
-       liftIO $ freezeChunk $ cgs'^.cgChunk
+       cgs' ← lift $ runLift $ execState cgs $
+              do cGen^.terraform
+                 cGen^.decorate
+       lift $ freezeChunk $ cgs'^.cgChunk

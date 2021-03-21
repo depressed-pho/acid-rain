@@ -1,6 +1,7 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Local
   ( LocalWorld
@@ -11,11 +12,11 @@ import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.STM.TBQueue
   ( TBQueue, newTBQueueIO, tryReadTBQueue, readTBQueue, writeTBQueue )
 import Control.Concurrent.STM.TVar (TVar, newTVarIO, readTVar, writeTVar)
+import Control.Eff (Eff, Lifted, lift, run, runLift)
+import Control.Eff.Exception (Exc, runError)
 import Data.Convertible.Base (convert)
-import Control.Exception (SomeException, handle, toException)
+import Control.Exception (Exception(..), SomeException, handle)
 import Control.Monad (void)
-import Control.Monad.Catch (MonadThrow)
-import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.STM (STM, atomically, throwSTM)
 import qualified Data.UUID as U
 import Game.AcidRain.Module (SomeModule)
@@ -29,7 +30,6 @@ import Game.AcidRain.World.Chunk (Chunk, putEntity)
 import Game.AcidRain.World.Chunk.Manager.Local (LocalChunkManager)
 import qualified Game.AcidRain.World.Chunk.Manager.Local as LCM
 import qualified Game.AcidRain.World.Chunk.Palette as Pal
-import Game.AcidRain.World.Chunk.Position (ChunkPos)
 import qualified Game.AcidRain.World.Entity as E
 import qualified Game.AcidRain.World.Entity.Catalogue as ECat
 import Game.AcidRain.World.Event (Event(..), SomeEvent)
@@ -94,13 +94,11 @@ changeState lw ws
 instance World LocalWorld where
   type RunningStateT LocalWorld = RunningState
 
-  getWorldState ∷ MonadIO μ ⇒ LocalWorld → μ (WorldState RunningState)
   getWorldState
-    = liftIO ∘ atomically ∘ readTVar ∘ lwState
+    = lift ∘ atomically ∘ readTVar ∘ lwState
 
-  waitForEvent ∷ MonadIO μ ⇒ LocalWorld → μ (Maybe SomeEvent)
   waitForEvent lw
-    = liftIO $ atomically $
+    = lift $ atomically $
       do ev' ← tryReadTBQueue (lwEvents lw)
          case ev' of
            Just ev → return (Just ev)
@@ -111,21 +109,19 @@ instance World LocalWorld where
                   Closed     _ → return Nothing
                   _            → Just <$> readTBQueue (lwEvents lw)
 
-  lookupChunk ∷ MonadIO μ ⇒ LocalWorld → ChunkPos → μ (Maybe Chunk)
   lookupChunk lw pos
-    = liftIO $ atomically $
+    = lift $ atomically $
       do rs ← assumeRunning lw
          LCM.lookup pos $ rsChunks rs
 
   -- FIXME: Remove this later.
   ensureChunkExists lw pos
-    = liftIO $ atomically $
+    = lift $ atomically $
       do rs ← assumeRunning lw
          void $ LCM.get pos $ rsChunks rs
 
-  getPlayer ∷ (MonadIO μ, MonadThrow μ) ⇒ LocalWorld → PlayerID → μ Player
   getPlayer lw pid
-    = liftIO $ atomically $ assumeRunning lw >>= get'
+    = lift $ atomically $ assumeRunning lw >>= get'
     where
       get' rs | U.null pid = case lwMode lw of
                                SinglePlayer →
@@ -148,9 +144,9 @@ instance World LocalWorld where
 
 -- | Create a new world out of thin air. The world will be
 -- asynchronously created on a separate thread.
-newWorld ∷ (MonadIO μ, Foldable f) ⇒ WorldMode → f SomeModule → WorldSeed → μ LocalWorld
+newWorld ∷ (Lifted IO r, Foldable f) ⇒ WorldMode → f SomeModule → WorldSeed → Eff r LocalWorld
 newWorld wm mods seed
-  = liftIO $
+  = lift $
     do ws ← newTVarIO Loading
        es ← newTBQueueIO eventQueueCapacity
        let lw = LocalWorld
@@ -159,16 +155,16 @@ newWorld wm mods seed
                 , lwState  = ws
                 , lwEvents = es
                 }
-       void $ forkIO $ newWorld' lw >> runWorld lw
+       void $ forkIO $ runLift (newWorld' lw) >> runWorld lw
        return lw
   where
-    newWorld' ∷ LocalWorld → IO ()
+    newWorld' ∷ Lifted IO r ⇒ LocalWorld → Eff r ()
     newWorld' lw
       = catchWhileLoading lw $
-        do rs ← atomically $
+        do rs ← lift $ atomically $
                 do -- The first thing we need to do is to load
                    -- modules. This can of course fail.
-                   lc  ← loadModules mods seed
+                   lc  ← runErrorInSTM $ loadModules mods seed
                    -- From now on we enter into an STM transaction. In
                    -- order to construct the LCM, we need a tile
                    -- palette. Constructing a tile palette never fails
@@ -194,7 +190,7 @@ newWorld wm mods seed
                      { rsChunks  = lcm
                      , rsPlayers = lpm
                      }
-           atomically $
+           lift $ atomically $
              do case wm of
                   SinglePlayer → void $ newPlayer U.nil Administrator rs
                   _            → return ()
@@ -202,12 +198,18 @@ newWorld wm mods seed
                 -- change the state.
                 changeState lw $ Running rs
 
-catchWhileLoading ∷ LocalWorld → IO () → IO ()
-catchWhileLoading lw a
-  = handle f a
-  where
-    f ∷ SomeException → IO ()
-    f = atomically ∘ changeState lw ∘ LoadFailed ∘ toException
+runErrorInSTM ∷ Exception e ⇒ Eff '[Exc e] α → STM α
+runErrorInSTM m
+  = case run (runError m) of
+      Right a → return a
+      Left  e → throwSTM e
+
+catchWhileLoading ∷ Lifted IO r ⇒ LocalWorld → Eff (Exc SomeException : r) () → Eff r ()
+catchWhileLoading lw m
+  = do a ← runError m
+       case a of
+         Right () → return ()
+         Left e   → lift $ atomically $ changeState lw $ LoadFailed e
 
 catchWhileRunning ∷ LocalWorld → IO () → IO ()
 catchWhileRunning lw a

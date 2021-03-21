@@ -1,20 +1,17 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.Module.Builtin
   ( BuiltinModule
   ) where
 
-import Control.Monad.Catch (MonadThrow)
-import Control.Monad.State.Strict (MonadState)
 import Data.Proxy (Proxy)
-import Game.AcidRain.Module (Module(..), ModuleID)
 import qualified Game.AcidRain.Module.Builtin.ChunkGen as CG
+import Game.AcidRain.Module (Module(..))
 import Game.AcidRain.Module.Builtin.Loader.Entity (loadEntities)
 import Game.AcidRain.Module.Builtin.Loader.Tile (loadTiles)
-import Game.AcidRain.Module.Loader (LoaderContext, modifyChunkGenerator)
+import Game.AcidRain.Module.Loader (modifyChunkGenerator)
 import Game.AcidRain.World.Chunk.Generator (terraform)
 import Lens.Micro ((%~))
 
@@ -24,12 +21,7 @@ import Lens.Micro ((%~))
 data BuiltinModule
 
 instance Module (Proxy BuiltinModule) where
-  modID ∷ Proxy BuiltinModule → ModuleID
   modID _ = "acid-rain"
-
-  load ∷ (MonadState LoaderContext μ, MonadThrow μ)
-       ⇒ Proxy BuiltinModule
-       → μ ()
   load _
     = do loadTiles
          loadEntities

@@ -25,7 +25,7 @@ module Data.Upcastable
   , Downcastable(..)
   ) where
 
-import Control.Exception.Base (Exception, SomeException, toException, fromException)
+import Control.Exception.Base (Exception(..), SomeException)
 import Data.Dynamic (Dynamic, Typeable, toDyn, fromDyn, fromDynamic)
 import Data.Kind (Constraint)
 import Data.Maybe (fromMaybe)

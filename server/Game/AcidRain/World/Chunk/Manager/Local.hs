@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE UnicodeSyntax #-}
 -- | This is an internal module used by
@@ -14,10 +16,10 @@ module Game.AcidRain.World.Chunk.Manager.Local
   ) where
 
 import Control.Concurrent (forkIO)
-import Control.Exception (SomeException, catch)
+import Control.Eff (Eff, Lifted, Member, runLift, lift)
+import Control.Eff.Exception (Exc, runError)
+import Control.Exception (SomeException)
 import Control.Monad (void)
-import Control.Monad.Catch (MonadThrow)
-import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.STM (STM, atomically, retry, throwSTM)
 import qualified Focus as F
 import GHC.Conc (unsafeIOToSTM)
@@ -106,14 +108,12 @@ get pos lcm
        case chunk' of
          Just cell → evalCell cell
          Nothing →
-           do void $ unsafeIOToSTM $ forkIO $
-                do cell ← (Loaded <$> loadOrGenerate)
-                          `catch`
-                          (return ∘ LoadFailed)
-                   atomically $ SM.focus (focIns cell) pos (lcmCells lcm)
+           do void $ unsafeIOToSTM $ forkIO $ runLift $
+                do cell ← either LoadFailed Loaded <$> runError loadOrGenerate
+                   lift $ atomically $ SM.focus (focIns cell) pos (lcmCells lcm)
               retry
   where
-    loadOrGenerate ∷ IO Chunk
+    loadOrGenerate ∷ (Member (Exc SomeException) r, Lifted IO r) ⇒ Eff r Chunk
     loadOrGenerate = generate pos lcm -- FIXME: load
 
     focIns ∷ ChunkCell → F.Focus ChunkCell STM ()
@@ -133,6 +133,9 @@ modify f pos lcm
 
 -- | Generate a chunk. Since chunk generation is a time consuming
 -- task, callers are highly advised to do it in a separate thread.
-generate ∷ (MonadThrow μ, MonadIO μ) ⇒ ChunkPos → LocalChunkManager → μ Chunk
+generate ∷ (Member (Exc SomeException) r, Lifted IO r)
+         ⇒ ChunkPos
+         → LocalChunkManager
+         → Eff r Chunk
 generate cPos (LocalChunkManager { .. })
   = generateChunk lcmTiles lcmPalette lcmEntities lcmChunkGen cPos

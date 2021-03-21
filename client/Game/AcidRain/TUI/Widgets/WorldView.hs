@@ -1,9 +1,13 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.TUI.Widgets.WorldView
   ( WorldView
@@ -18,9 +22,10 @@ import Brick.Types
   , availWidthL, availHeightL, emptyResult, getContext, imageL, locL )
 import Brick.Widgets.Center (center)
 import Brick.Widgets.Core (Named(..), fill, reportExtent, txt, txtWrap)
-import Control.Exception (Handler(..), SomeException, catches)
-import Control.Monad.Catch (MonadThrow)
-import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Eff (Eff, Lifted, Member, runLift)
+import Control.Eff.Exception (Exc, catchError, throwError, runError)
+import Control.Exception (Exception(..), SomeException)
+import Control.Monad.IO.Class (liftIO)
 import Data.Convertible.Base (convert)
 import Data.Int (Int32)
 import Data.Monoid.Unicode ((⊕))
@@ -35,7 +40,6 @@ import Game.AcidRain.World.Position (WorldPos(..), wpX, wpY, wpZ, lowestZ)
 import qualified Graphics.Vty as V
 import Lens.Micro ((&), (.~), (^.), (+~), (-~), (%~), _1, _2, to)
 import Lens.Micro.TH (makeLenses)
-import Prelude.Unicode ((∘))
 
 
 -- | This is a Brick widget to render some part of the world centered
@@ -97,10 +101,10 @@ redrawWorldView wv
     mkWidget ∷ Extent n → EventM n (Widget n)
     mkWidget ext
       = liftIO $
-        -- Now we are in the IO monad.
-        flip catches [ Handler catchWNRE
-                     , Handler catchAll
-                     ] $
+        runLift $
+        -- Now we are in the Eff [Lifted IO] monad.
+        catchAll $
+        catchWNRE $
         do -- Draw all the tiles currently visible from the
            -- viewpoint. The easiest way to do this is to iterate on
            -- every visible world position and ask the world for the
@@ -129,7 +133,12 @@ redrawWorldView wv
                 let img = V.resize (ctx^.availWidthL) (ctx^.availHeightL) cRows
                 return $ emptyResult & imageL .~ img
 
-    renderChunk ∷ (MonadThrow μ, MonadIO μ) ⇒ WorldPos → WorldPos → WorldPos → ChunkPos → μ V.Image
+    renderChunk ∷ (Member (Exc SomeException) r, Lifted IO r)
+                ⇒ WorldPos
+                → WorldPos
+                → WorldPos
+                → ChunkPos
+                → Eff r V.Image
     renderChunk wTopLeft wTopRight wBottomLeft cPos
       = do ensureChunkExists (wv^.wvWorld) cPos
            chunk' ← lookupChunk (wv^.wvWorld) cPos
@@ -155,7 +164,7 @@ redrawWorldView wv
                in
                  V.vertCat <$> mapM wRow [wyBegin .. wyEnd]
 
-    renderXY ∷ MonadThrow μ ⇒ Chunk → Int32 → Int32 → μ V.Image
+    renderXY ∷ Member (Exc SomeException) r ⇒ Chunk → Int32 → Int32 → Eff r V.Image
     renderXY chunk wx wy = go (lowestZ + chunkHeight - 1)
       where
         -- Search for a visible object from the highest Z to the
@@ -169,7 +178,7 @@ redrawWorldView wv
         blank ∷ V.Image
         blank = V.char V.defAttr ' '
 
-    renderAt ∷ MonadThrow μ ⇒ Chunk → WorldPos → μ (Maybe V.Image)
+    renderAt ∷ Member (Exc SomeException) r ⇒ Chunk → WorldPos → Eff r (Maybe V.Image)
     renderAt chunk pos
       -- If there is a visible entity here, then it has the highest
       -- priority.  Next an item pile, then a tile.
@@ -192,7 +201,11 @@ redrawWorldView wv
 
 
 -- Convert a point in the local coords to that of the world coords.
-worldPosAt ∷ WorldView n → Extent n → Location → IO WorldPos
+worldPosAt ∷ (Member (Exc SomeException) r, Lifted IO r)
+           ⇒ WorldView n
+           → Extent n
+           → Location
+           → Eff r WorldPos
 worldPosAt wv ext lp
   = do -- Get the player position
        pl ← getPlayer (wv^.wvWorld) (wv^.wvPlayer)
@@ -223,15 +236,24 @@ addLoc a b
   = a & locL._1 +~ b^._1
       & locL._2 +~ b^._2
 
-catchAll ∷ SomeException → IO (Widget n)
-catchAll = return ∘ txtWrap ∘ pack ∘ show
+catchAll ∷ Eff (Exc SomeException : r) (Widget n) → Eff r (Widget n)
+catchAll m
+  = do r ← runError m
+       return $
+         case r of
+           Left  e → txtWrap $ pack $ show e
+           Right w → w
 
-catchWNRE ∷ WorldNotRunningException → IO (Widget n)
-catchWNRE (WorldNotRunningException ws)
-  = return $
-    case ws of
-      Loading      → center $ txt "Loading..."
-      LoadPending  → center $ txt "FIXME: LoadPending"
-      LoadFailed e → txtWrap $ "Load failed: " ⊕ pack (show e)
-      Running _    → error "Impossible"
-      Closed e     → txtWrap $ "World closed: " ⊕ pack (show e)
+catchWNRE ∷ Member (Exc SomeException) r ⇒ Eff r (Widget n) → Eff r (Widget n)
+catchWNRE m = catchError m h
+  where
+    h e = case fromException e of
+            Just (WorldNotRunningException ws) →
+              return $ case ws of
+                         Loading       → center $ txt "Loading..."
+                         LoadPending   → center $ txt "FIXME: LoadPending"
+                         LoadFailed e' → txtWrap $ "Load failed: " ⊕ pack (show e')
+                         Running _     → error "Impossible"
+                         Closed e'     → txtWrap $ "World closed: " ⊕ pack (show e')
+            Nothing →
+              throwError e

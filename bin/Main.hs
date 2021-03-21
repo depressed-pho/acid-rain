@@ -9,6 +9,7 @@ import Brick.Main (
 import Brick.Types (BrickEvent(..), Widget, EventM, Next)
 import Brick.Widgets.Core (getName)
 import Control.Concurrent (forkIO)
+import Control.Eff (runLift)
 import Control.Monad (void)
 import Data.UUID (nil)
 import Data.Proxy (Proxy(..))
@@ -32,7 +33,7 @@ data AppEvent n
 main ∷ IO ()
 main
   = do let seed = 666
-       lw ← newWorld SinglePlayer [upcastModule (Proxy ∷ Proxy BuiltinModule)] seed
+       lw ← runLift $ newWorld SinglePlayer [upcastModule (Proxy ∷ Proxy BuiltinModule)] seed
 
        evChan ← newBChan 256
        let wv = worldView TheWorldView True lw nil
@@ -48,7 +49,7 @@ main
 
 handleWorldEvents ∷ World w ⇒ n → w → BChan (AppEvent n) → IO ()
 handleWorldEvents n w evChan
-  = do e' ← waitForEvent w
+  = do e' ← runLift $ waitForEvent w
        case e' of
          Just e  → dispatch ed e *> handleWorldEvents n w evChan
          Nothing → return ()
