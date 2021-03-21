@@ -29,6 +29,7 @@ library
     Game.AcidRain.World.Position
     Game.AcidRain.World.Tile
     Game.AcidRain.World.Tile.Registry
+    Numeric.Noise.OpenSimplex
 
   other-modules:
     Data.Upcastable
