@@ -19,7 +19,7 @@ import Game.AcidRain.TUI.Widgets.WorldView
   ( WorldView, worldView, renderWorldView, redrawWorldView )
 import Game.AcidRain.World (World(..), WorldMode(..){-, WorldStateChanged-})
 import Game.AcidRain.World.Event
-  ( Event, EventDispatcher, EmptyConst, dispatcher, {-addHandler, -}dispatch )
+  ( Event, EventDispatcher, dispatcher, {-addHandler, -}dispatch )
 import Game.AcidRain.World.Local (newWorld)
 import qualified Graphics.Vty as V
 
@@ -54,7 +54,7 @@ handleWorldEvents n w evChan
          Just e  → dispatch ed e *> handleWorldEvents n w evChan
          Nothing → return ()
   where
-    ed ∷ EventDispatcher EmptyConst IO ()
+    ed ∷ EventDispatcher () IO ()
     ed = --addHandler catchWSC $
          dispatcher catchAll
 
