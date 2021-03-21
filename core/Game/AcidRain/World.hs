@@ -1,5 +1,4 @@
 {-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World
@@ -18,9 +17,8 @@ module Game.AcidRain.World
   , UnknownPlayerIDException(..)
   ) where
 
-import Control.Eff (Eff, Lifted, Member)
-import Control.Eff.Exception (Exc)
 import Control.Exception (Exception, SomeException)
+import Control.Monad.IO.Class (MonadIO)
 import Data.Kind (Type)
 import Data.Int (Int64)
 import Data.Typeable (Typeable)
@@ -52,18 +50,18 @@ class World w where
   -- 'WorldStateChanged' events. Unless explicitly stated, most of the
   -- other methods of this class throws exceptions when invoked at a
   -- wrong state.
-  getWorldState ∷ Lifted IO r ⇒ w → Eff r (WorldState (RunningStateT w))
+  getWorldState ∷ MonadIO μ ⇒ w → μ (WorldState (RunningStateT w))
   -- | Block until the next world event is fired, or return 'Nothing'
   -- if these is no chance that any more events can ever fire.
-  waitForEvent ∷ Lifted IO r ⇒ w → Eff r (Maybe SomeEvent)
+  waitForEvent ∷ MonadIO μ ⇒ w → μ (Maybe SomeEvent)
   -- | Lookup a chunk at a certain position if it's available. This
   -- does not block. If the chunk isn't available yet, an event
   -- ChunkArrived will fire later.
-  lookupChunk ∷ Lifted IO r ⇒ w → ChunkPos → Eff r (Maybe Chunk)
+  lookupChunk ∷ MonadIO μ ⇒ w → ChunkPos → μ (Maybe Chunk)
   -- FIXME: Remove this later.
-  ensureChunkExists ∷ Lifted IO r ⇒ w → ChunkPos → Eff r ()
+  ensureChunkExists ∷ MonadIO μ ⇒ w → ChunkPos → μ ()
   -- | Get a player in the world having a given ID.
-  getPlayer ∷ (Member (Exc SomeException) r, Lifted IO r) ⇒ w → PlayerID → Eff r Player
+  getPlayer ∷ MonadIO μ ⇒ w → PlayerID → μ Player
 
 -- | A type-erased 'World'.
 data SomeWorld = ∀w. World w ⇒ SomeWorld !w

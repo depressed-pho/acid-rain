@@ -1,18 +1,15 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE ExplicitNamespaces #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.Module.Builtin.Loader.Tile
   ( loadTiles
   ) where
 
-import Control.Eff (Eff, type (<::))
-import Control.Eff.Exception (Exc)
+import Control.Eff (Eff, Member)
 import Control.Eff.State.Strict (State)
-import Control.Exception (SomeException)
+import Control.Monad.Catch (MonadThrow)
 import Data.Foldable (traverse_)
 import Data.Proxy (Proxy(..))
 import Game.AcidRain.Module.Loader (LoaderContext, registerTile)
@@ -44,7 +41,7 @@ instance Tile (Proxy Water) where
     where
       colour = hsl 195.0 1.0 0.5 -- CSS3 deepskyblue
 
-loadTiles ∷ [State LoaderContext, Exc SomeException] <:: r ⇒ Eff r ()
+loadTiles ∷ (Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ Eff r ()
 loadTiles
   = traverse_ registerTile
     [ upcastTile (Proxy ∷ Proxy Air)

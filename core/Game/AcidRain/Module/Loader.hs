@@ -1,8 +1,5 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE ExplicitNamespaces #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MonoLocalBinds #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.Module.Loader
   ( LoaderContext
@@ -37,10 +34,10 @@ module Game.AcidRain.Module.Loader
   , lcChunkGen
   ) where
 
-import Control.Eff (Eff, Member, type (<::))
-import Control.Eff.Exception (Exc)
+import Control.Eff (Eff, Member, runLift)
+import Control.Eff.Instances ()
 import Control.Eff.State.Strict (State, execState, get, modify)
-import Control.Exception (SomeException)
+import Control.Monad.Catch (MonadThrow)
 import Data.Default (Default(..))
 import Data.Foldable (traverse_, toList)
 import qualified Data.HashMap.Strict as HM
@@ -70,7 +67,7 @@ empty seed
     }
 
 -- | Load a single module.
-loadMod ∷ (Module α, [State LoaderContext, Exc SomeException] <:: r) ⇒ α → Eff r ()
+loadMod ∷ (Module α, Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ α → Eff r ()
 loadMod m
   = do load m
        modify $ lcMods %~ insMod'
@@ -88,15 +85,15 @@ loadMod m
 --
 -- This function only makes sense for client and server
 -- implementations. Modules shouldn't use this.
-loadModules ∷ (Foldable f, Member (Exc SomeException) r)
+loadModules ∷ (Foldable f, MonadThrow μ)
             ⇒ f SomeModule
             → WorldSeed
-            → Eff r LoaderContext
+            → μ LoaderContext
 loadModules mods seed
   = do mods' ← reorderMods mods
-       execState (empty seed) (traverse_ loadMod mods')
+       runLift $ execState (empty seed) (traverse_ loadMod mods')
 
-reorderMods ∷ (Foldable f, Member (Exc SomeException) r) ⇒ f SomeModule → Eff r [SomeModule]
+reorderMods ∷ (Foldable f, MonadThrow μ) ⇒ f SomeModule → μ [SomeModule]
 reorderMods = return . toList -- FIXME: Actually reorder it.
 
 -- | Get the seed of which the world that the modules are being loaded
@@ -117,7 +114,7 @@ putTileRegistry tiles
   = modify $ lcTiles .~ tiles
 
 -- | Register a tile. Throws if it's already been registered.
-registerTile ∷ (Tile τ, [State LoaderContext, Exc SomeException] <:: r) ⇒ τ → Eff r ()
+registerTile ∷ (Tile τ, Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ τ → Eff r ()
 registerTile tile
   = getTileRegistry >>= TR.register tile >>= putTileRegistry
 
@@ -127,7 +124,7 @@ lookupTile tid
   = getTileRegistry >>= return ∘ TR.lookup tid
 
 -- | Get a tile by its ID. Throws if it doesn't exist.
-getTile ∷ [State LoaderContext, Exc SomeException] <:: r ⇒ TileID → Eff r SomeTile
+getTile ∷ (Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ TileID → Eff r SomeTile
 getTile tid
   = getTileRegistry >>= TR.get tid
 
@@ -144,7 +141,7 @@ putEntityRegistry entities
   = modify $ lcEntityTypes .~ entities
 
 -- | Register an entity type. Throws if it's already been registered.
-registerEntityType ∷ (EntityType τ, [State LoaderContext, Exc SomeException] <:: r) ⇒ τ → Eff r ()
+registerEntityType ∷ (EntityType τ, Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ τ → Eff r ()
 registerEntityType et
   = getEntityRegistry >>= ER.register et >>= putEntityRegistry
 
@@ -154,7 +151,7 @@ lookupEntityType etid
   = getEntityRegistry >>= return ∘ ER.lookup etid
 
 -- | Get an entity type by its ID. Throws if it doesn't exist.
-getEntityType ∷ [State LoaderContext, Exc SomeException] <:: r ⇒ EntityTypeID → Eff r SomeEntityType
+getEntityType ∷ (Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ EntityTypeID → Eff r SomeEntityType
 getEntityType etid
   = getEntityRegistry >>= ER.get etid
 

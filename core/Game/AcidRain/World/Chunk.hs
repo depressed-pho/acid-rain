@@ -1,6 +1,4 @@
 {-# LANGUAGE DisambiguateRecordFields #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Chunk
@@ -19,9 +17,8 @@ module Game.AcidRain.World.Chunk
   , entityAt
   ) where
 
-import Control.Eff (Eff, Member)
-import Control.Eff.Exception (Exc)
-import Control.Exception (SomeException, assert)
+import Control.Exception (assert)
+import Control.Monad.Catch (MonadThrow)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Vector.Generic as GV
 import Game.AcidRain.World.Chunk.Palette (TilePalette, indexOf, idOf)
@@ -37,7 +34,7 @@ import Lens.Micro ((&), (^.), (%~))
 import Prelude.Unicode ((∘), (⋅))
 
 
-toIndexed ∷ Member (Exc SomeException) r ⇒ TilePalette → TileState τ → Eff r IndexedTileState
+toIndexed ∷ MonadThrow μ ⇒ TilePalette → TileState τ → μ IndexedTileState
 toIndexed palette (TileState { tsTile, tsValue })
   = do idx ← indexOf (tileID tsTile) palette
        return $ IndexedTileState
@@ -59,12 +56,12 @@ assertValidEntity e c
 
 -- | Create a chunk filled with a single specific tile which is
 -- usually @acid-rain:air@.
-new ∷ Member (Exc SomeException) r
+new ∷ MonadThrow μ
     ⇒ TileRegistry
     → TilePalette
     → EntityCatalogue
     → TileState τ
-    → Eff r Chunk
+    → μ Chunk
 new tReg tPal eCat fill
   = do its ← toIndexed tPal fill
        return $ Chunk
@@ -89,7 +86,7 @@ deleteEntity off c
     c & cEntities %~ HM.delete off
 
 -- | Get a tile state at a given offset in a chunk.
-tileStateAt ∷ Member (Exc SomeException) r ⇒ TileOffset → Chunk → Eff r SomeTileState
+tileStateAt ∷ MonadThrow μ ⇒ TileOffset → Chunk → μ SomeTileState
 tileStateAt off@(TileOffset { x, y, z }) c
   = assertValidOffset off $
     let x'  = fromIntegral x ∷ Int

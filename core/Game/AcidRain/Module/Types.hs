@@ -1,9 +1,7 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE ExplicitNamespaces #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.Module.Types
   ( ModuleID
@@ -13,10 +11,9 @@ module Game.AcidRain.Module.Types
   , LoaderContext(..), lcWorldSeed, lcMods, lcTiles, lcEntityTypes, lcChunkGen
   ) where
 
-import Control.Eff (Eff, type (<::))
-import Control.Eff.Exception (Exc)
+import Control.Eff (Eff, Member)
 import Control.Eff.State.Strict (State)
-import Control.Exception (SomeException)
+import Control.Monad.Catch (MonadThrow)
 import Data.HashMap.Strict (HashMap)
 import Data.Text (Text)
 import Game.AcidRain.World (WorldSeed)
@@ -51,7 +48,7 @@ class Module α where
   -- per the entire process. When a module is to be loaded, it is
   -- guaranteed that all the modules it depends on have already been
   -- loaded. FIXME: dependency resolution
-  load ∷ [State LoaderContext, Exc SomeException] <:: r ⇒ α → Eff r ()
+  load ∷ (Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ α → Eff r ()
 
 -- | A type-erased 'Module'.
 data SomeModule = ∀α. Module α ⇒ SomeModule !α

@@ -23,7 +23,7 @@ library
     base-unicode-symbols ^>= 0.2.4.2,
     brick                ^>= 0.60.2,
     convertible          ^>= 1.1.1.0,
-    extensible-effects   ^>= 5.0.0.1,
+    exceptions           ^>= 0.10.4,
     microlens            ^>= 0.4.12.0,
     microlens-th         ^>= 0.4.3.9,
     text                 ^>= 1.2.4.0,

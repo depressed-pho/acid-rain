@@ -21,9 +21,8 @@ module Game.AcidRain.World.Entity.Registry
   , UnknownEntityTypeIDException(..)
   ) where
 
-import Control.Eff (Eff, Member)
-import Control.Eff.Exception (Exc, throwError)
-import Control.Exception (Exception(..), SomeException)
+import Control.Exception (Exception(..))
+import Control.Monad.Catch (MonadThrow, throwM)
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import Data.MonoTraversable
@@ -53,12 +52,12 @@ empty = EntityRegistry HM.empty
 
 -- | Register an entity type to the registry. Throws if it's already been
 -- registered.
-register ∷ (EntityType τ, Member (Exc SomeException) r) ⇒ τ → EntityRegistry → Eff r EntityRegistry
+register ∷ (EntityType τ, MonadThrow μ) ⇒ τ → EntityRegistry → μ EntityRegistry
 register et (EntityRegistry reg)
   = let etid = entityTypeID et
     in
       case HM.member etid reg of
-        True  → throwError $ toException $ ConflictingEntityTypeIDException etid
+        True  → throwM $ ConflictingEntityTypeIDException etid
         False → return $ EntityRegistry $ HM.insert etid (upcastEntityType et) reg
 
 -- | Lookup an entity type by its ID.
@@ -67,11 +66,11 @@ lookup etid (EntityRegistry reg)
   = HM.lookup etid reg
 
 -- | Get an entity type by its ID. Throws if it doesn't exist.
-get ∷ Member (Exc SomeException) r ⇒ EntityTypeID → EntityRegistry → Eff r SomeEntityType
+get ∷ MonadThrow μ ⇒ EntityTypeID → EntityRegistry → μ SomeEntityType
 get etid reg
   = case lookup etid reg of
       Just et → return et
-      Nothing → throwError $ toException $ UnknownEntityTypeIDException etid
+      Nothing → throwM $ UnknownEntityTypeIDException etid
 
 -- | An exception to be thrown when two entity types with the same ID
 -- is being registered.

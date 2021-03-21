@@ -12,11 +12,10 @@ import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.STM.TBQueue
   ( TBQueue, newTBQueueIO, tryReadTBQueue, readTBQueue, writeTBQueue )
 import Control.Concurrent.STM.TVar (TVar, newTVarIO, readTVar, writeTVar)
-import Control.Eff (Eff, Lifted, lift, run, runLift)
-import Control.Eff.Exception (Exc, runError)
 import Data.Convertible.Base (convert)
 import Control.Exception (Exception(..), SomeException, handle)
 import Control.Monad (void)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.STM (STM, atomically, throwSTM)
 import qualified Data.UUID as U
 import Game.AcidRain.Module (SomeModule)
@@ -95,10 +94,10 @@ instance World LocalWorld where
   type RunningStateT LocalWorld = RunningState
 
   getWorldState
-    = lift ∘ atomically ∘ readTVar ∘ lwState
+    = liftIO ∘ atomically ∘ readTVar ∘ lwState
 
   waitForEvent lw
-    = lift $ atomically $
+    = liftIO $ atomically $
       do ev' ← tryReadTBQueue (lwEvents lw)
          case ev' of
            Just ev → return (Just ev)
@@ -110,18 +109,18 @@ instance World LocalWorld where
                   _            → Just <$> readTBQueue (lwEvents lw)
 
   lookupChunk lw pos
-    = lift $ atomically $
+    = liftIO $ atomically $
       do rs ← assumeRunning lw
          LCM.lookup pos $ rsChunks rs
 
   -- FIXME: Remove this later.
   ensureChunkExists lw pos
-    = lift $ atomically $
+    = liftIO $ atomically $
       do rs ← assumeRunning lw
          void $ LCM.get pos $ rsChunks rs
 
   getPlayer lw pid
-    = lift $ atomically $ assumeRunning lw >>= get'
+    = liftIO $ atomically $ assumeRunning lw >>= get'
     where
       get' rs | U.null pid = case lwMode lw of
                                SinglePlayer →
@@ -144,9 +143,9 @@ instance World LocalWorld where
 
 -- | Create a new world out of thin air. The world will be
 -- asynchronously created on a separate thread.
-newWorld ∷ (Lifted IO r, Foldable f) ⇒ WorldMode → f SomeModule → WorldSeed → Eff r LocalWorld
+newWorld ∷ (Foldable f, MonadIO μ) ⇒ WorldMode → f SomeModule → WorldSeed → μ LocalWorld
 newWorld wm mods seed
-  = lift $
+  = liftIO $
     do ws ← newTVarIO Loading
        es ← newTBQueueIO eventQueueCapacity
        let lw = LocalWorld
@@ -155,16 +154,16 @@ newWorld wm mods seed
                 , lwState  = ws
                 , lwEvents = es
                 }
-       void $ forkIO $ runLift (newWorld' lw) >> runWorld lw
+       void $ forkIO $ newWorld' lw >> runWorld lw
        return lw
   where
-    newWorld' ∷ Lifted IO r ⇒ LocalWorld → Eff r ()
+    newWorld' ∷ LocalWorld → IO ()
     newWorld' lw
       = catchWhileLoading lw $
-        do rs ← lift $ atomically $
+        do rs ← atomically $
                 do -- The first thing we need to do is to load
                    -- modules. This can of course fail.
-                   lc  ← runErrorInSTM $ loadModules mods seed
+                   lc  ← loadModules mods seed
                    -- From now on we enter into an STM transaction. In
                    -- order to construct the LCM, we need a tile
                    -- palette. Constructing a tile palette never fails
@@ -190,7 +189,7 @@ newWorld wm mods seed
                      { rsChunks  = lcm
                      , rsPlayers = lpm
                      }
-           lift $ atomically $
+           atomically $
              do case wm of
                   SinglePlayer → void $ newPlayer U.nil Administrator rs
                   _            → return ()
@@ -198,18 +197,12 @@ newWorld wm mods seed
                 -- change the state.
                 changeState lw $ Running rs
 
-runErrorInSTM ∷ Exception e ⇒ Eff '[Exc e] α → STM α
-runErrorInSTM m
-  = case run (runError m) of
-      Right a → return a
-      Left  e → throwSTM e
-
-catchWhileLoading ∷ Lifted IO r ⇒ LocalWorld → Eff (Exc SomeException : r) () → Eff r ()
-catchWhileLoading lw m
-  = do a ← runError m
-       case a of
-         Right () → return ()
-         Left e   → lift $ atomically $ changeState lw $ LoadFailed e
+catchWhileLoading ∷ LocalWorld → IO () → IO ()
+catchWhileLoading lw a
+  = handle f a
+  where
+    f ∷ SomeException → IO ()
+    f = atomically ∘ changeState lw ∘ LoadFailed ∘ toException
 
 catchWhileRunning ∷ LocalWorld → IO () → IO ()
 catchWhileRunning lw a

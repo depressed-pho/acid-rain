@@ -13,10 +13,10 @@ module Game.AcidRain.World.Chunk.Generator
   , generateChunk
   ) where
 
-import Control.Eff (Eff, Lift, Lifted, Member, lift, runLift)
-import Control.Eff.Exception (Exc)
+import Control.Eff (Eff, Lift, runLift)
 import Control.Eff.State.Strict (State, execState)
-import Control.Exception (SomeException)
+import Control.Monad.Catch (MonadThrow)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Primitive (PrimMonad(..))
 import Data.Default (Default(..))
 import qualified Game.AcidRain.World.Chunk as C
@@ -72,22 +72,22 @@ instance Default ChunkGenerator where
 
 -- | Generate a chunk by running a chunk generator. Only useful for
 -- server implementations.
-generateChunk ∷ (Member (Exc SomeException) r, Lifted IO r)
+generateChunk ∷ (MonadThrow μ, MonadIO μ)
               ⇒ TileRegistry
               → TilePalette
               → EntityCatalogue
               → ChunkGenerator
               → ChunkPos
-              → Eff r Chunk
+              → μ Chunk
 generateChunk tReg tPal eCat cGen cPos
   = do air  ← TR.get "acid-rain:dirt" tReg
        c    ← C.new tReg tPal eCat (defaultState air)
-       mc   ← lift $ thawChunk c
+       mc   ← liftIO $ thawChunk c
        let cgs = ChunkGenState
                  { _cgPos   = cPos
                  , _cgChunk = mc
                  }
-       cgs' ← lift $ runLift $ execState cgs $
+       cgs' ← liftIO $ runLift $ execState cgs $
               do cGen^.terraform
                  cGen^.decorate
-       lift $ freezeChunk $ cgs'^.cgChunk
+       liftIO $ freezeChunk $ cgs'^.cgChunk

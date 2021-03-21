@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Chunk.Palette
   ( -- * Types
@@ -21,9 +20,8 @@ module Game.AcidRain.World.Chunk.Palette
   , UnknownTileIndexException(..)
   ) where
 
-import Control.Eff (Eff, Member)
-import Control.Eff.Exception (Exc, throwError)
-import Control.Exception (Exception(..), SomeException)
+import Control.Exception (Exception(..))
+import Control.Monad.Catch (MonadThrow, throwM)
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import Data.Map.Strict (Map)
@@ -95,18 +93,18 @@ insert tid p
           }
 
 -- | Find a tile index by a tile ID.
-indexOf ∷ Member (Exc SomeException) r ⇒ TileID → TilePalette → Eff r TileIndex
+indexOf ∷ MonadThrow μ ⇒ TileID → TilePalette → μ TileIndex
 indexOf tid p
   = case HM.lookup tid $ indexOf' p of
       Just idx → return idx
-      Nothing  → throwError $ toException $ UnknownTileIDException tid
+      Nothing  → throwM $ UnknownTileIDException tid
 
 -- | Find a tile ID by a tile index.
-idOf ∷ Member (Exc SomeException) r ⇒ TileIndex → TilePalette → Eff r TileID
+idOf ∷ MonadThrow μ ⇒ TileIndex → TilePalette → μ TileID
 idOf idx p
   = case M.lookup idx $ idOf' p of
       Just tid → return tid
-      Nothing  → throwError $ toException $ UnknownTileIndexException idx
+      Nothing  → throwM $ UnknownTileIndexException idx
 
 -- | An exception to be thrown when there was no tile ID having the
 -- given index.
