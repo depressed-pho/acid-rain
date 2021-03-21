@@ -2,8 +2,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE UnicodeSyntax #-}
--- | Orphan instances for the 'Eff' monad.
-module Control.Eff.Instances () where
+-- | Orphan instance of 'MonadThrow' for the 'Eff' monad.
+module Control.Eff.Instances.Catch () where
 
 import Control.Eff (Eff, Lifted, lift)
 import Control.Monad.Catch (MonadThrow(..))

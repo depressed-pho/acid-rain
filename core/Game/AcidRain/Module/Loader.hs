@@ -35,7 +35,7 @@ module Game.AcidRain.Module.Loader
   ) where
 
 import Control.Eff (Eff, Member, runLift)
-import Control.Eff.Instances ()
+import Control.Eff.Instances.Catch ()
 import Control.Eff.State.Strict (State, execState, get, modify)
 import Control.Monad.Catch (MonadThrow)
 import Data.Default (Default(..))

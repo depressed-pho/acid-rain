@@ -13,7 +13,7 @@ extra-source-files:  CHANGELOG.md
 
 library
   exposed-modules:
-    Control.Eff.Instances
+    Control.Eff.Instances.Catch
     Game.AcidRain.Module
     Game.AcidRain.Module.Loader
     Game.AcidRain.TUI
