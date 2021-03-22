@@ -20,8 +20,8 @@ module Numeric.Noise.OpenSimplex
   , mkSimplexGen
 
     -- * Generating noise
-  , noise2D
-  , noise3D
+  , simplex2D
+  , simplex3D
   ) where
 
 import Control.Monad.ST (ST, runST)
@@ -52,7 +52,7 @@ data SimplexGen
 
 makeLenses ''SimplexGen
 
--- | Class of types that can be a result value of 'noise2D'.
+-- | Class of types that can be a result value of 'simplex2D'.
 class (Default α, Floating (BaseType α), RealFrac (BaseType α), UV.Unbox (BaseType α)) ⇒ Noise2D α where
   type BaseType α ∷ Type
   accumulate ∷ Integral i
@@ -442,8 +442,8 @@ lookup3D = runST $
     {-# NOINLINE contributions3D #-}
     contributions3D
       = runST $
-        do mv ∷ BV.MVector σ (Contribution3D' σ i r)
-             ← GMV.unsafeNew (GV.length p3D `div` 9)
+        do mv ← GMV.unsafeNew (GV.length p3D `div` 9)
+                ∷ ST σ (BV.MVector σ (Contribution3D' σ i r))
            for_ [0, 9 .. (GV.length p3D) - 1] $ \i →
              do let baseSet = base3D GV.! fromIntegral (p3D GV.! i)
                 previous ← newSTRef Nothing
@@ -479,12 +479,12 @@ lookup3D = runST $
                 contribution3D cont
 
 -- | Construct an OpenSimplex noise generator with a given 64-bits
--- seed. Since this is a quite expensive operation, one should reuse
+-- seed. Since this is quite an expensive operation, one should reuse
 -- generators as far as possible.
 mkSimplexGen ∷ Int64 → SimplexGen
 mkSimplexGen seed
   = runST $
-    do source ∷ UV.MVector σ Int ← GMV.unsafeNew 1024
+    do source ← GMV.unsafeNew 1024 ∷ ST σ (UV.MVector σ Int)
        for_ [0 .. 1023] $ \i → GMV.write source i i
 
        perm       ← GMV.unsafeNew 1024
@@ -529,15 +529,15 @@ floorAndAbsFrac r
        else (n  , abs f)
 
 -- | 2D OpenSimplex noise (KdotJPG)
-noise2D ∷ (Noise2D α, BaseType α ~ r)
-        ⇒ SimplexGen
-        → r -- ^ x
-        → r -- ^ y
-        → α
-{-# SPECIALISE noise2D ∷ SimplexGen → Double → Double → Scalar     Double #-}
-{-# SPECIALISE noise2D ∷ SimplexGen → Double → Double → Disk       Double #-}
-{-# SPECIALISE noise2D ∷ SimplexGen → Double → Double → Derivative Double #-}
-noise2D gen x y
+simplex2D ∷ (Noise2D α, BaseType α ~ r)
+          ⇒ SimplexGen
+          → r -- ^ x
+          → r -- ^ y
+          → α
+{-# SPECIALISE simplex2D ∷ SimplexGen → Double → Double → Scalar     Double #-}
+{-# SPECIALISE simplex2D ∷ SimplexGen → Double → Double → Disk       Double #-}
+{-# SPECIALISE simplex2D ∷ SimplexGen → Double → Double → Derivative Double #-}
+simplex2D gen x y
   =     -- Get points for A2 lattice
     let s  = stretch2D ⋅ (x + y)
         xs = x + s
@@ -582,14 +582,14 @@ noise2D gen x y
       accum 0 def
 
 -- | 3D OpenSimplex Noise (DigitalShadow)
-noise3D ∷ (Floating r, RealFrac r, UV.Unbox r)
-        ⇒ SimplexGen
-        → r -- ^ x
-        → r -- ^ y
-        → r -- ^ z
-        → r
-{-# SPECIALISE noise3D ∷ SimplexGen → Double → Double → Double → Double #-}
-noise3D gen x y z
+simplex3D ∷ (Floating r, RealFrac r, UV.Unbox r)
+          ⇒ SimplexGen
+          → r -- ^ x
+          → r -- ^ y
+          → r -- ^ z
+          → r
+{-# SPECIALISE simplex3D ∷ SimplexGen → Double → Double → Double → Double #-}
+simplex3D gen x y z
   = let stretchOffset = (x + y + z) ⋅ stretch3D
         xs = x + stretchOffset
         ys = y + stretchOffset

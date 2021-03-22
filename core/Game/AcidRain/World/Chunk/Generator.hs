@@ -10,13 +10,16 @@ module Game.AcidRain.World.Chunk.Generator
   ( ChunkGenerator(..), terraform, decorate
   , ChunkGenM
 
+    -- * Querying state
+  , chunkPos
+
     -- * Running chunk generators
   , generateChunk
   ) where
 
-import Control.Eff (Eff, Lift, runLift)
+import Control.Eff (Eff, Lift, Lifted, lift, runLift)
 import Control.Eff.Instances.Catch ()
-import Control.Eff.State.Strict (State, execState)
+import Control.Eff.State.Strict (State, execState, get)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Primitive (PrimMonad(..))
@@ -33,10 +36,10 @@ import qualified Game.AcidRain.World.Tile.Registry as TR
 import Lens.Micro ((^.))
 import Lens.Micro.TH (makeLenses)
 
-data ChunkGenState σ
+data ChunkGenState
   = ChunkGenState
     { _cgPos   ∷ ChunkPos
-    , _cgChunk ∷ MutableChunk σ
+    , _cgChunk ∷ MutableChunk (PrimState IO)
     }
 
 makeLenses ''ChunkGenState
@@ -47,7 +50,7 @@ newtype ChunkGenM α
   -- The fact it's actually a lifted IO monad is totally an
   -- implementation detail. We just need some PrimMonad to mutate
   -- vectors but we don't want to expose that to outside.
-  = ChunkGenM { runChunkGenM ∷ Eff '[State (ChunkGenState (PrimState IO)), Lift IO] α }
+  = ChunkGenM { runChunkGenM ∷ Eff '[State ChunkGenState, Lift IO] α }
   deriving (Functor, Applicative, Monad, MonadThrow)
 
 -- | Chunks start with an empty state where every tile position is
@@ -80,6 +83,10 @@ instance Default ChunkGenerator where
         { _terraform = return ()
         , _decorate  = return ()
         }
+
+-- | Query the position of the chunk to generate.
+chunkPos ∷ Lifted ChunkGenM r ⇒ Eff r ChunkPos
+chunkPos = lift $ ChunkGenM $ (^.cgPos) <$> get
 
 -- | Generate a chunk by running a chunk generator. Only useful for
 -- server implementations.
