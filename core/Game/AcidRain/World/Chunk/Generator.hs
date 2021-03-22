@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -7,13 +8,14 @@
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Chunk.Generator
   ( ChunkGenerator(..), terraform, decorate
-  , ChunkGenState
+  , ChunkGenM
 
     -- * Running chunk generators
   , generateChunk
   ) where
 
 import Control.Eff (Eff, Lift, runLift)
+import Control.Eff.Instances.Catch ()
 import Control.Eff.State.Strict (State, execState)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO, liftIO)
@@ -31,13 +33,22 @@ import qualified Game.AcidRain.World.Tile.Registry as TR
 import Lens.Micro ((^.))
 import Lens.Micro.TH (makeLenses)
 
-data ChunkGenState
+data ChunkGenState σ
   = ChunkGenState
     { _cgPos   ∷ ChunkPos
-    , _cgChunk ∷ MutableChunk (PrimState IO)
+    , _cgChunk ∷ MutableChunk σ
     }
 
 makeLenses ''ChunkGenState
+
+-- | The 'ChunkGen' monad is essentially a state monad for
+-- manipulating chunks efficiently.
+newtype ChunkGenM α
+  -- The fact it's actually a lifted IO monad is totally an
+  -- implementation detail. We just need some PrimMonad to mutate
+  -- vectors but we don't want to expose that to outside.
+  = ChunkGenM { runChunkGenM ∷ Eff '[State (ChunkGenState (PrimState IO)), Lift IO] α }
+  deriving (Functor, Applicative, Monad, MonadThrow)
 
 -- | Chunks start with an empty state where every tile position is
 -- filled with @acid-rain:air@ and no entities exist. The task of
@@ -58,8 +69,8 @@ makeLenses ''ChunkGenState
 -- usually undesirable though.
 data ChunkGenerator
   = ChunkGenerator
-    { _terraform ∷ Eff '[State (ChunkGenState), Lift IO] ()
-    , _decorate  ∷ Eff '[State (ChunkGenState), Lift IO] ()
+    { _terraform ∷ Eff '[Lift ChunkGenM] ()
+    , _decorate  ∷ Eff '[Lift ChunkGenM] ()
     }
 
 makeLenses ''ChunkGenerator
@@ -87,7 +98,7 @@ generateChunk tReg tPal eCat cGen cPos
                  { _cgPos   = cPos
                  , _cgChunk = mc
                  }
-       cgs' ← liftIO $ runLift $ execState cgs $
+       cgs' ← liftIO $ runLift $ execState cgs $ runChunkGenM $ runLift $
               do cGen^.terraform
                  cGen^.decorate
        liftIO $ freezeChunk $ cgs'^.cgChunk
