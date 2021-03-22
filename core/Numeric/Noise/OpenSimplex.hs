@@ -11,7 +11,7 @@
 module Numeric.Noise.OpenSimplex
   ( -- * Types
     SimplexGen
-  , Noise2D(..)
+  , Simplex2D(..)
   , Scalar(..), scalar
   , Disk(..), diskX, diskY
   , Derivative(..), dx, dy
@@ -53,7 +53,7 @@ data SimplexGen
 makeLenses ''SimplexGen
 
 -- | Class of types that can be a result value of 'simplex2D'.
-class (Default α, Floating (BaseType α), RealFrac (BaseType α), UV.Unbox (BaseType α)) ⇒ Noise2D α where
+class (Default α, Floating (BaseType α), RealFrac (BaseType α), UV.Unbox (BaseType α)) ⇒ Simplex2D α where
   type BaseType α ∷ Type
   accumulate ∷ Integral i
              ⇒ α
@@ -303,8 +303,8 @@ gradients3D
 instance Num r ⇒ Default (Scalar r) where
   def = Scalar 0
 
-instance (Floating r, RealFrac r, UV.Unbox r) ⇒ Noise2D (Scalar r) where
-  {-# SPECIALISE instance Noise2D (Scalar Double) #-}
+instance (Floating r, RealFrac r, UV.Unbox r) ⇒ Simplex2D (Scalar r) where
+  {-# SPECIALISE instance Simplex2D (Scalar Double) #-}
   type BaseType (Scalar r) = r
   accumulate v attn extrp _ _ _ _ _
     = let attnSq = attn ⋅ attn
@@ -315,8 +315,8 @@ instance (Floating r, RealFrac r, UV.Unbox r) ⇒ Noise2D (Scalar r) where
 instance Num r ⇒ Default (Disk r) where
   def = Disk 0 0
 
-instance (Floating r, RealFrac r, UV.Unbox r) ⇒ Noise2D (Disk r) where
-  {-# SPECIALISE instance Noise2D (Disk Double) #-}
+instance (Floating r, RealFrac r, UV.Unbox r) ⇒ Simplex2D (Disk r) where
+  {-# SPECIALISE instance Simplex2D (Disk Double) #-}
   type BaseType (Disk r) = r
   accumulate v attn extrp _ _ gi_sph2 _ _
     = let attnSq = attn ⋅ attn
@@ -328,8 +328,8 @@ instance (Floating r, RealFrac r, UV.Unbox r) ⇒ Noise2D (Disk r) where
 instance Num r ⇒ Default (Derivative r) where
   def = Derivative 0 0
 
-instance (Floating r, RealFrac r, UV.Unbox r) ⇒ Noise2D (Derivative r) where
-  {-# SPECIALISE instance Noise2D (Derivative Double) #-}
+instance (Floating r, RealFrac r, UV.Unbox r) ⇒ Simplex2D (Derivative r) where
+  {-# SPECIALISE instance Simplex2D (Derivative Double) #-}
   type BaseType (Derivative r) = r
   accumulate v attn extrp gx gy _ dx' dy'
     = let attnSq = attn ⋅ attn
@@ -529,7 +529,7 @@ floorAndAbsFrac r
        else (n  , abs f)
 
 -- | 2D OpenSimplex noise (KdotJPG)
-simplex2D ∷ (Noise2D α, BaseType α ~ r)
+simplex2D ∷ (Simplex2D α, BaseType α ~ r)
           ⇒ SimplexGen
           → r -- ^ x
           → r -- ^ y
