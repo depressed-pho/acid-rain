@@ -6,9 +6,11 @@ module Game.AcidRain.Module.Builtin.ChunkGen
   ( terraform
   ) where
 
-import Control.Eff (Eff, Lifted)
+import Control.Eff (Eff, Lifted, Member)
+import Control.Eff.Reader.Lazy (Reader)
+import Game.AcidRain.Module.Builtin.ChunkGen.WorldInfo (WorldInfo)
 import Game.AcidRain.World.Chunk.Generator (ChunkGenM)
 
 
-terraform ∷ Lifted ChunkGenM r ⇒ Eff r ()
+terraform ∷ (Member (Reader WorldInfo) r, Lifted ChunkGenM r) ⇒ Eff r ()
 terraform = return ()

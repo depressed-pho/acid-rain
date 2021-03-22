@@ -6,12 +6,14 @@ module Game.AcidRain.Module.Builtin
   ( BuiltinModule
   ) where
 
+import Control.Eff.Reader.Lazy (runReader)
 import Data.Proxy (Proxy)
 import qualified Game.AcidRain.Module.Builtin.ChunkGen as CG
+import Game.AcidRain.Module.Builtin.ChunkGen.WorldInfo (worldInfo)
 import Game.AcidRain.Module (Module(..))
 import Game.AcidRain.Module.Builtin.Loader.Entity (loadEntities)
 import Game.AcidRain.Module.Builtin.Loader.Tile (loadTiles)
-import Game.AcidRain.Module.Loader (modifyChunkGenerator)
+import Game.AcidRain.Module.Loader (getWorldSeed, modifyChunkGenerator)
 import Game.AcidRain.World.Chunk.Generator (terraform)
 import Lens.Micro ((%~))
 
@@ -25,5 +27,6 @@ instance Module (Proxy BuiltinModule) where
   load _
     = do loadTiles
          loadEntities
+         wi ← worldInfo <$> getWorldSeed
          modifyChunkGenerator $
-           terraform %~ (>> CG.terraform)
+           terraform %~ (>> runReader wi CG.terraform)
