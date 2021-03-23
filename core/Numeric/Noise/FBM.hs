@@ -23,6 +23,8 @@ fBm ∷ (Num r, Integral i)
     → r
 {-# INLINEABLE fBm #-}
 {-# SPECIALISE fBm
+    ∷ (Float  → v → v) → (v → Float ) → Int → Float  → Float  → Float  → Float  → v → Float  #-}
+{-# SPECIALISE fBm
     ∷ (Double → v → v) → (v → Double) → Int → Double → Double → Double → Double → v → Double #-}
 fBm scale noise oct amp0 gain freq0 lac vec = go amp0 freq0 0 0
   where

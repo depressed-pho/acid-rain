@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnicodeSyntax #-}
@@ -8,13 +10,20 @@ module Game.AcidRain.World.Chunk.Types
   , chunkSize
   , chunkHeight
 
+  , assertValidOffset
+  , assertValidEntity
+
   , IndexedTileState(..)
   , Chunk(..), cTileReg, cTilePal, cTiles, cClimates, cEntCat, cEntities
   , MutableChunk(..), mcTileReg, mcTilePal, mcClimates, mcTiles, mcEntCat, mcEntities
+
   , freezeChunk
   , thawChunk
+
+  , writeClimate
   ) where
 
+import Control.Exception (assert)
 import Control.Monad.Primitive (PrimMonad, PrimState)
 import Data.Convertible.Base (Convertible(..))
 import Data.HashMap.Strict (HashMap)
@@ -26,14 +35,14 @@ import Data.Word (Word8)
 import GHC.Generics (Generic)
 import Game.AcidRain.World.Chunk.Palette (TilePalette, TileIndex)
 import Game.AcidRain.World.Climate (Climate)
-import Game.AcidRain.World.Entity (SomeEntity)
-import Game.AcidRain.World.Entity.Catalogue (EntityCatalogue)
+import Game.AcidRain.World.Entity (EntityType(..), Entity(..), SomeEntity)
+import Game.AcidRain.World.Entity.Catalogue (EntityCatalogue, (∈))
 import Game.AcidRain.World.Position (WorldPos(..), wpX, wpY, wpZ)
 import Game.AcidRain.World.Tile (TileStateValue)
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
 import Lens.Micro.TH (makeLenses)
 import Lens.Micro ((^.))
-import Prelude.Unicode ((∘))
+import Prelude.Unicode ((∘), (⋅))
 
 
 -- | Unlike Minecraft our chunks are only two blocks tall so we can
@@ -131,6 +140,18 @@ data MutableChunk σ
 
 makeLenses ''MutableChunk
 
+-- | Assert that the given offset is valid.
+assertValidOffset ∷ TileOffset → α → α
+assertValidOffset (TileOffset { x, y, z })
+  = assert (x < chunkSize) ∘
+    assert (y < chunkSize) ∘
+    assert (z < chunkHeight)
+
+-- | Assert that the given entity is in the catalogue.
+assertValidEntity ∷ Entity ε ⇒ ε → Chunk → α → α
+assertValidEntity e c
+  = assert (entityTypeID (entityType e) ∈ c^.cEntCat)
+
 freezeChunk ∷ PrimMonad μ ⇒ MutableChunk (PrimState μ) → μ Chunk
 freezeChunk mc
   = do tiles    ← GV.freeze $ mc^.mcTiles
@@ -156,3 +177,11 @@ thawChunk c
          , _mcEntCat   = c^.cEntCat
          , _mcEntities = c^.cEntities
          }
+
+writeClimate ∷ PrimMonad μ ⇒ TileOffset → Climate → MutableChunk (PrimState μ) → μ ()
+writeClimate off@(TileOffset { x, y, .. }) cli mc
+  = assertValidOffset off $
+    let x' = fromIntegral x ∷ Int
+        y' = fromIntegral y ∷ Int
+    in
+      GMV.write (mc^.mcClimates) (y'⋅chunkSize + x') cli

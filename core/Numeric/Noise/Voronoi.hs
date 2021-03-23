@@ -56,6 +56,7 @@ data Voronoi2D r
     } deriving Show
 
 instance Fractional r ⇒ Default (Voronoi2D r) where
+  {-# SPECIALISE instance Default (Voronoi2D Float ) #-}
   {-# SPECIALISE instance Default (Voronoi2D Double) #-}
   def = Voronoi2D
         { v2dShortestDistanceSq = 1 / 0 -- Infinity
@@ -75,7 +76,8 @@ minDistanceSq = 0.005
 -- | Construct a Voronoi noise generator with a given 64-bits
 -- seed. Since this is quite an expensive operation, one should reuse
 -- generators as far as possible.
-mkVoronoiGen ∷ (Floating r, Ord r, UV.Unbox r, UniformRange r) ⇒ Int64 → VoronoiGen r
+mkVoronoiGen ∷ (Hashable h, Floating r, Ord r, UV.Unbox r, UniformRange r) ⇒ h → VoronoiGen r
+{-# SPECIALISE mkVoronoiGen ∷ Int64 → VoronoiGen Float  #-}
 {-# SPECIALISE mkVoronoiGen ∷ Int64 → VoronoiGen Double #-}
 mkVoronoiGen seed
   = runST $
@@ -112,6 +114,8 @@ minimalToroidalDistanceSquared ∷ (Floating r, Ord r, GMV.MVector v (r, r), Mon
                                → v σ (r, r)
                                → Int → μ r
 {-# SPECIALISE minimalToroidalDistanceSquared
+    ∷ (Float , Float ) → UV.MVector σ (Float , Float ) → Int → ST σ Float  #-}
+{-# SPECIALISE minimalToroidalDistanceSquared
     ∷ (Double, Double) → UV.MVector σ (Double, Double) → Int → ST σ Double #-}
 minimalToroidalDistanceSquared point existing numPoints = go 0 1.0
   where
@@ -124,6 +128,8 @@ minimalToroidalDistanceSquared point existing numPoints = go 0 1.0
                                | otherwise       → go (i + 1) result
 
 toroidalDistanceSquared ∷ (Floating r, Ord r) ⇒ (r, r) → (r, r) → r
+{-# SPECIALISE toroidalDistanceSquared
+    ∷ (Float , Float ) → (Float , Float ) → Float  #-}
 {-# SPECIALISE toroidalDistanceSquared
     ∷ (Double, Double) → (Double, Double) → Double #-}
 toroidalDistanceSquared (x0, y0) (x1, y1)
@@ -143,6 +149,7 @@ voronoi2D ∷ (Floating r, RealFrac r, UV.Unbox r)
           → r -- ^ x
           → r -- ^ y
           → Voronoi2D r
+{-# SPECIALISE voronoi2D ∷ VoronoiGen Float  → Float  → Float  → Voronoi2D Float  #-}
 {-# SPECIALISE voronoi2D ∷ VoronoiGen Double → Double → Double → Voronoi2D Double #-}
 voronoi2D gen x0 y0
   = run $ execState def $
@@ -208,6 +215,7 @@ areaPoints ∷ (Integral i, Floating r, Hashable i, UV.Unbox r)
            ⇒ VoronoiGen r
            → (i, i) -- ^ area
            → UV.Vector (r, r)
+{-# SPECIALISE areaPoints ∷ VoronoiGen Float  → (Int, Int) → UV.Vector (Float , Float ) #-}
 {-# SPECIALISE areaPoints ∷ VoronoiGen Double → (Int, Int) → UV.Vector (Double, Double) #-}
 areaPoints gen area@(areaX, areaY)
   = runST $
@@ -245,6 +253,8 @@ evalPoint ∷ ∀r. (Floating r, Ord r, UV.Unbox r)
           → Voronoi2D r
           → Voronoi2D r
 {-# SPECIALISE evalPoint
+    ∷ UV.Vector (Float , Float ) → (Float , Float ) → Voronoi2D Float  → Voronoi2D Float  #-}
+{-# SPECIALISE evalPoint
     ∷ UV.Vector (Double, Double) → (Double, Double) → Voronoi2D Double → Voronoi2D Double #-}
 evalPoint points (x, y) res0 = GV.foldl' update res0 points
   where
@@ -268,12 +278,14 @@ evalPoint points (x, y) res0 = GV.foldl' update res0 points
 
 -- | Return 0 in the middle of a cell and 1 on the border.
 borderValue ∷ Fractional r ⇒ Voronoi2D r → r
+{-# SPECIALISE borderValue ∷ Voronoi2D Float  → Float  #-}
 {-# SPECIALISE borderValue ∷ Voronoi2D Double → Double #-}
 borderValue res
   = (v2dShortestDistanceSq res) / (v2dNextDistanceSq res)
 
 -- | Return 1 in the middle of a cell and 0 on the border.
 interiorValue ∷ Fractional r ⇒ Voronoi2D r → r
+{-# SPECIALISE interiorValue ∷ Voronoi2D Float  → Float  #-}
 {-# SPECIALISE interiorValue ∷ Voronoi2D Double → Double #-}
 interiorValue res
   = (v2dNextDistanceSq res - v2dShortestDistanceSq res) / (v2dNextDistanceSq res)

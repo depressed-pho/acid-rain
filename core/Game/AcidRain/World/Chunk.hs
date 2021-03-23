@@ -17,7 +17,6 @@ module Game.AcidRain.World.Chunk
   , entityAt
   ) where
 
-import Control.Exception (assert)
 import Control.Monad.Catch (MonadThrow)
 import Data.Default (Default(..))
 import qualified Data.HashMap.Strict as HM
@@ -25,14 +24,15 @@ import qualified Data.Vector.Generic as GV
 import Game.AcidRain.World.Chunk.Palette (TilePalette, indexOf, idOf)
 import Game.AcidRain.World.Chunk.Types
   ( Chunk(..), TileOffset(..), IndexedTileState(..)
-  , cTileReg, cTilePal, cTiles, cEntCat, cEntities, chunkSize, chunkHeight )
-import Game.AcidRain.World.Entity (EntityType(..), Entity(..), SomeEntity)
-import Game.AcidRain.World.Entity.Catalogue (EntityCatalogue, (∈))
+  , cTileReg, cTilePal, cTiles, cEntities, chunkSize, chunkHeight
+  , assertValidOffset, assertValidEntity )
+import Game.AcidRain.World.Entity (Entity(..), SomeEntity)
+import Game.AcidRain.World.Entity.Catalogue (EntityCatalogue)
 import Game.AcidRain.World.Tile (Tile(..), TileState(..), SomeTileState)
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
 import qualified Game.AcidRain.World.Tile.Registry as TR
 import Lens.Micro ((&), (^.), (%~))
-import Prelude.Unicode ((∘), (⋅))
+import Prelude.Unicode ((⋅))
 
 
 toIndexed ∷ MonadThrow μ ⇒ TilePalette → TileState τ → μ IndexedTileState
@@ -42,18 +42,6 @@ toIndexed palette (TileState { tsTile, tsValue })
          { itsIndex = idx
          , itsValue = tsValue
          }
-
--- Assert that the given offset is valid.
-assertValidOffset ∷ TileOffset → α → α
-assertValidOffset (TileOffset { x, y, z })
-  = assert (x < chunkSize) ∘
-    assert (y < chunkSize) ∘
-    assert (z < chunkHeight)
-
--- Assert that the given entity is in the catalogue.
-assertValidEntity ∷ Entity ε ⇒ ε → Chunk → α → α
-assertValidEntity e c
-  = assert (entityTypeID (entityType e) ∈ c^.cEntCat)
 
 -- | Create a chunk filled with a single specific tile which is
 -- usually @acid-rain:air@.
@@ -68,8 +56,8 @@ new tReg tPal eCat fill
        return $ Chunk
          { _cTileReg  = tReg
          , _cTilePal  = tPal
-         , _cTiles    = GV.replicate (chunkSize ⋅ chunkSize ⋅ chunkHeight) its
-         , _cClimates = GV.replicate (chunkSize ⋅ chunkSize) def
+         , _cTiles    = GV.replicate (chunkSize⋅chunkSize⋅chunkHeight) its
+         , _cClimates = GV.replicate (chunkSize⋅chunkSize) def
          , _cEntCat   = eCat
          , _cEntities = HM.empty
          }
@@ -94,7 +82,7 @@ tileStateAt off@(TileOffset { x, y, z }) c
     let x'  = fromIntegral x ∷ Int
         y'  = fromIntegral y ∷ Int
         z'  = fromIntegral z ∷ Int
-        its = (c^.cTiles) GV.! (z' ⋅ chunkHeight ⋅ chunkSize + y' ⋅ chunkSize + x')
+        its = (c^.cTiles) GV.! (y'⋅chunkHeight⋅chunkSize + x'⋅chunkHeight + z')
     in
       do tid  ← idOf (itsIndex its) (c^.cTilePal)
          tile ← TR.get tid (c^.cTileReg)

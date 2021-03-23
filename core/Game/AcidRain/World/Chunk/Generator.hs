@@ -14,6 +14,10 @@ module Game.AcidRain.World.Chunk.Generator
   , chunkPos
   , tileRegistry
 
+    -- * Modifying state
+  --, putTileState
+  , putClimate
+
     -- * Running chunk generators
   , generateChunk
   ) where
@@ -26,10 +30,12 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Primitive (PrimMonad(..))
 import Data.Default (Default(..))
 import qualified Game.AcidRain.World.Chunk as C
-import Game.AcidRain.World.Chunk.Types (mcTileReg, freezeChunk, thawChunk)
+import Game.AcidRain.World.Chunk.Types
+  (TileOffset, mcTileReg, freezeChunk, thawChunk, writeClimate )
 import Game.AcidRain.World.Chunk.Palette (TilePalette)
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
 import Game.AcidRain.World.Chunk.Types (Chunk, MutableChunk)
+import Game.AcidRain.World.Climate (Climate)
 import Game.AcidRain.World.Entity.Catalogue (EntityCatalogue)
 import Game.AcidRain.World.Tile (defaultState)
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
@@ -93,6 +99,13 @@ chunkPos = lift $ ChunkGenM $ (^.cgPos) <$> get
 -- generated.
 tileRegistry ∷ Lifted ChunkGenM r ⇒ Eff r TileRegistry
 tileRegistry = lift $ ChunkGenM $ (^.cgChunk.mcTileReg) <$> get
+
+-- | Put a climate value at a given tile offset.
+putClimate ∷ Lifted ChunkGenM r ⇒ TileOffset → Climate → Eff r ()
+putClimate off cli
+  = lift $ ChunkGenM $
+    do mc ← (^.cgChunk) <$> get
+       lift $ writeClimate off cli mc
 
 -- | Generate a chunk by running a chunk generator. Only useful for
 -- server implementations.

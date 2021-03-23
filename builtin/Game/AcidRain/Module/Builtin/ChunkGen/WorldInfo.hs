@@ -31,6 +31,8 @@ data WorldInfo
       -- no enhancements. Higher values turn the height exponentially
       -- close to zero.
     , wiMountainExp ∷ Double
+      -- | The size of biomes.
+    , wiBiomeSize ∷ !Double
       -- | The large bend size of rivers.
     , wiLargeBendSize ∷ !Double
       -- | The small bend size of rivers.
@@ -48,6 +50,7 @@ worldInfo seed
     { wiSimplices        = unfoldr (\x → Just (mkSimplexGen x, x + 1)) seed
     , wiVoronois         = unfoldr (\x → Just (mkVoronoiGen x, x + 1)) seed
     , wiMountainExp      = 0.3
+    , wiBiomeSize        = 350
     , wiLargeBendSize    = 140
     , wiSmallBendSize    = 30
     , wiRiverSeparation  = 975

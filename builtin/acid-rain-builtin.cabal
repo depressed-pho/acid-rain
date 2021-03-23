@@ -25,8 +25,9 @@ library
 
   build-depends:
     base                 ==  4.*,
-    base-unicode-symbols ^>= 0.2.4.2,
     acid-rain-core       ^>= 0.1.0.0,
+    base-unicode-symbols ^>= 0.2.4.2,
+    convertible          ^>= 1.1.1.0,
     exceptions           ^>= 0.10.4,
     extensible-effects   ^>= 5.0.0.1,
     microlens            ^>= 0.4.12.0,

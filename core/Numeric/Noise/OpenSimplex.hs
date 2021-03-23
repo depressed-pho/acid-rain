@@ -96,18 +96,22 @@ data Derivative r
 makeLenses ''Derivative
 
 stretch2D ∷ Floating r ⇒ r
+{-# SPECIALISE stretch2D ∷ Float  #-}
 {-# SPECIALISE stretch2D ∷ Double #-}
 stretch2D = (1 / (sqrt (2 + 1)) - 1) / 2
 
 squish2D ∷ Floating r ⇒ r
+{-# SPECIALISE squish2D ∷ Float  #-}
 {-# SPECIALISE squish2D ∷ Double #-}
 squish2D = (sqrt (2 + 1) - 1) / 2
 
 stretch3D ∷ Floating r ⇒ r
+{-# SPECIALISE stretch3D ∷ Float  #-}
 {-# SPECIALISE stretch3D ∷ Double #-}
 stretch3D = (1 / sqrt (3 + 1) - 1) / 3
 
 squish3D ∷ Floating r ⇒ r
+{-# SPECIALISE squish3D ∷ Float  #-}
 {-# SPECIALISE squish3D ∷ Double #-}
 squish3D = (sqrt (3 + 1) - 1) / 3
 
@@ -170,21 +174,23 @@ data Contribution3D i r
 
 makeLenses ''Contribution3D
 
-data Contribution3D' σ i r
-  = Contribution3D'
+-- Mutable version of Contribution3D.
+data MContribution3D σ i r
+  = MContribution3D
     { _c'xsb  ∷ !i
     , _c'ysb  ∷ !i
     , _c'zsb  ∷ !i
     , _c'δx   ∷ !r
     , _c'δy   ∷ !r
     , _c'δz   ∷ !r
-    , _c'next ∷ !(STRef σ (Maybe (Contribution3D' σ i r)))
+    , _c'next ∷ !(STRef σ (Maybe (MContribution3D σ i r)))
     }
 
-makeLenses ''Contribution3D'
+makeLenses ''MContribution3D
 
-contribution3D ∷ (Integral i, Floating r) ⇒ Contribution3D' σ i r → ST σ (Contribution3D i r)
-{-# SPECIALISE contribution3D ∷ Contribution3D' σ Int Double → ST σ (Contribution3D Int Double) #-}
+contribution3D ∷ (Integral i, Floating r) ⇒ MContribution3D σ i r → ST σ (Contribution3D i r)
+{-# SPECIALISE contribution3D ∷ MContribution3D σ Int Float  → ST σ (Contribution3D Int Float ) #-}
+{-# SPECIALISE contribution3D ∷ MContribution3D σ Int Double → ST σ (Contribution3D Int Double) #-}
 contribution3D c'
   = do next' ← readSTRef (c'^.c'next)
        next  ← traverse contribution3D next'
@@ -198,10 +204,10 @@ contribution3D c'
          , _cnext = next
          }
 
-contribution3D' ∷ (Integral i, Floating r) ⇒ r → i → i → i → ST σ (Contribution3D' σ i r)
+contribution3D' ∷ (Integral i, Floating r) ⇒ r → i → i → i → ST σ (MContribution3D σ i r)
 contribution3D' multiplier xsb ysb zsb
   = do next ← newSTRef Nothing
-       return Contribution3D'
+       return MContribution3D
          { _c'xsb  = xsb
          , _c'ysb  = ysb
          , _c'zsb  = zsb
@@ -213,6 +219,7 @@ contribution3D' multiplier xsb ysb zsb
 
 -- 2D gradients (Dodecagon)
 gradients2D ∷ (Floating r, UV.Unbox r) ⇒ UV.Vector r
+{-# SPECIALISE NOINLINE gradients2D ∷ UV.Vector Float  #-}
 {-# SPECIALISE NOINLINE gradients2D ∷ UV.Vector Double #-}
 gradients2D
   = GV.fromList
@@ -230,6 +237,7 @@ gradients2D
     ,  0.065963060686016,  0.114251372530929 ]
 
 gradientsSph2 ∷ (Floating r, UV.Unbox r) ⇒ UV.Vector r
+{-# SPECIALISE NOINLINE gradientsSph2 ∷ UV.Vector Float  #-}
 {-# SPECIALISE NOINLINE gradientsSph2 ∷ UV.Vector Double #-}
 gradientsSph2
   = GV.fromList
@@ -248,6 +256,7 @@ gradientsSph2
 
 -- 3D Gradients (Normalized expanded cuboctahedron)
 gradients3D ∷ (Floating r, UV.Unbox r) ⇒ UV.Vector r
+{-# SPECIALISE NOINLINE gradients3D ∷ UV.Vector Float  #-}
 {-# SPECIALISE NOINLINE gradients3D ∷ UV.Vector Double #-}
 gradients3D
   = GV.fromList
@@ -304,6 +313,7 @@ instance Num r ⇒ Default (Scalar r) where
   def = Scalar 0
 
 instance (Floating r, RealFrac r, UV.Unbox r) ⇒ Simplex2D (Scalar r) where
+  {-# SPECIALISE instance Simplex2D (Scalar Float ) #-}
   {-# SPECIALISE instance Simplex2D (Scalar Double) #-}
   type BaseType (Scalar r) = r
   accumulate v attn extrp _ _ _ _ _
@@ -316,6 +326,7 @@ instance Num r ⇒ Default (Disk r) where
   def = Disk 0 0
 
 instance (Floating r, RealFrac r, UV.Unbox r) ⇒ Simplex2D (Disk r) where
+  {-# SPECIALISE instance Simplex2D (Disk Float ) #-}
   {-# SPECIALISE instance Simplex2D (Disk Double) #-}
   type BaseType (Disk r) = r
   accumulate v attn extrp _ _ gi_sph2 _ _
@@ -329,6 +340,7 @@ instance Num r ⇒ Default (Derivative r) where
   def = Derivative 0 0
 
 instance (Floating r, RealFrac r, UV.Unbox r) ⇒ Simplex2D (Derivative r) where
+  {-# SPECIALISE instance Simplex2D (Derivative Float ) #-}
   {-# SPECIALISE instance Simplex2D (Derivative Double) #-}
   type BaseType (Derivative r) = r
   accumulate v attn extrp gx gy _ dx' dy'
@@ -339,6 +351,7 @@ instance (Floating r, RealFrac r, UV.Unbox r) ⇒ Simplex2D (Derivative r) where
 
 -- 2D lattice lookup table (KdotJPG)
 lookup2D ∷ (Integral i, Floating r, UV.Unbox i, UV.Unbox r) ⇒ UV.Vector (LatticePoint2D i r)
+{-# SPECIALISE NOINLINE lookup2D ∷ UV.Vector (LatticePoint2D Int Float ) #-}
 {-# SPECIALISE NOINLINE lookup2D ∷ UV.Vector (LatticePoint2D Int Double) #-}
 lookup2D = runST $
            do mv ← GMV.unsafeNew (8 * 4)
@@ -375,6 +388,7 @@ lookup3D ∷ ∀i r. ( Integral i
                  , GMV.MVector BV.MVector (Contribution3D i r)
                  )
          ⇒ BV.Vector (Contribution3D i r)
+{-# SPECIALISE NOINLINE lookup3D ∷ BV.Vector (Contribution3D Int Float ) #-}
 {-# SPECIALISE NOINLINE lookup3D ∷ BV.Vector (Contribution3D Int Double) #-}
 lookup3D = runST $
            do mv ← GMV.unsafeNew 2048
@@ -443,7 +457,7 @@ lookup3D = runST $
     contributions3D
       = runST $
         do mv ← GMV.unsafeNew (GV.length p3D `div` 9)
-                ∷ ST σ (BV.MVector σ (Contribution3D' σ i r))
+                ∷ ST σ (BV.MVector σ (MContribution3D σ i r))
            for_ [0, 9 .. (GV.length p3D) - 1] $ \i →
              do let baseSet = base3D GV.! fromIntegral (p3D GV.! i)
                 previous ← newSTRef Nothing
@@ -521,6 +535,7 @@ mkSimplexGen seed
          }
 
 floorAndAbsFrac ∷ (Integral i, RealFrac r) ⇒ r → (i, r)
+{-# SPECIALISE floorAndAbsFrac ∷ Float  → (Int, Float ) #-}
 {-# SPECIALISE floorAndAbsFrac ∷ Double → (Int, Double) #-}
 floorAndAbsFrac r
   = let (n, f) = properFraction r
@@ -534,6 +549,9 @@ simplex2D ∷ (Simplex2D α, BaseType α ~ r)
           → r -- ^ x
           → r -- ^ y
           → α
+{-# SPECIALISE simplex2D ∷ SimplexGen → Float  → Float  → Scalar     Float  #-}
+{-# SPECIALISE simplex2D ∷ SimplexGen → Float  → Float  → Disk       Float  #-}
+{-# SPECIALISE simplex2D ∷ SimplexGen → Float  → Float  → Derivative Float  #-}
 {-# SPECIALISE simplex2D ∷ SimplexGen → Double → Double → Scalar     Double #-}
 {-# SPECIALISE simplex2D ∷ SimplexGen → Double → Double → Disk       Double #-}
 {-# SPECIALISE simplex2D ∷ SimplexGen → Double → Double → Derivative Double #-}
@@ -588,6 +606,7 @@ simplex3D ∷ (Floating r, RealFrac r, UV.Unbox r)
           → r -- ^ y
           → r -- ^ z
           → r
+{-# SPECIALISE simplex3D ∷ SimplexGen → Float  → Float  → Float  → Float  #-}
 {-# SPECIALISE simplex3D ∷ SimplexGen → Double → Double → Double → Double #-}
 simplex3D gen x y z
   = let stretchOffset = (x + y + z) ⋅ stretch3D

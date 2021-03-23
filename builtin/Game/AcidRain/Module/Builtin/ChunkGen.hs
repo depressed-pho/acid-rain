@@ -8,15 +8,17 @@ module Game.AcidRain.Module.Builtin.ChunkGen
 
 import Control.Eff (Eff, Lifted, Member)
 import Control.Eff.Reader.Lazy (Reader)
+import Data.Convertible.Base (convert)
 import Data.Foldable (for_)
 import Game.AcidRain.Module.Builtin.ChunkGen.SpaceAttrs
-  ( remappedHeight, isWaterLogged, spaceAttrs )
+  ( SpaceAttrs(..), remappedHeight, spaceAttrs )
 import Game.AcidRain.Module.Builtin.ChunkGen.WorldInfo (WorldInfo(..))
 import Game.AcidRain.World.Chunk (chunkSize, chunkHeight)
-import Game.AcidRain.World.Chunk.Generator (ChunkGenM, chunkPos)
+import Game.AcidRain.World.Chunk.Generator
+  ( ChunkGenM, chunkPos, putClimate )
 import Game.AcidRain.World.Chunk.Position (toWorldPos)
-import Game.AcidRain.World.Position (wpX, wpY, lowestZ)
-import Lens.Micro ((&), (+~))
+import Game.AcidRain.World.Position (wpX, wpY, wpZ, lowestZ)
+import Lens.Micro ((&), (.~), (+~))
 
 
 -- | The built-in terrain generator. Internally it creates a height
@@ -32,10 +34,17 @@ terraform
        --air  ← 
        for_ [0, chunkSize-1] $ \y →
          for_ [0, chunkSize-1] $ \x →
-           do let wPos = (toWorldPos cPos 0) & wpX +~ x
-                                             & wpY +~ y
-              attrs ← spaceAttrs wPos
-              let height = remappedHeight attrs
+           do let wPos0 = (toWorldPos cPos 0) & wpX +~ x
+                                              & wpY +~ y
+                  off0  = convert wPos0
+
+              attrs ← spaceAttrs wPos0
+              putClimate off0 (saClimate attrs)
+
+              --let height = remappedHeight attrs
+
               for_ [lowestZ, lowestZ+chunkHeight-1] $ \z →
-                error "FIXME"
+                do --let wPos = wPos0 & wpZ .~ z
+                   --    off  = convert wPos
+                   return ()
        return ()
