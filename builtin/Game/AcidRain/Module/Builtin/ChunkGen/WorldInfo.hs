@@ -27,6 +27,10 @@ data WorldInfo
       -- | An infinite list of Voronoi noise generators of varying
       -- seeds. The starting seed is that of the world seed.
     , wiVoronois ∷ [VoronoiGen Double]
+      -- | Mountain and valley enhancement factor. Use zero to apply
+      -- no enhancements. Higher values turn the height exponentially
+      -- close to zero.
+    , wiMountainExp ∷ Double
       -- | The large bend size of rivers.
     , wiLargeBendSize ∷ !Double
       -- | The small bend size of rivers.
@@ -43,6 +47,7 @@ worldInfo seed
   = WorldInfo
     { wiSimplices        = unfoldr (\x → Just (mkSimplexGen x, x + 1)) seed
     , wiVoronois         = unfoldr (\x → Just (mkVoronoiGen x, x + 1)) seed
+    , wiMountainExp      = 0.3
     , wiLargeBendSize    = 140
     , wiSmallBendSize    = 30
     , wiRiverSeparation  = 975

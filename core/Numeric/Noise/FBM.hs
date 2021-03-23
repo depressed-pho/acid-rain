@@ -24,7 +24,7 @@ fBm ∷ (Num r, Integral i)
 {-# INLINEABLE fBm #-}
 {-# SPECIALISE fBm
     ∷ (Double → v → v) → (v → Double) → Int → Double → Double → Double → Double → v → Double #-}
-fBm scale noise oct ampI gain freqI lac vec = go ampI freqI 0 0
+fBm scale noise oct amp0 gain freq0 lac vec = go amp0 freq0 0 0
   where
     go amp freq i sum
       | i ≥ oct   = sum

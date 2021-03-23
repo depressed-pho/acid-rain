@@ -12,6 +12,7 @@ module Game.AcidRain.World.Chunk.Generator
 
     -- * Querying state
   , chunkPos
+  , tileRegistry
 
     -- * Running chunk generators
   , generateChunk
@@ -25,7 +26,7 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Primitive (PrimMonad(..))
 import Data.Default (Default(..))
 import qualified Game.AcidRain.World.Chunk as C
-import Game.AcidRain.World.Chunk.Types (freezeChunk, thawChunk)
+import Game.AcidRain.World.Chunk.Types (mcTileReg, freezeChunk, thawChunk)
 import Game.AcidRain.World.Chunk.Palette (TilePalette)
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
 import Game.AcidRain.World.Chunk.Types (Chunk, MutableChunk)
@@ -87,6 +88,11 @@ instance Default ChunkGenerator where
 -- | Query the position of the chunk to generate.
 chunkPos ∷ Lifted ChunkGenM r ⇒ Eff r ChunkPos
 chunkPos = lift $ ChunkGenM $ (^.cgPos) <$> get
+
+-- | Query the tile registry for the world of which the chunk is being
+-- generated.
+tileRegistry ∷ Lifted ChunkGenM r ⇒ Eff r TileRegistry
+tileRegistry = lift $ ChunkGenM $ (^.cgChunk.mcTileReg) <$> get
 
 -- | Generate a chunk by running a chunk generator. Only useful for
 -- server implementations.

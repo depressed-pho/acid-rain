@@ -60,7 +60,8 @@ register tile (TileRegistry reg)
         True  → throwM $ ConflictingTileIDException tid
         False → return $ TileRegistry $ HM.insert tid (upcastTile tile) reg
 
--- | Lookup a tile by its ID.
+-- | Lookup a tile by its ID. Return 'Nothing' if no tiles matching
+-- with the given ID has been registered.
 lookup ∷ TileID → TileRegistry → Maybe SomeTile
 lookup tid (TileRegistry reg)
   = HM.lookup tid reg

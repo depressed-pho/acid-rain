@@ -8,10 +8,15 @@ module Game.AcidRain.Module.Builtin.ChunkGen
 
 import Control.Eff (Eff, Lifted, Member)
 import Control.Eff.Reader.Lazy (Reader)
-import Game.AcidRain.Module.Builtin.ChunkGen.SpaceAttr (spaceAttr)
+import Data.Foldable (for_)
+import Game.AcidRain.Module.Builtin.ChunkGen.SpaceAttrs
+  ( remappedHeight, isWaterLogged, spaceAttrs )
 import Game.AcidRain.Module.Builtin.ChunkGen.WorldInfo (WorldInfo(..))
+import Game.AcidRain.World.Chunk (chunkSize, chunkHeight)
 import Game.AcidRain.World.Chunk.Generator (ChunkGenM, chunkPos)
 import Game.AcidRain.World.Chunk.Position (toWorldPos)
+import Game.AcidRain.World.Position (wpX, wpY, lowestZ)
+import Lens.Micro ((&), (+~))
 
 
 -- | The built-in terrain generator. Internally it creates a height
@@ -23,6 +28,13 @@ import Game.AcidRain.World.Chunk.Position (toWorldPos)
 terraform ∷ (Member (Reader WorldInfo) r, Lifted ChunkGenM r) ⇒ Eff r ()
 terraform
   = do cPos ← chunkPos
-       attr ← spaceAttr (toWorldPos cPos 0)
-       error (show attr)
+       --air  ← 
+       for_ [0, chunkSize-1] $ \y →
+         for_ [0, chunkSize-1] $ \x →
+           do let wPos = (toWorldPos cPos 0) & wpX +~ x
+                                             & wpY +~ y
+              attrs ← spaceAttrs wPos
+              let height = remappedHeight attrs
+              for_ [lowestZ, lowestZ+chunkHeight-1] $ \z →
+                error "FIXME"
        return ()

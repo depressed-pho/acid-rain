@@ -13,6 +13,7 @@ module Game.AcidRain.World.Tile
   ) where
 
 import Data.Text (Text)
+import Data.Typeable (Typeable, cast)
 import Data.Word (Word32)
 import Game.AcidRain.TUI (Appearance, HasAppearance(..))
 import Game.AcidRain.World.Position (WorldPos)
@@ -33,10 +34,13 @@ type TileID = Text
 --   tileID _ = "acid-rain:dirt"
 --   ..
 -- @
-class Show τ ⇒ Tile τ where
+class (Show τ, Typeable τ) ⇒ Tile τ where
   -- | Erase the type of the tile.
   upcastTile ∷ τ → SomeTile
   upcastTile = SomeTile
+  -- | Recover the type of the tile.
+  downcastTile ∷ SomeTile → Maybe τ
+  downcastTile (SomeTile t) = cast t
   -- | Get the tile ID such as @acid-rain:dirt@.
   tileID ∷ τ → TileID
   -- | Get the default state value of the tile.
