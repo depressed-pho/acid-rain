@@ -29,8 +29,8 @@ import Prelude.Unicode ((⋅), (≥), (≤))
 -- @(x, y)@ coordinates in a world.
 data SpaceAttrs
   = SpaceAttrs
-    { -- | The height at this point. It is generated with a
-      -- domain-warped fBm (see
+    { -- | The height at this point in @[-1, 1]@. It is generated with
+      -- a domain-warped fBm (see
       -- <https://github.com/dandrino/terrain-erosion-3-ways>) and is
       -- then further affected by a river strength which is computed
       -- using a jittered Voronoi noise.
@@ -56,7 +56,7 @@ remappedHeight sa
         else
           lowestZ + 1
   where
-    cutOff = 67 --100
+    cutOff = 0.52 --0.78
 
 -- | Test if the height of the ground is blow the sea level. Whether
 -- the water is seawater or not is outside of the scope of this
@@ -92,19 +92,18 @@ height pos
                  , evalFBm noiseY' (offset pt0 (scale warp pt1)) )
 
        noiseF  ← simplexInstance 4
-       let baseHeightFactor = evalFBm noiseF (offset pt0 (scale warp pt2))
+       let baseHeight = evalFBm noiseF (offset pt0 (scale warp pt2))
 
-       -- Now we obtained a height factor in [-1, 1]. Enhance
-       -- mountains and valleys by multiplying it by its absolute
-       -- value on the power of some constant.
+       -- Now we obtained a height in [-1, 1]. Enhance mountains and
+       -- valleys by multiplying it by its absolute value on the power
+       -- of some constant.
        wi      ← ask
-       let enhancedHeightFactor
-             = baseHeightFactor⋅(abs baseHeightFactor)⋅(wiMountainExp wi)
+       let enhancedHeight
+             = baseHeight⋅(abs baseHeight)⋅(wiMountainExp wi)
 
-       -- Remap it to [0, 128] then apply a river strength.
-       let baseHeight = 64 ⋅ enhancedHeightFactor + 64
+       -- Then apply a river strength.
        river   ← riverStrength pos
-       return $ riverize baseHeight river
+       return $ riverize enhancedHeight river
   where
     evalFBm ∷ SimplexGen → (Double, Double) → Double
     evalFBm gen pt
@@ -133,21 +132,21 @@ height pos
 
 -- | The sea level.
 seaLevel ∷ Double
-seaLevel = 63
+seaLevel = 0
 
 -- | Corrode the terrain based on the 'riverStrength'.
 riverize ∷ Double → Double → Double
 riverize baseHeight river
-  | baseHeight < seaLevel' - 0.55
+  | baseHeight ≤ seaLevel
     = baseHeight -- Already sunk in water.
   | otherwise
-    = let adjustment = (baseHeight - seaLevel) / 10 + 0.6
+    = let adjustment = (baseHeight - seaLevel) * 6.4 + 0.6
           river'     = bayesianAdjustment (river + 1) adjustment
       in
-        -- Adjustment to make riverbanks more varied.
-        seaLevel' + (baseHeight - seaLevel') ⋅ river'
-  where
-    seaLevel' = seaLevel - 0.55
+        -- Adjustment to make riverbanks more varied depending on
+        -- height. The lower the height is, the wider the river should
+        -- be.
+        seaLevel + (baseHeight - seaLevel) ⋅ river'
 
 -- | Get the river strengh at a given world position. River strength
 -- is a scalar value from @-1.0@ to @0.0@ where @-1.0@ means

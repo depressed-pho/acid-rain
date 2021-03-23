@@ -20,11 +20,12 @@ import Lens.Micro ((&), (+~))
 
 
 -- | The built-in terrain generator. Internally it creates a height
--- map where 63.0 is the sea level, and then brutally remaps it in
--- @[-1, 0]@ because our actual world is only 2 tiles high. Since the
--- z position 0 is the highest position in the world, and players
--- cannot pass through solid tiles at the position, this terrain
--- generator applies a bias not to generate too many tiles at @z = 0@.
+-- map in @[-1, 1]@ where 0 is the sea level, and then remaps it in
+-- integer @[-1, 0]@ because our actual world is only 2 tiles
+-- high. Since the z position 0 is the highest position in the world,
+-- and players cannot pass through solid tiles at the position, this
+-- terrain generator applies a bias not to generate too many tiles at
+-- @z = 0@.
 terraform ∷ (Member (Reader WorldInfo) r, Lifted ChunkGenM r) ⇒ Eff r ()
 terraform
   = do cPos ← chunkPos
