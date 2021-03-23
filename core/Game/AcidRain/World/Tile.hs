@@ -20,11 +20,11 @@ import Game.AcidRain.World.Position (WorldPos)
 
 type TileID = Text
 
--- | An instance of this class defines a tile in the game. A tile at a
+-- | A type in this class defines a tile in the game. A tile at a
 -- specific location is represented as a pair of 'Tile' and a single
 -- integer value 'TileStateValue', and the values of 'Tile' types are
--- shared across the entire world. For this reason, an instance of
--- 'Tile' typically has no values, and instead implements the class on
+-- shared across the entire world. For this reason, a type in 'Tile'
+-- typically has no values, and instead implements the class on
 -- 'Data.Proxy.Proxy' like:
 --
 -- @
@@ -58,6 +58,7 @@ instance Show SomeTile where
 
 instance Tile SomeTile where
   upcastTile = id
+  downcastTile = Just
   tileID (SomeTile t) = tileID t
   defaultStateValue (SomeTile t) = defaultStateValue t
   appearanceFor (SomeTile t) pos = appearanceFor t pos

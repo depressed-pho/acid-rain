@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UnicodeSyntax #-}
-module Game.AcidRain.World.Chunk.Palette
+module Game.AcidRain.World.Tile.Palette
   ( -- * Types
     TilePalette
   , TileIndex

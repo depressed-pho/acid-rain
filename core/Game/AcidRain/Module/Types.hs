@@ -8,7 +8,8 @@ module Game.AcidRain.Module.Types
   , Module(..)
   , SomeModule(..)
   , ModuleMap
-  , LoaderContext(..), lcWorldSeed, lcMods, lcTiles, lcEntityTypes, lcChunkGen
+  , LoaderContext(..)
+  , lcWorldSeed, lcMods, lcTiles, lcBiomes, lcEntityTypes, lcChunkGen
   ) where
 
 import Control.Eff (Eff, Member)
@@ -17,6 +18,7 @@ import Control.Monad.Catch (MonadThrow)
 import Data.HashMap.Strict (HashMap)
 import Data.Text (Text)
 import Game.AcidRain.World (WorldSeed)
+import Game.AcidRain.World.Biome.Registry (BiomeRegistry)
 import Game.AcidRain.World.Chunk.Generator (ChunkGenerator)
 import Game.AcidRain.World.Entity.Registry (EntityRegistry)
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
@@ -72,6 +74,8 @@ data LoaderContext
     , _lcMods        ∷ !ModuleMap
       -- | Extract the tile registry that has been constructed.
     , _lcTiles       ∷ !TileRegistry
+      -- | Extract the biome registry that has been constructed.
+    , _lcBiomes      ∷ !BiomeRegistry
       -- | Extract the entity registry that has been constructed.
     , _lcEntityTypes ∷ !EntityRegistry
       -- | Extract the chunk generator that has been composed.

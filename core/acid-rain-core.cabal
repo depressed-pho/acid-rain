@@ -18,10 +18,12 @@ library
     Game.AcidRain.Module.Loader
     Game.AcidRain.TUI
     Game.AcidRain.World
+    Game.AcidRain.World.Biome
+    Game.AcidRain.World.Biome.Palette
+    Game.AcidRain.World.Biome.Registry
     Game.AcidRain.World.Chunk
     Game.AcidRain.World.Chunk.Generator
     Game.AcidRain.World.Chunk.Position
-    Game.AcidRain.World.Chunk.Palette
     Game.AcidRain.World.Climate
     Game.AcidRain.World.Entity
     Game.AcidRain.World.Entity.Catalogue
@@ -30,6 +32,7 @@ library
     Game.AcidRain.World.Player
     Game.AcidRain.World.Position
     Game.AcidRain.World.Tile
+    Game.AcidRain.World.Tile.Palette
     Game.AcidRain.World.Tile.Registry
     Numeric.Noise.FBM
     Numeric.Noise.OpenSimplex

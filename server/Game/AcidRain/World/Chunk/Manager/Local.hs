@@ -22,11 +22,13 @@ import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.STM (STM, atomically, retry, throwSTM)
 import qualified Focus as F
 import GHC.Conc (unsafeIOToSTM)
+import Game.AcidRain.World.Biome.Palette (BiomePalette)
+import Game.AcidRain.World.Biome.Registry (BiomeRegistry)
 import Game.AcidRain.World.Chunk (Chunk)
 import Game.AcidRain.World.Chunk.Generator (ChunkGenerator, generateChunk)
-import Game.AcidRain.World.Chunk.Palette (TilePalette)
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
 import Game.AcidRain.World.Entity.Catalogue (EntityCatalogue)
+import Game.AcidRain.World.Tile.Palette (TilePalette)
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
 import Prelude hiding (lcm, lookup)
 import Prelude.Unicode ((∘))
@@ -52,9 +54,11 @@ evalCell (LoadFailed e) = throwSTM e
 -- therefore not an LRU.
 data LocalChunkManager
   = LocalChunkManager
-    { lcmTiles    ∷ !TileRegistry
-    , lcmPalette  ∷ !TilePalette
-    , lcmEntities ∷ !EntityCatalogue
+    { lcmTileReg  ∷ !TileRegistry
+    , lcmTilePal  ∷ !TilePalette
+    , lcmBiomeReg ∷ !BiomeRegistry
+    , lcmBiomePal ∷ !BiomePalette
+    , lcmEntCat   ∷ !EntityCatalogue
     , lcmChunkGen ∷ !ChunkGenerator
       -- | Note that this is an STM map. Accessing it requires an STM
       -- transaction.
@@ -65,24 +69,34 @@ instance Show LocalChunkManager where
   showsPrec d lcm
     = showParen (d > appPrec) $
       showString "LocalChunkManager " ∘
-      showString "{ lcmTiles = "    ∘ showsPrec (appPrec + 1) (lcmTiles    lcm) ∘
-      showString ", lcmPalette = "  ∘ showsPrec (appPrec + 1) (lcmPalette  lcm) ∘
-      showString ", lcmEntities = " ∘ showsPrec (appPrec + 1) (lcmEntities lcm) ∘
+      showString "{ lcmTileReg = "  ∘ showsPrec (appPrec + 1) (lcmTileReg  lcm) ∘
+      showString ", lcmTilePal = "  ∘ showsPrec (appPrec + 1) (lcmTilePal  lcm) ∘
+      showString ", lcmBiomeReg = " ∘ showsPrec (appPrec + 1) (lcmBiomeReg lcm) ∘
+      showString ", lcmBiomePal = " ∘ showsPrec (appPrec + 1) (lcmBiomePal lcm) ∘
+      showString ", lcmEntCat = "   ∘ showsPrec (appPrec + 1) (lcmEntCat   lcm) ∘
       showString ", .. }"
     where
       appPrec = 10
 
--- | Construct a new chunk manager out of a tile registry, and a
--- properly populated tile palette and catalogues. Care must be taken
--- because if the palette is somehow invalid it will later result in
+-- | Construct a new chunk manager out of registries, and a properly
+-- populated tile palette and catalogues. Care must be taken because
+-- if the palette is somehow invalid it will later result in
 -- exceptions (or even chunk corruptions!) but not immediately.
-new ∷ TileRegistry → TilePalette → EntityCatalogue → ChunkGenerator → STM LocalChunkManager
-new tReg tPal eCat cGen
+new ∷ TileRegistry
+    → TilePalette
+    → BiomeRegistry
+    → BiomePalette
+    → EntityCatalogue
+    → ChunkGenerator
+    → STM LocalChunkManager
+new tReg tPal bReg bPal eCat cGen
   = do cells ← SM.new
        return $ LocalChunkManager
-         { lcmTiles    = tReg
-         , lcmPalette  = tPal
-         , lcmEntities = eCat
+         { lcmTileReg  = tReg
+         , lcmTilePal  = tPal
+         , lcmBiomeReg = bReg
+         , lcmBiomePal = bPal
+         , lcmEntCat   = eCat
          , lcmChunkGen = cGen
          , lcmCells    = cells
          }
@@ -139,4 +153,4 @@ generate ∷ (MonadThrow μ, MonadIO μ)
          → LocalChunkManager
          → μ Chunk
 generate cPos (LocalChunkManager { .. })
-  = generateChunk lcmTiles lcmPalette lcmEntities lcmChunkGen cPos
+  = generateChunk lcmTileReg lcmTilePal lcmBiomeReg lcmBiomePal lcmEntCat lcmChunkGen cPos

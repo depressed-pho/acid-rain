@@ -20,15 +20,15 @@ import Control.Monad.STM (STM, atomically, throwSTM)
 import qualified Data.UUID as U
 import Game.AcidRain.Module (SomeModule)
 import Game.AcidRain.Module.Loader
-  ( loadModules, lcTiles, lcEntityTypes, lcChunkGen )
+  ( loadModules, lcTiles, lcBiomes, lcEntityTypes, lcChunkGen )
 import qualified Game.AcidRain.Module.Builtin.Entity as B
 import Game.AcidRain.World
   ( World(..), WorldMode(..), WorldState(..), WorldSeed, WorldStateChanged(..)
   , WorldNotRunningException(..), UnknownPlayerIDException(..) )
+import qualified Game.AcidRain.World.Biome.Palette as BPal
 import Game.AcidRain.World.Chunk (Chunk, putEntity)
 import Game.AcidRain.World.Chunk.Manager.Local (LocalChunkManager)
 import qualified Game.AcidRain.World.Chunk.Manager.Local as LCM
-import qualified Game.AcidRain.World.Chunk.Palette as Pal
 import qualified Game.AcidRain.World.Entity as E
 import qualified Game.AcidRain.World.Entity.Catalogue as ECat
 import Game.AcidRain.World.Event (Event(..), SomeEvent)
@@ -36,6 +36,7 @@ import Game.AcidRain.World.Player.Manager.Local (LocalPlayerManager)
 import Game.AcidRain.World.Player (Player(..), Permission(..), PlayerID)
 import Game.AcidRain.World.Position (WorldPos(..))
 import qualified Game.AcidRain.World.Player.Manager.Local as LPM
+import qualified Game.AcidRain.World.Tile.Palette as TPal
 import Lens.Micro ((^.))
 import Numeric.Natural (Natural)
 import Prelude hiding (lcm)
@@ -169,13 +170,16 @@ newWorld wm mods seed
                    -- palette. Constructing a tile palette never fails
                    -- because we are doing it from scratch.
                    let tReg = lc^.lcTiles
-                       tPal = Pal.fromRegistry tReg
-                       -- And we also need an entity catalogue.
+                       tPal = TPal.fromRegistry tReg
+                       -- And we also need a biome palette.
+                       bReg = lc^.lcBiomes
+                       bPal = BPal.fromRegistry bReg
+                       -- And an entity catalogue.
                        eReg = lc^.lcEntityTypes
                        eCat = ECat.fromRegistry eReg
                        -- And a chunk generator too.
                        cGen = lc^.lcChunkGen
-                   lcm ← LCM.new tReg tPal eCat cGen
+                   lcm ← LCM.new tReg tPal bReg bPal eCat cGen
                    -- And then create an empty LPM.
                    lpm ← LPM.new
                    -- If we are in single player mode, create the Nil

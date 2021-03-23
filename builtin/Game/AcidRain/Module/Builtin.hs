@@ -11,6 +11,7 @@ import Data.Proxy (Proxy)
 import qualified Game.AcidRain.Module.Builtin.ChunkGen as CG
 import Game.AcidRain.Module.Builtin.ChunkGen.WorldInfo (worldInfo)
 import Game.AcidRain.Module (Module(..))
+--import Game.AcidRain.Module.Builtin.Loader.Biome (loadBiomes)
 import Game.AcidRain.Module.Builtin.Loader.Entity (loadEntities)
 import Game.AcidRain.Module.Builtin.Loader.Tile (loadTiles)
 import Game.AcidRain.Module.Loader (getWorldSeed, modifyChunkGenerator)

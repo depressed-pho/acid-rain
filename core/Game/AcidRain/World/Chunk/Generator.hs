@@ -29,15 +29,18 @@ import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Primitive (PrimMonad(..))
 import Data.Default (Default(..))
+import Game.AcidRain.World.Biome.Palette (BiomePalette)
+import Game.AcidRain.World.Biome.Registry (BiomeRegistry)
+import qualified Game.AcidRain.World.Biome.Registry as BR
 import qualified Game.AcidRain.World.Chunk as C
 import Game.AcidRain.World.Chunk.Types
   (TileOffset, mcTileReg, freezeChunk, thawChunk, writeClimate )
-import Game.AcidRain.World.Chunk.Palette (TilePalette)
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
 import Game.AcidRain.World.Chunk.Types (Chunk, MutableChunk)
 import Game.AcidRain.World.Climate (Climate)
 import Game.AcidRain.World.Entity.Catalogue (EntityCatalogue)
 import Game.AcidRain.World.Tile (defaultState)
+import Game.AcidRain.World.Tile.Palette (TilePalette)
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
 import qualified Game.AcidRain.World.Tile.Registry as TR
 import Lens.Micro ((^.))
@@ -112,14 +115,17 @@ putClimate off cli
 generateChunk ∷ (MonadThrow μ, MonadIO μ)
               ⇒ TileRegistry
               → TilePalette
+              → BiomeRegistry
+              → BiomePalette
               → EntityCatalogue
               → ChunkGenerator
               → ChunkPos
               → μ Chunk
-generateChunk tReg tPal eCat cGen cPos
-  = do air  ← TR.get "acid-rain:dirt" tReg
-       c    ← C.new tReg tPal eCat (defaultState air)
-       mc   ← liftIO $ thawChunk c
+generateChunk tReg tPal bReg bPal eCat cGen cPos
+  = do air    ← TR.get "acid-rain:dirt" tReg
+       plains ← BR.get "acid-rain:plains" bReg
+       c      ← C.new tReg tPal bReg bPal eCat (defaultState air) plains
+       mc     ← liftIO $ thawChunk c
        let cgs = ChunkGenState
                  { _cgPos   = cPos
                  , _cgChunk = mc

@@ -14,8 +14,10 @@ module Game.AcidRain.World.Chunk.Types
   , assertValidEntity
 
   , IndexedTileState(..)
-  , Chunk(..), cTileReg, cTilePal, cTiles, cClimates, cEntCat, cEntities
-  , MutableChunk(..), mcTileReg, mcTilePal, mcClimates, mcTiles, mcEntCat, mcEntities
+  , Chunk(..)
+  , cTileReg, cTilePal, cTiles, cClimates, cBiomeReg, cBiomePal, cBiomes, cEntCat, cEntities
+  , MutableChunk(..)
+  , mcTileReg, mcTilePal, mcTiles, mcClimates, mcBiomeReg, mcBiomePal, mcBiomes, mcEntCat, mcEntities
 
   , freezeChunk
   , thawChunk
@@ -33,12 +35,14 @@ import qualified Data.Vector.Generic.Mutable as GMV
 import qualified Data.Vector.Unboxed as UV
 import Data.Word (Word8)
 import GHC.Generics (Generic)
-import Game.AcidRain.World.Chunk.Palette (TilePalette, TileIndex)
+import Game.AcidRain.World.Biome.Palette (BiomePalette, BiomeIndex)
+import Game.AcidRain.World.Biome.Registry (BiomeRegistry)
 import Game.AcidRain.World.Climate (Climate)
 import Game.AcidRain.World.Entity (EntityType(..), Entity(..), SomeEntity)
 import Game.AcidRain.World.Entity.Catalogue (EntityCatalogue, (∈))
 import Game.AcidRain.World.Position (WorldPos(..), wpX, wpY, wpZ)
 import Game.AcidRain.World.Tile (TileStateValue)
+import Game.AcidRain.World.Tile.Palette (TilePalette, TileIndex)
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
 import Lens.Micro.TH (makeLenses)
 import Lens.Micro ((^.))
@@ -111,6 +115,9 @@ data Chunk
     , _cTilePal  ∷ !TilePalette
     , _cTiles    ∷ !(UV.Vector IndexedTileState)
     , _cClimates ∷ !(UV.Vector Climate)
+    , _cBiomeReg ∷ !BiomeRegistry
+    , _cBiomePal ∷ !BiomePalette
+    , _cBiomes   ∷ !(UV.Vector BiomeIndex)
     , _cEntCat   ∷ !EntityCatalogue
     , _cEntities ∷ !(HashMap TileOffset SomeEntity)
     }
@@ -123,6 +130,8 @@ instance Show Chunk where
       showString "Chunk " ∘
       showString "{ _cTileReg = "  ∘ showsPrec (appPrec + 1) (c^.cTileReg ) ∘
       showString ", _cTilePal = "  ∘ showsPrec (appPrec + 1) (c^.cTilePal ) ∘
+      showString ", _cBiomeReg = " ∘ showsPrec (appPrec + 1) (c^.cBiomeReg) ∘
+      showString ", _cBiomePal = " ∘ showsPrec (appPrec + 1) (c^.cBiomePal) ∘
       showString ", _cEntities = " ∘ showsPrec (appPrec + 1) (c^.cEntities) ∘
       showString ", .. }"
     where
@@ -134,6 +143,9 @@ data MutableChunk σ
     , _mcTilePal  ∷ !TilePalette
     , _mcTiles    ∷ !(UV.MVector σ IndexedTileState)
     , _mcClimates ∷ !(UV.MVector σ Climate)
+    , _mcBiomeReg ∷ !BiomeRegistry
+    , _mcBiomePal ∷ !BiomePalette
+    , _mcBiomes   ∷ !(UV.MVector σ BiomeIndex)
     , _mcEntCat   ∷ !EntityCatalogue
     , _mcEntities ∷ !(HashMap TileOffset SomeEntity)
     }
@@ -156,11 +168,15 @@ freezeChunk ∷ PrimMonad μ ⇒ MutableChunk (PrimState μ) → μ Chunk
 freezeChunk mc
   = do tiles    ← GV.freeze $ mc^.mcTiles
        climates ← GV.freeze $ mc^.mcClimates
+       biomes   ← GV.freeze $ mc^.mcBiomes
        return Chunk
          { _cTileReg  = mc^.mcTileReg
          , _cTilePal  = mc^.mcTilePal
          , _cTiles    = tiles
          , _cClimates = climates
+         , _cBiomeReg = mc^.mcBiomeReg
+         , _cBiomePal = mc^.mcBiomePal
+         , _cBiomes   = biomes
          , _cEntCat   = mc^.mcEntCat
          , _cEntities = mc^.mcEntities
          }
@@ -169,11 +185,15 @@ thawChunk ∷ PrimMonad μ ⇒ Chunk → μ (MutableChunk (PrimState μ))
 thawChunk c
   = do tiles    ← GV.thaw $ c^.cTiles
        climates ← GV.thaw $ c^.cClimates
+       biomes   ← GV.thaw $ c^.cBiomes
        return MutableChunk
          { _mcTileReg  = c^.cTileReg
          , _mcTilePal  = c^.cTilePal
          , _mcTiles    = tiles
          , _mcClimates = climates
+         , _mcBiomeReg = c^.cBiomeReg
+         , _mcBiomePal = c^.cBiomePal
+         , _mcBiomes   = biomes
          , _mcEntCat   = c^.cEntCat
          , _mcEntities = c^.cEntities
          }
