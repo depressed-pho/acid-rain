@@ -14,14 +14,13 @@ extra-source-files:  CHANGELOG.md
 library
   exposed-modules:
     Game.AcidRain.Module.Builtin
-    Game.AcidRain.Module.Builtin.Entity
+    Game.AcidRain.Module.Builtin.Entities
 
   other-modules:
     Game.AcidRain.Module.Builtin.ChunkGen
     Game.AcidRain.Module.Builtin.ChunkGen.PointAttrs
     Game.AcidRain.Module.Builtin.ChunkGen.WorldInfo
---    Game.AcidRain.Module.Builtin.Biomes
-    Game.AcidRain.Module.Builtin.Entities
+    Game.AcidRain.Module.Builtin.Biomes
     Game.AcidRain.Module.Builtin.Tiles
 
   build-depends:

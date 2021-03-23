@@ -153,7 +153,7 @@ putBiomeRegistry biomes
   = modify $ lcBiomes .~ biomes
 
 -- | Register a biome. Throws if it's already been registered.
-registerBiome ∷ (Biome τ, Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ τ → Eff r ()
+registerBiome ∷ (Biome β, Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ β → Eff r ()
 registerBiome biome
   = getBiomeRegistry >>= BR.register biome >>= putBiomeRegistry
 

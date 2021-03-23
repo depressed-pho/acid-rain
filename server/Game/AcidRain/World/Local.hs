@@ -21,7 +21,7 @@ import qualified Data.UUID as U
 import Game.AcidRain.Module (SomeModule)
 import Game.AcidRain.Module.Loader
   ( loadModules, lcTiles, lcBiomes, lcEntityTypes, lcChunkGen )
-import qualified Game.AcidRain.Module.Builtin.Entity as B
+import qualified Game.AcidRain.Module.Builtin.Entities as B
 import Game.AcidRain.World
   ( World(..), WorldMode(..), WorldState(..), WorldSeed, WorldStateChanged(..)
   , WorldNotRunningException(..), UnknownPlayerIDException(..) )
