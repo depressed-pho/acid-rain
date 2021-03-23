@@ -1,13 +1,13 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE UnicodeSyntax #-}
-module Game.AcidRain.Module.Builtin.ChunkGen.SpaceAttrs
-  ( SpaceAttrs(..)
+module Game.AcidRain.Module.Builtin.ChunkGen.PointAttrs
+  ( PointAttrs(..)
 
-    -- * Computing space attributes
-  , spaceAttrs
+    -- * Computing point attributes
+  , pointAttrs
 
-    -- * Querying space attributes
+    -- * Querying point attributes
   , remappedHeight
   --, isWaterLogged
   ) where
@@ -26,30 +26,30 @@ import Lens.Micro ((^.))
 import Prelude.Unicode ((⋅), (≥), (≤))
 
 
--- | Space attributes describe a set of attributes determined for each
+-- | Point attributes describe a set of attributes determined for each
 -- @(x, y)@ coordinates in a world.
-data SpaceAttrs
-  = SpaceAttrs
+data PointAttrs
+  = PointAttrs
     { -- | The height at this point in @[-1, 1]@. It is generated with
       -- a domain-warped fBm (see
       -- <https://github.com/dandrino/terrain-erosion-3-ways>) and is
       -- then further affected by a river strength which is computed
       -- using a jittered Voronoi noise.
-      saHeight ∷ !Double
+      paHeight ∷ !Double
       -- | The climate at this point. The altitude is calculated based
       -- on the height. Temperature and humidity are generated with a
       -- simplex noise but they of course are affected by the
       -- altitude.
-    , saClimate ∷ !Climate
-    --, saBiome   ∷ ?
+    , paClimate ∷ !Climate
+    --, paBiome   ∷ ?
     } deriving (Show)
 
 -- | Get a remapped height in @[-1, 0]@. The sea level becomes @-1@
 -- after remapping, and nearly every height is also remapped to
 -- @-1@. Only a few become @0@.
-remappedHeight ∷ SpaceAttrs → Int8
-remappedHeight sa
-  = let height0 = saHeight sa
+remappedHeight ∷ PointAttrs → Int8
+remappedHeight pa
+  = let height0 = paHeight pa
     in
       -- Remap everything below the sea level to lowestZ.
       if height0 ≤ 0 then
@@ -69,20 +69,20 @@ remappedHeight sa
 -- | Test if the height of the ground is blow the sea level. Whether
 -- the water is seawater or not is outside of the scope of this
 -- function.
-isWaterLogged ∷ SpaceAttrs → Bool
-isWaterLogged sa
-  = saHeight sa ≤ 0
+isWaterLogged ∷ PointAttrs → Bool
+isWaterLogged pa
+  = paHeight pa ≤ 0
 -}
 
--- | Compute 'SpaceAttrs' for a given @(x, y)@ coordinates. The @z@
+-- | Compute 'PointAttrs' for a given @(x, y)@ coordinates. The @z@
 -- coordinate is ignored.
-spaceAttrs ∷ Member (Reader WorldInfo) r ⇒ WorldPos → Eff r SpaceAttrs
-spaceAttrs pos
+pointAttrs ∷ Member (Reader WorldInfo) r ⇒ WorldPos → Eff r PointAttrs
+pointAttrs pos
   = do h ← height pos
        c ← climate h pos
-       return SpaceAttrs
-         { saHeight  = h
-         , saClimate = c
+       return PointAttrs
+         { paHeight  = h
+         , paClimate = c
          }
 
 -- | Compute the final height for a given (x, y) coordinates. For the

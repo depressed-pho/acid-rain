@@ -10,8 +10,8 @@ import Control.Eff (Eff, Lifted, Member)
 import Control.Eff.Reader.Lazy (Reader)
 import Data.Convertible.Base (convert)
 import Data.Foldable (for_)
-import Game.AcidRain.Module.Builtin.ChunkGen.SpaceAttrs
-  ( SpaceAttrs(..), remappedHeight, spaceAttrs )
+import Game.AcidRain.Module.Builtin.ChunkGen.PointAttrs
+  ( PointAttrs(..), remappedHeight, pointAttrs )
 import Game.AcidRain.Module.Builtin.ChunkGen.WorldInfo (WorldInfo(..))
 import Game.AcidRain.World.Chunk (chunkSize, chunkHeight)
 import Game.AcidRain.World.Chunk.Generator
@@ -38,8 +38,8 @@ terraform
                                               & wpY +~ y
                   off0  = convert wPos0
 
-              attrs ← spaceAttrs wPos0
-              putClimate off0 (saClimate attrs)
+              attrs ← pointAttrs wPos0
+              putClimate off0 (paClimate attrs)
 
               --let height = remappedHeight attrs
 

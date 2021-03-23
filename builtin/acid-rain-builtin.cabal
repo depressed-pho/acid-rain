@@ -18,11 +18,11 @@ library
 
   other-modules:
     Game.AcidRain.Module.Builtin.ChunkGen
-    Game.AcidRain.Module.Builtin.ChunkGen.SpaceAttrs
+    Game.AcidRain.Module.Builtin.ChunkGen.PointAttrs
     Game.AcidRain.Module.Builtin.ChunkGen.WorldInfo
---    Game.AcidRain.Module.Builtin.Loader.Biome
-    Game.AcidRain.Module.Builtin.Loader.Entity
-    Game.AcidRain.Module.Builtin.Loader.Tile
+--    Game.AcidRain.Module.Builtin.Biomes
+    Game.AcidRain.Module.Builtin.Entities
+    Game.AcidRain.Module.Builtin.Tiles
 
   build-depends:
     base                 ==  4.*,

@@ -3,7 +3,7 @@
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE UnicodeSyntax #-}
-module Game.AcidRain.Module.Builtin.Loader.Tile
+module Game.AcidRain.Module.Builtin.Tiles
   ( loadTiles
   ) where
 

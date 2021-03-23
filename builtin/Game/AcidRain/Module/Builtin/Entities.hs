@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE UnicodeSyntax #-}
-module Game.AcidRain.Module.Builtin.Loader.Entity
+module Game.AcidRain.Module.Builtin.Entities
   ( loadEntities
   ) where
 
