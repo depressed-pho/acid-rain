@@ -22,6 +22,7 @@ library
     Game.AcidRain.World.Chunk.Generator
     Game.AcidRain.World.Chunk.Position
     Game.AcidRain.World.Chunk.Palette
+    Game.AcidRain.World.Climate
     Game.AcidRain.World.Entity
     Game.AcidRain.World.Entity.Catalogue
     Game.AcidRain.World.Entity.Registry

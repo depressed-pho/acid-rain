@@ -19,6 +19,7 @@ module Game.AcidRain.World.Chunk
 
 import Control.Exception (assert)
 import Control.Monad.Catch (MonadThrow)
+import Data.Default (Default(..))
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Vector.Generic as GV
 import Game.AcidRain.World.Chunk.Palette (TilePalette, indexOf, idOf)
@@ -68,6 +69,7 @@ new tReg tPal eCat fill
          { _cTileReg  = tReg
          , _cTilePal  = tPal
          , _cTiles    = GV.replicate (chunkSize ⋅ chunkSize ⋅ chunkHeight) its
+         , _cClimates = GV.replicate (chunkSize ⋅ chunkSize) def
          , _cEntCat   = eCat
          , _cEntities = HM.empty
          }

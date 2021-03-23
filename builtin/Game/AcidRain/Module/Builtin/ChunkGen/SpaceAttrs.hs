@@ -45,7 +45,7 @@ remappedHeight sa
   = let height0 = saHeight sa
     in
       -- Remap everything below the sea level to lowestZ.
-      if height0 ≤ seaLevel then
+      if height0 ≤ 0 then
         lowestZ
       else
         -- And now this is a hard question. How exactly should we
@@ -63,7 +63,7 @@ remappedHeight sa
 -- function.
 isWaterLogged ∷ SpaceAttrs → Bool
 isWaterLogged sa
-  = saHeight sa ≤ seaLevel
+  = saHeight sa ≤ 0
 
 -- | Compute 'SpaceAttrs' for a given @(x, y)@ coordinates. The @z@
 -- coordinate is ignored.
@@ -130,23 +130,19 @@ height pos
     freq0 ∷ Double
     freq0 = 1 / 300
 
--- | The sea level.
-seaLevel ∷ Double
-seaLevel = 0
-
 -- | Corrode the terrain based on the 'riverStrength'.
 riverize ∷ Double → Double → Double
 riverize baseHeight river
-  | baseHeight ≤ seaLevel
+  | baseHeight ≤ 0
     = baseHeight -- Already sunk in water.
   | otherwise
-    = let adjustment = (baseHeight - seaLevel) * 6.4 + 0.6
+    = let adjustment = baseHeight * 6.4 + 0.6
           river'     = bayesianAdjustment (river + 1) adjustment
       in
         -- Adjustment to make riverbanks more varied depending on
         -- height. The lower the height is, the wider the river should
         -- be.
-        seaLevel + (baseHeight - seaLevel) ⋅ river'
+        baseHeight ⋅ river'
 
 -- | Get the river strengh at a given world position. River strength
 -- is a scalar value from @-1.0@ to @0.0@ where @-1.0@ means

@@ -9,8 +9,8 @@ module Game.AcidRain.World.Chunk.Types
   , chunkHeight
 
   , IndexedTileState(..)
-  , Chunk(..), cTileReg, cTilePal, cTiles, cEntCat, cEntities
-  , MutableChunk(..), mcTileReg, mcTilePal, mcTiles, mcEntCat, mcEntities
+  , Chunk(..), cTileReg, cTilePal, cTiles, cClimates, cEntCat, cEntities
+  , MutableChunk(..), mcTileReg, mcTilePal, mcClimates, mcTiles, mcEntCat, mcEntities
   , freezeChunk
   , thawChunk
   ) where
@@ -25,6 +25,7 @@ import qualified Data.Vector.Unboxed as UV
 import Data.Word (Word8)
 import GHC.Generics (Generic)
 import Game.AcidRain.World.Chunk.Palette (TilePalette, TileIndex)
+import Game.AcidRain.World.Climate (Climate)
 import Game.AcidRain.World.Entity (SomeEntity)
 import Game.AcidRain.World.Entity.Catalogue (EntityCatalogue)
 import Game.AcidRain.World.Position (WorldPos(..), wpX, wpY, wpZ)
@@ -100,6 +101,7 @@ data Chunk
     { _cTileReg  ∷ !TileRegistry
     , _cTilePal  ∷ !TilePalette
     , _cTiles    ∷ !(UV.Vector IndexedTileState)
+    , _cClimates ∷ !(UV.Vector Climate)
     , _cEntCat   ∷ !EntityCatalogue
     , _cEntities ∷ !(HashMap TileOffset SomeEntity)
     }
@@ -122,6 +124,7 @@ data MutableChunk σ
     { _mcTileReg  ∷ !TileRegistry
     , _mcTilePal  ∷ !TilePalette
     , _mcTiles    ∷ !(UV.MVector σ IndexedTileState)
+    , _mcClimates ∷ !(UV.MVector σ Climate)
     , _mcEntCat   ∷ !EntityCatalogue
     , _mcEntities ∷ !(HashMap TileOffset SomeEntity)
     }
@@ -130,22 +133,26 @@ makeLenses ''MutableChunk
 
 freezeChunk ∷ PrimMonad μ ⇒ MutableChunk (PrimState μ) → μ Chunk
 freezeChunk mc
-  = do tiles ← GV.freeze (mc^.mcTiles)
+  = do tiles    ← GV.freeze $ mc^.mcTiles
+       climates ← GV.freeze $ mc^.mcClimates
        return Chunk
          { _cTileReg  = mc^.mcTileReg
          , _cTilePal  = mc^.mcTilePal
          , _cTiles    = tiles
+         , _cClimates = climates
          , _cEntCat   = mc^.mcEntCat
          , _cEntities = mc^.mcEntities
          }
 
 thawChunk ∷ PrimMonad μ ⇒ Chunk → μ (MutableChunk (PrimState μ))
 thawChunk c
-  = do tiles ← GV.thaw (c^.cTiles)
+  = do tiles    ← GV.thaw $ c^.cTiles
+       climates ← GV.thaw $ c^.cClimates
        return MutableChunk
          { _mcTileReg  = c^.cTileReg
          , _mcTilePal  = c^.cTilePal
          , _mcTiles    = tiles
+         , _mcClimates = climates
          , _mcEntCat   = c^.cEntCat
          , _mcEntities = c^.cEntities
          }
