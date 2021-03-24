@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnicodeSyntax #-}
@@ -6,9 +7,11 @@ module Game.AcidRain.World.Climate
   ) where
 
 import Data.Default (Default(..))
+import Data.Hashable (Hashable)
 import qualified Data.Vector.Generic as GV
 import qualified Data.Vector.Generic.Mutable as GMV
 import qualified Data.Vector.Unboxed as UV
+import GHC.Generics (Generic)
 
 
 -- | Climate is defined for each @(x, y)@ world position in the
@@ -22,8 +25,9 @@ data Climate
     , cliHumidity    ∷ {-# UNPACK #-} !Float
       -- | Altidude in meters where @0@ is the sea level.
     , cliAltitude    ∷ {-# UNPACK #-} !Float
-    } deriving (Show, Eq)
+    } deriving (Show, Eq, Generic)
 
+instance Hashable Climate
 instance Default Climate where
   def = Climate
         { cliTemperature = 14.88 -- Global average temperature in 2020.

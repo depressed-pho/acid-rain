@@ -28,6 +28,7 @@ type BiomeID = Text
 class (Show β, Typeable β) ⇒ Biome β where
   -- | Erase the type of the biome.
   upcastBiome ∷ β → SomeBiome
+  upcastBiome = SomeBiome
   -- | Recover the type of the biome.
   downcastBiome ∷ SomeBiome → Maybe β
   downcastBiome (SomeBiome b) = cast b
