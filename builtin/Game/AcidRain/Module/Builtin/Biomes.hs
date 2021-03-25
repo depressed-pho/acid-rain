@@ -27,6 +27,7 @@ import Control.Eff (Eff, Lifted, Member)
 import Control.Eff.Reader.Lazy (Reader)
 import Control.Eff.State.Strict (State)
 import Control.Monad.Catch (MonadThrow)
+import Data.Convertible.Base (convert)
 import Data.Foldable (traverse_, for_, foldl')
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
@@ -38,12 +39,13 @@ import Game.AcidRain.World.Biome (Biome(..), SomeBiome(..))
 import Game.AcidRain.World.Chunk (chunkHeight)
 import Game.AcidRain.World.Chunk.Generator (ChunkGenM, putTileState)
 import Game.AcidRain.World.Climate (Climate(..))
-import Game.AcidRain.World.Position (WorldPos, lowestZ)
+import Game.AcidRain.World.Position (WorldPos, wpZ, lowestZ)
 import Game.AcidRain.World.Tile (SomeTileState, defaultState)
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
 import qualified Game.AcidRain.World.Tile.Registry as TR
 import Game.AcidRain.Module.Loader (LoaderContext, registerBiome)
-import Prelude.Unicode ((⋅), (≤))
+import Lens.Micro ((&), (.~))
+import Prelude.Unicode ((⋅), (≤), (∧))
 
 
 -- | A type in this class is a 'Biome' which also knows how to
@@ -105,9 +107,9 @@ chooseBiome river height cli bc
 -- @-1@. Only a few become @0@.
 remappedHeight ∷ Double → Int8
 remappedHeight height0
-  = -- Remap everything below the sea level to lowestZ.
+  = -- The ground is below the seal level.
     if height0 ≤ 0 then
-      lowestZ
+      lowestZ - 1
     else
       -- And now this is a hard question. How exactly should we remap
       -- heights above the sea level? For now we simply apply a cut
@@ -138,10 +140,15 @@ instance BiomeChunkGen Plains where
               , cliHumidity    = 0.5
               , cliAltitude    = 400
               }
-  terraform _ height _wPos0
+  terraform (Plains { air, dirt, water })  height wPos0
     = do let rHeight = remappedHeight height
          for_ [lowestZ .. lowestZ+chunkHeight-1] $ \z →
-           do return ()
+           do let wPos = wPos0 & wpZ .~ z
+                  off  = convert wPos
+              case z of
+                _ | z < 0 ∧ rHeight < lowestZ → putTileState off water
+                  | z ≤ rHeight               → putTileState off dirt
+                  | otherwise                 → return ()
 -------------------------------------------------------------------------------
 
 -- | A map from representative climate to its corresponding biome

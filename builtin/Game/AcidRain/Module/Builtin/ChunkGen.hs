@@ -35,8 +35,8 @@ terraform
        tReg ← tileRegistry
        bc   ← B.biomeChooser tReg
 
-       for_ [0, chunkSize-1] $ \y →
-         for_ [0, chunkSize-1] $ \x →
+       for_ [0 .. chunkSize-1] $ \y →
+         for_ [0 .. chunkSize-1] $ \x →
            do let wPos0 = (toWorldPos cPos 0) & wpX +~ x
                                               & wpY +~ y
                   off0  = convert wPos0

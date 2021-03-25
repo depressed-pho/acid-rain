@@ -139,7 +139,7 @@ generateChunk ∷ (MonadThrow μ, MonadIO μ)
               → ChunkPos
               → μ Chunk
 generateChunk tReg tPal bReg bPal eCat cGen cPos
-  = do air    ← TR.get "acid-rain:dirt" tReg
+  = do air    ← TR.get "acid-rain:air" tReg
        plains ← BR.get "acid-rain:plains" bReg
        c      ← C.new tReg tPal bReg bPal eCat (defaultState air) plains
        mc     ← liftIO $ thawChunk c
