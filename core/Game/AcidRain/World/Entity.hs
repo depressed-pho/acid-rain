@@ -44,8 +44,8 @@ type EntityTypeID = Text
 --
 -- @
 -- {-\# LANGUAGE OverloadedStrings \#-}
--- data PlayerT
--- instance 'EntityType' ('Data.Proxy.Proxy' PlayerT) where
+-- data Player
+-- instance 'EntityType' ('Data.Proxy.Proxy' Player) where
 --   entityID _ = "acid-rain:player"
 --   ..
 -- @

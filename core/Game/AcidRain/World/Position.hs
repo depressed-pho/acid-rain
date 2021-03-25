@@ -17,7 +17,7 @@ data WorldPos = WorldPos
   , _wpZ ∷ {-# UNPACK #-} !Int8
   } deriving (Eq, Show)
 
+makeLenses ''WorldPos
+
 lowestZ ∷ Int8
 lowestZ = -1
-
-makeLenses ''WorldPos

@@ -10,15 +10,16 @@ import Control.Eff (Eff, Lifted, Member)
 import Control.Eff.Reader.Lazy (Reader)
 import Data.Convertible.Base (convert)
 import Data.Foldable (for_)
+import qualified Game.AcidRain.Module.Builtin.Biomes as B
 import Game.AcidRain.Module.Builtin.ChunkGen.PointAttrs
-  ( PointAttrs(..), remappedHeight, pointAttrs )
+  ( PointAttrs(..), pointAttrs )
 import Game.AcidRain.Module.Builtin.ChunkGen.WorldInfo (WorldInfo(..))
-import Game.AcidRain.World.Chunk (chunkSize, chunkHeight)
+import Game.AcidRain.World.Chunk (chunkSize)
 import Game.AcidRain.World.Chunk.Generator
-  ( ChunkGenM, chunkPos, putClimate )
+  ( ChunkGenM, chunkPos, tileRegistry, putClimate, putBiome )
 import Game.AcidRain.World.Chunk.Position (toWorldPos)
-import Game.AcidRain.World.Position (wpX, wpY, wpZ, lowestZ)
-import Lens.Micro ((&), (.~), (+~))
+import Game.AcidRain.World.Position (wpX, wpY)
+import Lens.Micro ((&), (+~))
 
 
 -- | The built-in terrain generator. Internally it creates a height
@@ -31,20 +32,17 @@ import Lens.Micro ((&), (.~), (+~))
 terraform ∷ (Member (Reader WorldInfo) r, Lifted ChunkGenM r) ⇒ Eff r ()
 terraform
   = do cPos ← chunkPos
-       --air  ← 
+       tReg ← tileRegistry
+       bc   ← B.biomeChooser tReg
+
        for_ [0, chunkSize-1] $ \y →
          for_ [0, chunkSize-1] $ \x →
            do let wPos0 = (toWorldPos cPos 0) & wpX +~ x
                                               & wpY +~ y
                   off0  = convert wPos0
 
-              attrs ← pointAttrs wPos0
+              attrs ← pointAttrs bc wPos0
               putClimate off0 (paClimate attrs)
-
-              --let height = remappedHeight attrs
-
-              for_ [lowestZ, lowestZ+chunkHeight-1] $ \z →
-                do --let wPos = wPos0 & wpZ .~ z
-                   --    off  = convert wPos
-                   return ()
-       return ()
+              putBiome off0 (B.withBiomeGenProxy (paBiome attrs) B.biomeType)
+              B.withBiomeGen (paBiome attrs) $
+                \b → B.terraform b (paHeight attrs) wPos0

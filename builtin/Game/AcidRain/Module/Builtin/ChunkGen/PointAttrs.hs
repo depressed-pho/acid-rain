@@ -6,19 +6,16 @@ module Game.AcidRain.Module.Builtin.ChunkGen.PointAttrs
 
     -- * Computing point attributes
   , pointAttrs
-
-    -- * Querying point attributes
-  , remappedHeight
-  --, isWaterLogged
   ) where
 
 import Control.Eff (Eff, Member)
 import Control.Eff.Reader.Lazy (Reader, ask)
-import Data.Int (Int8)
+import Game.AcidRain.Module.Builtin.Biomes
+  ( SomeBiomeGen, BiomeChooser, chooseBiome )
 import Game.AcidRain.Module.Builtin.ChunkGen.WorldInfo
   ( WorldInfo(..), simplexInstance, voronoiInstance )
 import Game.AcidRain.World.Climate (Climate(..))
-import Game.AcidRain.World.Position (WorldPos, wpX, wpY, lowestZ)
+import Game.AcidRain.World.Position (WorldPos, wpX, wpY)
 import Numeric.Noise.FBM (fBm)
 import Numeric.Noise.OpenSimplex (SimplexGen, Scalar(..), simplex2D, scalar, diskX, diskY)
 import Numeric.Noise.Voronoi (voronoi2D, interiorValue)
@@ -41,55 +38,28 @@ data PointAttrs
       -- simplex noise but they of course are affected by the
       -- altitude.
     , paClimate ∷ !Climate
-    --, paBiome   ∷ ?
+      -- | Per-biome chunk generator chosen for this point.
+    , paBiome   ∷ !SomeBiomeGen
     } deriving (Show)
-
--- | Get a remapped height in @[-1, 0]@. The sea level becomes @-1@
--- after remapping, and nearly every height is also remapped to
--- @-1@. Only a few become @0@.
-remappedHeight ∷ PointAttrs → Int8
-remappedHeight pa
-  = let height0 = paHeight pa
-    in
-      -- Remap everything below the sea level to lowestZ.
-      if height0 ≤ 0 then
-        lowestZ
-      else
-        -- And now this is a hard question. How exactly should we
-        -- remap heights above the sea level? For now we simply apply
-        -- a cut off at a certain constant height.
-        if height0 ≤ cutOff then
-          lowestZ
-        else
-          lowestZ + 1
-  where
-    cutOff = 0.52 --0.78
-
-{-
--- | Test if the height of the ground is blow the sea level. Whether
--- the water is seawater or not is outside of the scope of this
--- function.
-isWaterLogged ∷ PointAttrs → Bool
-isWaterLogged pa
-  = paHeight pa ≤ 0
--}
 
 -- | Compute 'PointAttrs' for a given @(x, y)@ coordinates. The @z@
 -- coordinate is ignored.
-pointAttrs ∷ Member (Reader WorldInfo) r ⇒ WorldPos → Eff r PointAttrs
-pointAttrs pos
-  = do h ← height pos
-       c ← climate h pos
+pointAttrs ∷ Member (Reader WorldInfo) r ⇒ BiomeChooser → WorldPos → Eff r PointAttrs
+pointAttrs bc pos
+  = do r  ← riverStrength pos
+       h  ← height r pos
+       c  ← climate h pos
        return PointAttrs
          { paHeight  = h
          , paClimate = c
+         , paBiome   = chooseBiome r h c bc
          }
 
 -- | Compute the final height for a given (x, y) coordinates. For the
 -- base height we compute @fBm(p + fBm(p + fBm(p)))@ for the point
 -- @p@.
-height ∷ Member (Reader WorldInfo) r ⇒ WorldPos → Eff r Double
-height pos
+height ∷ Member (Reader WorldInfo) r ⇒ Double → WorldPos → Eff r Double
+height river pos
   = do let pt0 = (fromIntegral (pos^.wpX), fromIntegral (pos^.wpY))
 
        noiseX  ← simplexInstance 0
@@ -113,7 +83,6 @@ height pos
              = baseHeight⋅(abs baseHeight)⋅(wiMountainExp wi)
 
        -- Then apply a river strength.
-       river   ← riverStrength pos
        return $ riverize enhancedHeight river
   where
     evalFBm ∷ SimplexGen → (Double, Double) → Double

@@ -19,13 +19,18 @@ module Game.AcidRain.World.Chunk.Types
   , MutableChunk(..)
   , mcTileReg, mcTilePal, mcTiles, mcClimates, mcBiomeReg, mcBiomePal, mcBiomes, mcEntCat, mcEntities
 
+  , toIndexed
+
   , freezeChunk
   , thawChunk
 
+  , writeTileState
   , writeClimate
+  , writeBiome
   ) where
 
 import Control.Exception (assert)
+import Control.Monad.Catch (MonadThrow)
 import Control.Monad.Primitive (PrimMonad, PrimState)
 import Data.Convertible.Base (Convertible(..))
 import Data.HashMap.Strict (HashMap)
@@ -35,14 +40,17 @@ import qualified Data.Vector.Generic.Mutable as GMV
 import qualified Data.Vector.Unboxed as UV
 import Data.Word (Word8)
 import GHC.Generics (Generic)
+import Game.AcidRain.World.Biome (Biome(..))
 import Game.AcidRain.World.Biome.Palette (BiomePalette, BiomeIndex)
+import qualified Game.AcidRain.World.Biome.Palette as BPal
 import Game.AcidRain.World.Biome.Registry (BiomeRegistry)
 import Game.AcidRain.World.Climate (Climate)
 import Game.AcidRain.World.Entity (EntityType(..), Entity(..), SomeEntity)
 import Game.AcidRain.World.Entity.Catalogue (EntityCatalogue, (∈))
 import Game.AcidRain.World.Position (WorldPos(..), wpX, wpY, wpZ)
-import Game.AcidRain.World.Tile (TileStateValue)
+import Game.AcidRain.World.Tile (Tile(..), TileState(..), TileStateValue)
 import Game.AcidRain.World.Tile.Palette (TilePalette, TileIndex)
+import qualified Game.AcidRain.World.Tile.Palette as TPal
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
 import Lens.Micro.TH (makeLenses)
 import Lens.Micro ((^.))
@@ -164,6 +172,14 @@ assertValidEntity ∷ Entity ε ⇒ ε → Chunk → α → α
 assertValidEntity e c
   = assert (entityTypeID (entityType e) ∈ c^.cEntCat)
 
+toIndexed ∷ MonadThrow μ ⇒ TilePalette → TileState τ → μ IndexedTileState
+toIndexed palette (TileState { tsTile, tsValue })
+  = do idx ← TPal.indexOf (tileID tsTile) palette
+       return $ IndexedTileState
+         { itsIndex = idx
+         , itsValue = tsValue
+         }
+
 freezeChunk ∷ PrimMonad μ ⇒ MutableChunk (PrimState μ) → μ Chunk
 freezeChunk mc
   = do tiles    ← GV.freeze $ mc^.mcTiles
@@ -198,6 +214,20 @@ thawChunk c
          , _mcEntities = c^.cEntities
          }
 
+writeTileState ∷ (MonadThrow μ, PrimMonad μ)
+               ⇒ TileOffset
+               → TileState τ
+               → MutableChunk (PrimState μ)
+               → μ ()
+writeTileState off@(TileOffset { x, y, .. }) ts mc
+  = assertValidOffset off $
+    let x'  = fromIntegral x ∷ Int
+        y'  = fromIntegral y ∷ Int
+        z'  = fromIntegral z ∷ Int
+    in
+      do its ← toIndexed (mc^.mcTilePal) ts
+         GMV.write (mc^.mcTiles) (y'⋅chunkHeight⋅chunkSize + x'⋅chunkHeight + z') its
+
 writeClimate ∷ PrimMonad μ ⇒ TileOffset → Climate → MutableChunk (PrimState μ) → μ ()
 writeClimate off@(TileOffset { x, y, .. }) cli mc
   = assertValidOffset off $
@@ -205,3 +235,16 @@ writeClimate off@(TileOffset { x, y, .. }) cli mc
         y' = fromIntegral y ∷ Int
     in
       GMV.write (mc^.mcClimates) (y'⋅chunkSize + x') cli
+
+writeBiome ∷ (Biome β, MonadThrow μ, PrimMonad μ)
+           ⇒ TileOffset
+           → β
+           → MutableChunk (PrimState μ)
+           → μ ()
+writeBiome off@(TileOffset { x, y, .. }) b mc
+  = assertValidOffset off $
+    let x' = fromIntegral x ∷ Int
+        y' = fromIntegral y ∷ Int
+    in
+      do bi ← BPal.indexOf (biomeID b) (mc^.mcBiomePal)
+         GMV.write (mc^.mcBiomes) (y'⋅chunkSize + x') bi

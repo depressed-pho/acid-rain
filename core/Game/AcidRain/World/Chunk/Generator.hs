@@ -15,8 +15,9 @@ module Game.AcidRain.World.Chunk.Generator
   , tileRegistry
 
     -- * Modifying state
-  --, putTileState
+  , putTileState
   , putClimate
+  , putBiome
 
     -- * Running chunk generators
   , generateChunk
@@ -29,17 +30,19 @@ import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Primitive (PrimMonad(..))
 import Data.Default (Default(..))
+import Game.AcidRain.World.Biome (Biome)
 import Game.AcidRain.World.Biome.Palette (BiomePalette)
 import Game.AcidRain.World.Biome.Registry (BiomeRegistry)
 import qualified Game.AcidRain.World.Biome.Registry as BR
 import qualified Game.AcidRain.World.Chunk as C
 import Game.AcidRain.World.Chunk.Types
-  (TileOffset, mcTileReg, freezeChunk, thawChunk, writeClimate )
+  ( TileOffset, mcTileReg, freezeChunk, thawChunk
+  , writeTileState, writeClimate, writeBiome )
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
 import Game.AcidRain.World.Chunk.Types (Chunk, MutableChunk)
 import Game.AcidRain.World.Climate (Climate)
 import Game.AcidRain.World.Entity.Catalogue (EntityCatalogue)
-import Game.AcidRain.World.Tile (defaultState)
+import Game.AcidRain.World.Tile (TileState, defaultState)
 import Game.AcidRain.World.Tile.Palette (TilePalette)
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
 import qualified Game.AcidRain.World.Tile.Registry as TR
@@ -103,12 +106,26 @@ chunkPos = lift $ ChunkGenM $ (^.cgPos) <$> get
 tileRegistry ∷ Lifted ChunkGenM r ⇒ Eff r TileRegistry
 tileRegistry = lift $ ChunkGenM $ (^.cgChunk.mcTileReg) <$> get
 
--- | Put a climate value at a given tile offset.
+-- | Put a tile state at a given tile offset.
+putTileState ∷ Lifted ChunkGenM r ⇒ TileOffset → TileState τ → Eff r ()
+putTileState off ts
+  = lift $ ChunkGenM $
+    do mc ← (^.cgChunk) <$> get
+       lift $ writeTileState off ts mc
+
+-- | Put a climate value at a given @(x, y)@ tile offset.
 putClimate ∷ Lifted ChunkGenM r ⇒ TileOffset → Climate → Eff r ()
 putClimate off cli
   = lift $ ChunkGenM $
     do mc ← (^.cgChunk) <$> get
        lift $ writeClimate off cli mc
+
+-- | Put a biome type at a given @(x, y)@ tile offset.
+putBiome ∷ Biome β ⇒ Lifted ChunkGenM r ⇒ TileOffset → β → Eff r ()
+putBiome off b
+  = lift $ ChunkGenM $
+    do mc ← (^.cgChunk) <$> get
+       lift $ writeBiome off b mc
 
 -- | Generate a chunk by running a chunk generator. Only useful for
 -- server implementations.

@@ -35,11 +35,12 @@ import Game.AcidRain.World.Chunk.Types
   , cClimates
   , cBiomeReg, cBiomePal, cBiomes
   , cEntities, chunkSize, chunkHeight
-  , assertValidOffset, assertValidEntity )
+  , assertValidOffset, assertValidEntity
+  , toIndexed )
 import Game.AcidRain.World.Climate (Climate)
 import Game.AcidRain.World.Entity (Entity(..), SomeEntity)
 import Game.AcidRain.World.Entity.Catalogue (EntityCatalogue)
-import Game.AcidRain.World.Tile (Tile(..), TileState(..), SomeTileState)
+import Game.AcidRain.World.Tile (TileState(..), SomeTileState)
 import Game.AcidRain.World.Tile.Palette (TilePalette)
 import qualified Game.AcidRain.World.Tile.Palette as TPal
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
@@ -47,14 +48,6 @@ import qualified Game.AcidRain.World.Tile.Registry as TR
 import Lens.Micro ((&), (^.), (%~))
 import Prelude.Unicode ((⋅))
 
-
-toIndexed ∷ MonadThrow μ ⇒ TilePalette → TileState τ → μ IndexedTileState
-toIndexed palette (TileState { tsTile, tsValue })
-  = do idx ← TPal.indexOf (tileID tsTile) palette
-       return $ IndexedTileState
-         { itsIndex = idx
-         , itsValue = tsValue
-         }
 
 -- | Create a chunk filled with a single specific tile which is
 -- usually @acid-rain:air@. It also takes a single specific biome
@@ -112,7 +105,7 @@ tileStateAt off@(TileOffset { x, y, z }) c
            , tsValue = itsValue its
            }
 
--- | Get the climate at a given offset in a chunk.
+-- | Get the climate at a given @(x, y)@ offset in a chunk.
 climateAt ∷ TileOffset → Chunk → Climate
 climateAt off@(TileOffset { x, y, .. }) c
   = assertValidOffset off $
@@ -121,7 +114,7 @@ climateAt off@(TileOffset { x, y, .. }) c
     in
       (c^.cClimates) GV.! (y'⋅chunkSize + x')
 
--- | Get the biome at a given offset in a chunk.
+-- | Get the biome at a given @(x, y)@ offset in a chunk.
 biomeAt ∷ MonadThrow μ ⇒ TileOffset → Chunk → μ SomeBiome
 biomeAt off@(TileOffset { x, y, .. }) c
   = assertValidOffset off $

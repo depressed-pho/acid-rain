@@ -30,7 +30,7 @@ data WorldInfo
       -- | Mountain and valley enhancement factor. Use zero to apply
       -- no enhancements. Higher values turn the height exponentially
       -- close to zero.
-    , wiMountainExp ∷ Double
+    , wiMountainExp ∷ !Double
       -- | The size of biomes.
     , wiBiomeSize ∷ !Double
       -- | The large bend size of rivers.

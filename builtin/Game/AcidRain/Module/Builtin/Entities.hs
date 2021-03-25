@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.Module.Builtin.Entities
-  ( PlayerT, Player(..)
+  ( Player(..)
 
   , loadEntities
   ) where
@@ -22,14 +22,13 @@ import Game.AcidRain.World.Entity (EntityType(..), Entity(..))
 import Game.AcidRain.World.Player (PlayerID)
 
 
-data PlayerT
-instance EntityType (Proxy PlayerT) where
-  type EntityOf (Proxy PlayerT) = Player
+instance EntityType (Proxy Player) where
+  type EntityOf (Proxy Player) = Player
   entityTypeID _ = "acid-rain:player"
 
 data Player = Player !PlayerID deriving Show
 instance Entity Player where
-  type EntityTypeOf Player = Proxy PlayerT
+  type EntityTypeOf Player = Proxy Player
   entityType _ = Proxy
 
 instance HasAppearance Player where
@@ -40,5 +39,5 @@ instance HasAppearance Player where
 loadEntities ∷ (Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ Eff r ()
 loadEntities
   = traverse_ registerEntityType
-    [ upcastEntityType (Proxy ∷ Proxy PlayerT)
+    [ upcastEntityType (Proxy ∷ Proxy Player)
     ]
