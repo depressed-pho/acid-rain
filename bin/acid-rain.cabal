@@ -3,13 +3,18 @@ cabal-version:       2.4
 name:                acid-rain
 version:             0.1.0.0
 synopsis:            TTY-based factory simulation game
--- bug-reports:
+homepage:            https://github.com/depressed-pho/acid-rain
+bug-reports:         https://github.com/depressed-pho/acid-rain/issues
 license:             CC0-1.0
 license-file:        LICENSE
 author:              PHO
 maintainer:          pho@cielonegro.org
 category:            Game
 extra-source-files:  CHANGELOG.md
+
+source-repository head
+  type:     git
+  location: https://github.com/depressed-pho/acid-rain.git
 
 executable acid-rain
   main-is: Main.hs
