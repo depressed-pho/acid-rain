@@ -19,6 +19,9 @@ module Numeric.Noise.Voronoi
   , voronoi2D
   ) where
 
+import Control.Concurrent (getNumCapabilities)
+import Control.Concurrent.Cache.LRU (LRU)
+import qualified Control.Concurrent.Cache.LRU as LRU
 import Control.Monad (when)
 import Control.Monad.Primitive (MonadPrim)
 import Control.Monad.ST (ST, runST)
@@ -28,7 +31,8 @@ import Data.STRef (STRef, newSTRef, writeSTRef, readSTRef)
 import qualified Data.Vector.Generic as GV
 import qualified Data.Vector.Generic.Mutable as GMV
 import qualified Data.Vector.Unboxed as UV
-import Prelude.Unicode ((≥), (≢), (⋅))
+import Prelude.Unicode ((≥), (≢), (⋅), (∘))
+import System.IO.Unsafe (unsafePerformIO)
 import System.Random (StdGen, UniformRange, mkStdGen, uniform)
 import System.Random.Stateful (newSTGenM, uniformRM)
 
@@ -39,6 +43,8 @@ data VoronoiGen r
   = VoronoiGen
     { -- | Points in [0, 1] for both x and y coordinates.
       vgAllPoints ∷ !(UV.Vector (r, r))
+      -- | Cache of 'areaPoints'.
+    , vgAreaCache ∷ !(LRU (r, r) (UV.Vector (r, r)))
     }
 
 -- | Result of 2D Voronoi noise. It is generated with 'voronoi2D'.
@@ -102,7 +108,9 @@ minDistanceSq = 0.005
 -- | Construct a Voronoi noise generator with a given 64-bits
 -- seed. Since this is quite an expensive operation, one should reuse
 -- generators as far as possible.
-mkVoronoiGen ∷ (Hashable h, Floating r, Ord r, UV.Unbox r, UniformRange r) ⇒ h → VoronoiGen r
+mkVoronoiGen ∷ (Hashable h, Hashable r, Floating r, Ord r, UV.Unbox r, UniformRange r)
+             ⇒ h
+             → VoronoiGen r
 {-# SPECIALISE mkVoronoiGen ∷ Int64 → VoronoiGen Float  #-}
 {-# SPECIALISE mkVoronoiGen ∷ Int64 → VoronoiGen Double #-}
 mkVoronoiGen seed
@@ -124,9 +132,14 @@ mkVoronoiGen seed
        go 0
 
        allPoints' ← GV.unsafeFreeze allPoints
-       return VoronoiGen
-         { vgAllPoints = allPoints'
-         }
+       let gen = VoronoiGen
+                 { vgAllPoints = allPoints'
+                 , vgAreaCache = unsafePerformIO $
+                                 do caps ← getNumCapabilities
+                                    LRU.new caps 256 (return ∘ genAreaPoints gen)
+                                                     (const $ const $ return ())
+                 }
+       return gen
   where
     xRandom ∷ StdGen
     xRandom = mkStdGen (hash seed)
@@ -138,7 +151,8 @@ mkVoronoiGen seed
 minimalToroidalDistanceSquared ∷ (Floating r, Ord r, GMV.MVector v (r, r), MonadPrim σ μ)
                                ⇒ (r, r)
                                → v σ (r, r)
-                               → Int → μ r
+                               → Int
+                               → μ r
 {-# SPECIALISE minimalToroidalDistanceSquared
     ∷ (Float , Float ) → UV.MVector σ (Float , Float ) → Int → ST σ Float  #-}
 {-# SPECIALISE minimalToroidalDistanceSquared
@@ -170,7 +184,7 @@ toroidalDistanceSquared (x0, y0) (x1, y1)
     in
       xDist ⋅ xDist + yDist ⋅ yDist
 
-voronoi2D ∷ (Floating r, RealFrac r, UV.Unbox r)
+voronoi2D ∷ (Hashable r, Floating r, RealFrac r, UV.Unbox r)
           ⇒ VoronoiGen r
           → r -- ^ x
           → r -- ^ y
@@ -188,66 +202,80 @@ voronoi2D gen x0 y0
            y    = y0 / 5
            pt   = (x, y)
 
-           xInt = floor x ∷ Int
-           yInt = floor y ∷ Int
+           xInt = fromInteger (floor x)
+           yInt = fromInteger (floor y)
 
        -- Evaluate the points for the square (xInt, yInt).
        evalPoint mv (areaPoints gen (xInt, yInt)) pt
 
        -- Now horizontally adjacent squares as appropriate
        -- FIXME: Do these tests really make sense? I don't think so.
-       case y - fromIntegral yInt of
+       case y - yInt of
          distSq → do next ← readSTRef (mv2dNextDistanceSq mv)
                      when (distSq ≢ next) $
                        evalPoint mv (areaPoints gen (xInt, yInt - 1)) pt
 
-       case x - fromIntegral xInt of
+       case x - xInt of
          distSq → do next ← readSTRef (mv2dNextDistanceSq mv)
                      when (distSq ≢ next) $
                        evalPoint mv (areaPoints gen (xInt - 1, yInt)) pt
 
-       case y - fromIntegral yInt + 1 of
+       case y - yInt + 1 of
          distSq → do next ← readSTRef (mv2dNextDistanceSq mv)
                      when (distSq ≢ next) $
                        evalPoint mv (areaPoints gen (xInt, yInt + 1)) pt
 
-       case x - fromIntegral xInt + 1 of
+       case x - xInt + 1 of
          distSq → do next ← readSTRef (mv2dNextDistanceSq mv)
                      when (distSq ≢ next) $
                        evalPoint mv (areaPoints gen (xInt + 1, yInt)) pt
 
        -- Now diagonally adjacent squares
-       case min (y - fromIntegral yInt) (x - fromIntegral xInt) of
+       case min (y - yInt) (x - xInt) of
          distSq → do next ← readSTRef (mv2dNextDistanceSq mv)
                      when (distSq ≢ next) $
                        evalPoint mv (areaPoints gen (xInt - 1, yInt - 1)) pt
 
-       case min (y - fromIntegral yInt + 1) (x - fromIntegral xInt) of
+       case min (y - yInt + 1) (x - xInt) of
          distSq → do next ← readSTRef (mv2dNextDistanceSq mv)
                      when (distSq ≢ next) $
                        evalPoint mv (areaPoints gen (xInt - 1, yInt + 1)) pt
 
-       case min (y - fromIntegral yInt + 1) (x - fromIntegral xInt + 1) of
+       case min (y - yInt + 1) (x - xInt + 1) of
          distSq → do next ← readSTRef (mv2dNextDistanceSq mv)
                      when (distSq ≢ next) $
                        evalPoint mv (areaPoints gen (xInt + 1, yInt + 1)) pt
 
-       case min (y - fromIntegral yInt) (x - fromIntegral xInt + 1) of
+       case min (y - yInt) (x - xInt + 1) of
          distSq → do next ← readSTRef (mv2dNextDistanceSq mv)
                      when (distSq ≢ next) $
                        evalPoint mv (areaPoints gen (xInt + 1, yInt - 1)) pt
 
        freezeMutableV2D mv
 
+areaPoints ∷ (Eq r, Floating r, Hashable r, UV.Unbox r)
+           ⇒ VoronoiGen r
+           → (r, r) -- ^ area
+           → UV.Vector (r, r)
+{-# SPECIALISE areaPoints
+    ∷ VoronoiGen Float  → (Float , Float ) → UV.Vector (Float , Float ) #-}
+{-# SPECIALISE areaPoints
+    ∷ VoronoiGen Double → (Double, Double) → UV.Vector (Double, Double) #-}
+areaPoints gen area
+  = unsafePerformIO $
+    LRU.lookup area (vgAreaCache gen)
+
 -- Create a set of points on a unit torus, none of which are too
 -- close. Each unit square gets a random subset of these points.
-areaPoints ∷ (Integral i, Floating r, Hashable i, UV.Unbox r)
-           ⇒ VoronoiGen r
-           → (i, i) -- ^ area
-           → UV.Vector (r, r)
-{-# SPECIALISE areaPoints ∷ VoronoiGen Float  → (Int, Int) → UV.Vector (Float , Float ) #-}
-{-# SPECIALISE areaPoints ∷ VoronoiGen Double → (Int, Int) → UV.Vector (Double, Double) #-}
-areaPoints gen area@(areaX, areaY)
+genAreaPoints ∷ (Floating r, Hashable r, UV.Unbox r)
+              ⇒ VoronoiGen r
+              → (r, r) -- ^ area
+              → UV.Vector (r, r)
+{-# SPECIALISE genAreaPoints
+    ∷ VoronoiGen Float  → (Float , Float ) → UV.Vector (Float , Float ) #-}
+{-# SPECIALISE genAreaPoints
+    ∷ VoronoiGen Double → (Double, Double) → UV.Vector (Double, Double) #-}
+genAreaPoints gen area@(areaX, areaY)
   = runST $
     do random ← newSTGenM $ mkStdGen (hash area)
        used   ← GMV.replicate totalPoints False ∷ ST σ (UV.MVector σ Bool)
@@ -269,7 +297,7 @@ areaPoints gen area@(areaX, areaY)
                     index'  ← findUnused index 0
                     -- Add the point, offset to the area.
                     let (x, y) = (vgAllPoints gen) GV.! index'
-                    GMV.write result i (x + fromIntegral areaX, y + fromIntegral areaY)
+                    GMV.write result i (x + areaX, y + areaY)
                     -- And mark the point as used.
                     GMV.write used index' True
                     choosePoints index' (i + 1)

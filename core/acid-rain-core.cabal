@@ -18,6 +18,7 @@ source-repository head
 
 library
   exposed-modules:
+    Control.Concurrent.Cache.LRU
     Control.Eff.Instances.Catch
     Game.AcidRain.Module
     Game.AcidRain.Module.Loader

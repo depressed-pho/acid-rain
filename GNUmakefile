@@ -20,5 +20,8 @@ doc:
 run:
 	env TERM=$(RUN_TERM) cabal v2-run $(CABAL_BUILD_OPTS) all
 
+repl: # Usage: make COMP=foo
+	cabal v2-repl $(CABAL_BUILD_OPTS) $(COMP)
+
 clean:
 	cabal v2-clean
