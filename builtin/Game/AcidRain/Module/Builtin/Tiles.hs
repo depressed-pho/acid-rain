@@ -34,6 +34,13 @@ instance Tile (Proxy Dirt) where
     where
       colour = hsl 43.0 0.89 0.38 -- CSS3 darkgoldenrod
 
+data SeaWater
+instance Tile (Proxy SeaWater) where
+  tileID _ = "acid-rain:seawater"
+  appearanceFor _ _ _ = begin ⊳ unicode "~" ⊳ ascii '~' ⊳ fgColour colour ⊳ end
+    where
+      colour = hsl 195.0 1.0 0.4 -- Slightly darker than CSS3 deepskyblue
+
 data Water
 instance Tile (Proxy Water) where
   tileID _ = "acid-rain:water"
@@ -46,5 +53,6 @@ loadTiles
   = traverse_ registerTile
     [ upcastTile (Proxy ∷ Proxy Air)
     , upcastTile (Proxy ∷ Proxy Dirt)
+    , upcastTile (Proxy ∷ Proxy SeaWater)
     , upcastTile (Proxy ∷ Proxy Water)
     ]

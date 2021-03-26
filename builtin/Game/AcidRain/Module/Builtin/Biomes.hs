@@ -87,19 +87,22 @@ type BiomeSet = HashMap Climate SomeBiomeGen
 data BiomeChooser
   = BiomeChooser
     { bcClimateBased ∷ !BiomeSet
+    , bcOcean        ∷ !SomeBiomeGen
     }
 
 biomeChooser ∷ MonadThrow μ ⇒ TileRegistry → μ BiomeChooser
 biomeChooser tReg
   = do climateBased ← climateBasedBiomes tReg
+       ocean        ← instantiate (Proxy ∷ Proxy Ocean) tReg
        return BiomeChooser
          { bcClimateBased = climateBased
+         , bcOcean        = SomeBiomeGen ocean
          }
 
 chooseBiome ∷ Double → Double → Climate → BiomeChooser → SomeBiomeGen
 chooseBiome river height cli bc
 --  | river > 0.7 = error "river"
---  | height ≤ 0  = error "ocean"
+  | height < 0  = bcOcean bc
   | otherwise   = chooseBiomeForClimate cli (bcClimateBased bc)
 
 -- | Get a remapped height in @[-1, 0]@. The sea level becomes @-1@
@@ -124,6 +127,20 @@ remappedHeight height0
 -------------------------------------------------------------------------------
 -- Individual biomes
 -------------------------------------------------------------------------------
+data Ocean = Ocean { seawater ∷ !SomeTileState }
+instance Biome (Proxy Ocean) where
+  biomeID _ = "acid-rain:ocean"
+instance BiomeChunkGen Ocean where
+  instantiate _ tReg
+    = do seawater ← defaultState <$> TR.get "acid-rain:seawater" tReg
+         return Ocean { seawater }
+  climate _ = error "This biome is not climate-based"
+  terraform (Ocean { seawater }) _ wPos0
+    = for_ [lowestZ .. -1] $ \z →
+        do let wPos = wPos0 & wpZ .~ z
+               off  = convert wPos
+           putTileState off seawater
+
 data Plains = Plains { dirt  ∷ !SomeTileState
                      , water ∷ !SomeTileState }
 instance Biome (Proxy Plains) where
@@ -192,6 +209,7 @@ chooseBiomeForClimate cli biomes
 loadBiomes ∷ ∀r. (Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ Eff r ()
 loadBiomes
   = do traverse_ register' climateBasedBiomeProxies
+       registerBiome (Proxy ∷ Proxy Ocean)
   where
     register' ∷ SomeBiomeProxy → Eff r ()
     register' (SomeBiomeProxy bp)
