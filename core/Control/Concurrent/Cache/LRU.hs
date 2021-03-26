@@ -19,7 +19,8 @@ import Control.Concurrent.MVar
   ( MVar, newMVar, newEmptyMVar, readMVar
   , putMVar, modifyMVar, modifyMVar_ )
 import Control.Concurrent.QSem (QSem, newQSem, waitQSem, signalQSem)
-import Control.Exception (SomeException, assert, bracket_, catch, throwIO)
+import Control.Exception
+  ( SomeException, assert, bracket_, onException, catch, throwIO )
 import Control.Monad (join, void)
 import Data.Foldable (traverse_)
 import Data.Hashable (Hashable)
@@ -94,20 +95,27 @@ new maxR cap ret evi
 -- procedure if it's missing.
 lookup ∷ (Hashable k, Eq k) ⇒ k → LRU k v → IO v
 lookup k lru
-  = join $ modifyMVar (lru^.lruEntries) $ \lm →
-      case HM.lookup k (lm^.lmEntries) of
-        Just cell →
-          do let !lm' = lm & lmEvictionQ %~ touch k
-             return (lm', evalCell cell)
-
-        Nothing →
-          do -- We don't know if we can acquire the semaphore at this
-             -- point, but we must create an empty cell here because
-             -- otherwise there is no way to fill it afterwards.
-             cell ← newEmptyMVar
-             let !lm' = lm & lmEntries %~ HM.insert k cell
-             return (lm', fillCell cell)
+  = lookup' `onException` removeCell
   where
+    lookup'
+      = join $ modifyMVar (lru^.lruEntries) $ \lm →
+          case HM.lookup k (lm^.lmEntries) of
+            Just cell →
+              do let !lm' = lm & lmEvictionQ %~ touch k
+                 return (lm', evalCell cell)
+
+            Nothing →
+              do -- We don't know if we can acquire the semaphore at
+                -- this point, but we must create an empty cell here
+                -- because otherwise there is no way to fill it
+                -- afterwards.
+                cell ← newEmptyMVar
+                let !lm' = lm & lmEntries %~ HM.insert k cell
+                return (lm', fillCell cell)
+
+    removeCell
+      = modifyMVar_ (lru^.lruEntries) (return∘(& lmEntries %~ HM.delete k))
+
     evalCell cell
       = do ev ← readMVar cell
            case ev of
@@ -120,13 +128,13 @@ lookup k lru
            v ← bracket_ (waitQSem sem) (signalQSem sem) $
                do v ← catch ((lru^.lruRetrieve) k) $ \(e ∷ SomeException) →
                     do putMVar cell (Left e)
-                       modifyMVar_ (lru^.lruEntries) (return∘(& lmEntries %~ HM.delete k))
+                       -- Throwing an exception here will invoke
+                       -- 'removeCell'.
                        throwIO e
                   -- Reaching here means that the retriever didn't
-                  -- throw. If this thread gets killed by an
-                  -- asynchronous exception, 'evalCell' will die with
-                  -- 'BlockedOnMVar'. There is nothing we can do about
-                  -- that.
+                  -- throw. We can still be killed by an asynchronous
+                  -- exception, in which case 'removeCell' will be
+                  -- invoked.
                   putMVar cell (Right v)
                   return v
            -- Now that we have retrieved the value, we can release the
