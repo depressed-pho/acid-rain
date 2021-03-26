@@ -19,14 +19,12 @@ module Numeric.Noise.Voronoi
   , voronoi2D
   ) where
 
-import Control.Eff (run)
-import Control.Eff.State.Strict (execState, modify, get)
 import Control.Monad (when)
 import Control.Monad.Primitive (MonadPrim)
 import Control.Monad.ST (ST, runST)
-import Data.Default (Default(..))
 import Data.Hashable (Hashable, hash)
 import Data.Int (Int64)
+import Data.STRef (STRef, newSTRef, writeSTRef, readSTRef)
 import qualified Data.Vector.Generic as GV
 import qualified Data.Vector.Generic.Mutable as GMV
 import qualified Data.Vector.Unboxed as UV
@@ -51,18 +49,45 @@ data Voronoi2D r
       v2dShortestDistanceSq ∷ !r
       -- | Squared distance to the next closest point.
     , v2dNextDistanceSq ∷ !r
-      -- | @(x, y)@ coordinates of the closest point.
-    , v2dClosestPoint ∷ !(r, r)
+      -- | @x@ coordinate of the closest point.
+    , v2dClosestX ∷ !r
+      -- | @y@ coordinate of the closest point.
+    , v2dClosestY ∷ !r
     } deriving Show
 
-instance Fractional r ⇒ Default (Voronoi2D r) where
-  {-# SPECIALISE instance Default (Voronoi2D Float ) #-}
-  {-# SPECIALISE instance Default (Voronoi2D Double) #-}
-  def = Voronoi2D
-        { v2dShortestDistanceSq = 1 / 0 -- Infinity
-        , v2dNextDistanceSq     = 1 / 0
-        , v2dClosestPoint       = (1 / 0, 1 / 0)
-        }
+data MVoronoi2D σ r
+  = MVoronoi2D
+    { mv2dShortestDistanceSq ∷ !(STRef σ r)
+    , mv2dNextDistanceSq ∷ !(STRef σ r)
+    , mv2dClosestX ∷ !(STRef σ r)
+    , mv2dClosestY ∷ !(STRef σ r)
+    }
+
+newMutableV2D ∷ Fractional r ⇒ ST σ (MVoronoi2D σ r)
+newMutableV2D
+  = do shortest ← newSTRef (1/0) -- Infinity
+       next     ← newSTRef (1/0)
+       closestX ← newSTRef (1/0)
+       closestY ← newSTRef (1/0)
+       return MVoronoi2D
+         { mv2dShortestDistanceSq = shortest
+         , mv2dNextDistanceSq     = next
+         , mv2dClosestX           = closestX
+         , mv2dClosestY           = closestY
+         }
+
+freezeMutableV2D ∷ MVoronoi2D σ r → ST σ (Voronoi2D r)
+freezeMutableV2D mv
+  = do shortest ← readSTRef $ mv2dShortestDistanceSq mv
+       next     ← readSTRef $ mv2dNextDistanceSq mv
+       closestX ← readSTRef $ mv2dClosestX mv
+       closestY ← readSTRef $ mv2dClosestY mv
+       return Voronoi2D
+         { v2dShortestDistanceSq = shortest
+         , v2dNextDistanceSq     = next
+         , v2dClosestX           = closestX
+         , v2dClosestY           = closestY
+         }
 
 totalPoints ∷ Int
 totalPoints = 100
@@ -71,6 +96,7 @@ pointsPerTorus ∷ Int
 pointsPerTorus = 25
 
 minDistanceSq ∷ Floating r ⇒ r
+{-# INLINE minDistanceSq #-}
 minDistanceSq = 0.005
 
 -- | Construct a Voronoi noise generator with a given 64-bits
@@ -97,7 +123,7 @@ mkVoronoiGen seed
                       else go i -- Retry with the next random point.
        go 0
 
-       allPoints' ← GV.freeze allPoints
+       allPoints' ← GV.unsafeFreeze allPoints
        return VoronoiGen
          { vgAllPoints = allPoints'
          }
@@ -152,11 +178,13 @@ voronoi2D ∷ (Floating r, RealFrac r, UV.Unbox r)
 {-# SPECIALISE voronoi2D ∷ VoronoiGen Float  → Float  → Float  → Voronoi2D Float  #-}
 {-# SPECIALISE voronoi2D ∷ VoronoiGen Double → Double → Double → Voronoi2D Double #-}
 voronoi2D gen x0 y0
-  = run $ execState def $
-    do let -- This algorithm places the points about five times more
-           -- frequently, so adjust the passed coordinates rather than
-           -- recalibrating all the routes.
-           x    = x0 / 5
+  = runST $
+    do mv ← newMutableV2D
+
+       -- This algorithm places the points about five times more
+       -- frequently, so adjust the passed coordinates rather than
+       -- recalibrating all the routes.
+       let x    = x0 / 5
            y    = y0 / 5
            pt   = (x, y)
 
@@ -164,50 +192,52 @@ voronoi2D gen x0 y0
            yInt = floor y ∷ Int
 
        -- Evaluate the points for the square (xInt, yInt).
-       modify $ evalPoint (areaPoints gen (xInt, yInt)) pt
+       evalPoint mv (areaPoints gen (xInt, yInt)) pt
 
        -- Now horizontally adjacent squares as appropriate
        -- FIXME: Do these tests really make sense? I don't think so.
        case y - fromIntegral yInt of
-         distSq → do res ← get
-                     when (distSq ≢ v2dNextDistanceSq res) $
-                       modify $ evalPoint (areaPoints gen (xInt, yInt - 1)) pt
+         distSq → do next ← readSTRef (mv2dNextDistanceSq mv)
+                     when (distSq ≢ next) $
+                       evalPoint mv (areaPoints gen (xInt, yInt - 1)) pt
 
        case x - fromIntegral xInt of
-         distSq → do res ← get
-                     when (distSq ≢ v2dNextDistanceSq res) $
-                       modify $ evalPoint (areaPoints gen (xInt - 1, yInt)) pt
+         distSq → do next ← readSTRef (mv2dNextDistanceSq mv)
+                     when (distSq ≢ next) $
+                       evalPoint mv (areaPoints gen (xInt - 1, yInt)) pt
 
        case y - fromIntegral yInt + 1 of
-         distSq → do res ← get
-                     when (distSq ≢ v2dNextDistanceSq res) $
-                       modify $ evalPoint (areaPoints gen (xInt, yInt + 1)) pt
+         distSq → do next ← readSTRef (mv2dNextDistanceSq mv)
+                     when (distSq ≢ next) $
+                       evalPoint mv (areaPoints gen (xInt, yInt + 1)) pt
 
        case x - fromIntegral xInt + 1 of
-         distSq → do res ← get
-                     when (distSq ≢ v2dNextDistanceSq res) $
-                       modify $ evalPoint (areaPoints gen (xInt + 1, yInt)) pt
+         distSq → do next ← readSTRef (mv2dNextDistanceSq mv)
+                     when (distSq ≢ next) $
+                       evalPoint mv (areaPoints gen (xInt + 1, yInt)) pt
 
        -- Now diagonally adjacent squares
        case min (y - fromIntegral yInt) (x - fromIntegral xInt) of
-         distSq → do res ← get
-                     when (distSq ≢ v2dNextDistanceSq res) $
-                       modify $ evalPoint (areaPoints gen (xInt - 1, yInt - 1)) pt
+         distSq → do next ← readSTRef (mv2dNextDistanceSq mv)
+                     when (distSq ≢ next) $
+                       evalPoint mv (areaPoints gen (xInt - 1, yInt - 1)) pt
 
        case min (y - fromIntegral yInt + 1) (x - fromIntegral xInt) of
-         distSq → do res ← get
-                     when (distSq ≢ v2dNextDistanceSq res) $
-                       modify $ evalPoint (areaPoints gen (xInt - 1, yInt + 1)) pt
+         distSq → do next ← readSTRef (mv2dNextDistanceSq mv)
+                     when (distSq ≢ next) $
+                       evalPoint mv (areaPoints gen (xInt - 1, yInt + 1)) pt
 
        case min (y - fromIntegral yInt + 1) (x - fromIntegral xInt + 1) of
-         distSq → do res ← get
-                     when (distSq ≢ v2dNextDistanceSq res) $
-                       modify $ evalPoint (areaPoints gen (xInt + 1, yInt + 1)) pt
+         distSq → do next ← readSTRef (mv2dNextDistanceSq mv)
+                     when (distSq ≢ next) $
+                       evalPoint mv (areaPoints gen (xInt + 1, yInt + 1)) pt
 
        case min (y - fromIntegral yInt) (x - fromIntegral xInt + 1) of
-         distSq → do res ← get
-                     when (distSq ≢ v2dNextDistanceSq res) $
-                       modify $ evalPoint (areaPoints gen (xInt + 1, yInt - 1)) pt
+         distSq → do next ← readSTRef (mv2dNextDistanceSq mv)
+                     when (distSq ≢ next) $
+                       evalPoint mv (areaPoints gen (xInt + 1, yInt - 1)) pt
+
+       freezeMutableV2D mv
 
 -- Create a set of points on a unit torus, none of which are too
 -- close. Each unit square gets a random subset of these points.
@@ -245,36 +275,33 @@ areaPoints gen area@(areaX, areaY)
                     choosePoints index' (i + 1)
        choosePoints 0 0
 
-       GV.freeze result
+       GV.unsafeFreeze result
 
-evalPoint ∷ ∀r. (Floating r, Ord r, UV.Unbox r)
-          ⇒ UV.Vector (r, r)
+evalPoint ∷ ∀r σ. (Floating r, Ord r, UV.Unbox r)
+          ⇒ MVoronoi2D σ r
+          → UV.Vector (r, r)
           → (r, r)
-          → Voronoi2D r
-          → Voronoi2D r
+          → ST σ ()
 {-# SPECIALISE evalPoint
-    ∷ UV.Vector (Float , Float ) → (Float , Float ) → Voronoi2D Float  → Voronoi2D Float  #-}
+    ∷ MVoronoi2D σ Float  → UV.Vector (Float , Float ) → (Float , Float ) → ST σ () #-}
 {-# SPECIALISE evalPoint
-    ∷ UV.Vector (Double, Double) → (Double, Double) → Voronoi2D Double → Voronoi2D Double #-}
-evalPoint points (x, y) res0 = GV.foldl' update res0 points
+    ∷ MVoronoi2D σ Double → UV.Vector (Double, Double) → (Double, Double) → ST σ () #-}
+evalPoint mv points (x, y) = GV.mapM_ update points
   where
-    update ∷ Voronoi2D r → (r, r) → Voronoi2D r
-    update res (pX, pY)
-      = let xDist  = x - pX
-            yDist  = y - pY
-        in
-          case xDist ⋅ xDist + yDist ⋅ yDist of
-            distSq
-              | distSq < v2dShortestDistanceSq res →
-                  res {
-                    v2dNextDistanceSq     = v2dShortestDistanceSq res
-                  , v2dShortestDistanceSq = distSq
-                  , v2dClosestPoint       = (pX, pY)
-                  }
+    update ∷ (r, r) → ST σ ()
+    update (pX, pY)
+      = do let xDist = x - pX
+               yDist = y - pY
+           shortest ← readSTRef $ mv2dShortestDistanceSq mv
+           case xDist ⋅ xDist + yDist ⋅ yDist of
+             distSq
+               | distSq < shortest →
+                   do writeSTRef (mv2dNextDistanceSq     mv) shortest
+                      writeSTRef (mv2dShortestDistanceSq mv) distSq
+                      writeSTRef (mv2dClosestX           mv) pX
+                      writeSTRef (mv2dClosestY           mv) pY
               | otherwise →
-                  res {
-                    v2dNextDistanceSq = distSq
-                  }
+                  writeSTRef (mv2dNextDistanceSq mv) distSq
 
 -- | Return 0 in the middle of a cell and 1 on the border.
 borderValue ∷ Fractional r ⇒ Voronoi2D r → r

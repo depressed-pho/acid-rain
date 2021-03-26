@@ -124,23 +124,21 @@ remappedHeight height0
 -------------------------------------------------------------------------------
 -- Individual biomes
 -------------------------------------------------------------------------------
-data Plains = Plains { air   ∷ !SomeTileState
-                     , dirt  ∷ !SomeTileState
+data Plains = Plains { dirt  ∷ !SomeTileState
                      , water ∷ !SomeTileState }
 instance Biome (Proxy Plains) where
   biomeID _ = "acid-rain:plains"
 instance BiomeChunkGen Plains where
   instantiate _ tReg
-    = do air   ← defaultState <$> TR.get "acid-rain:air"   tReg
-         dirt  ← defaultState <$> TR.get "acid-rain:dirt"  tReg
+    = do dirt  ← defaultState <$> TR.get "acid-rain:dirt"  tReg
          water ← defaultState <$> TR.get "acid-rain:water" tReg
-         return Plains { air, dirt, water }
+         return Plains { dirt, water }
   climate _ = Climate
               { cliTemperature = 18
               , cliHumidity    = 0.5
               , cliAltitude    = 400
               }
-  terraform (Plains { air, dirt, water })  height wPos0
+  terraform (Plains { dirt, water })  height wPos0
     = do let rHeight = remappedHeight height
          for_ [lowestZ .. lowestZ+chunkHeight-1] $ \z →
            do let wPos = wPos0 & wpZ .~ z

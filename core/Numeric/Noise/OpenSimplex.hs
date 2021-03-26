@@ -379,7 +379,7 @@ lookup2D = runST $
                      GMV.write mv (i ⋅ 4 + 1) (latticePoint2D  0  1)
                      GMV.write mv (i ⋅ 4 + 2) (latticePoint2D i1 j1)
                      GMV.write mv (i ⋅ 4 + 3) (latticePoint2D i2 j2)
-              GV.freeze mv
+              GV.unsafeFreeze mv
 
 -- 3D contribution lookup table (DigitalShadow)
 lookup3D ∷ ∀i r. ( Integral i
@@ -395,7 +395,7 @@ lookup3D = runST $
               for_ [0, 2 .. (GV.length lookupPairs3D) - 1] $ \i →
                 GMV.write mv (fromIntegral (lookupPairs3D GV.! i))
                              (contributions3D GV.! fromIntegral (lookupPairs3D GV.! (i + 1)))
-              GV.freeze mv
+              GV.unsafeFreeze mv
   where
     base3D ∷ BV.Vector (UV.Vector i)
     {-# NOINLINE base3D #-}
@@ -523,10 +523,10 @@ mkSimplexGen seed
                       go (i-1) seed''
        go 1023 seed
 
-       perm'       ← GV.freeze perm
-       perm2D'     ← GV.freeze perm2D
-       perm2DSph2' ← GV.freeze perm2DSph2
-       perm3D'     ← GV.freeze perm3D
+       perm'       ← GV.unsafeFreeze perm
+       perm2D'     ← GV.unsafeFreeze perm2D
+       perm2DSph2' ← GV.unsafeFreeze perm2DSph2
+       perm3D'     ← GV.unsafeFreeze perm3D
        return SimplexGen
          { _sgPerm       = perm'
          , _sgPerm2D     = perm2D'

@@ -140,7 +140,7 @@ getTile ∷ (Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ TileID → 
 getTile tid
   = getTileRegistry >>= TR.get tid
 
-  -- | Get the biome registry from the context. Module loaders usually
+-- | Get the biome registry from the context. Module loaders usually
 -- don't need to use this directly. There are helper functions such as
 -- 'registerBiome' to manipulate the biome registry in a loader.
 getBiomeRegistry ∷ Member (State LoaderContext) r ⇒ Eff r BiomeRegistry
