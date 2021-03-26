@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -119,7 +120,7 @@ mkVoronoiGen seed
 
        xRandST ← newSTGenM xRandom
        yRandST ← newSTGenM yRandom
-       let go i
+       let go !i
              | i ≥ totalPoints = return ()
              | otherwise
                = do x  ← uniformRM (0, 1) xRandST
@@ -157,9 +158,9 @@ minimalToroidalDistanceSquared ∷ (Floating r, Ord r, GMV.MVector v (r, r), Mon
     ∷ (Float , Float ) → UV.MVector σ (Float , Float ) → Int → ST σ Float  #-}
 {-# SPECIALISE minimalToroidalDistanceSquared
     ∷ (Double, Double) → UV.MVector σ (Double, Double) → Int → ST σ Double #-}
-minimalToroidalDistanceSquared point existing numPoints = go 0 1.0
+minimalToroidalDistanceSquared !point !existing !numPoints = go 0 1.0
   where
-    go i result
+    go !i !result
       | i ≥ numPoints = return result
       | otherwise     = do point' ← GMV.read existing i
                            case toroidalDistanceSquared point point' of
@@ -172,17 +173,17 @@ toroidalDistanceSquared ∷ (Floating r, Ord r) ⇒ (r, r) → (r, r) → r
     ∷ (Float , Float ) → (Float , Float ) → Float  #-}
 {-# SPECIALISE toroidalDistanceSquared
     ∷ (Double, Double) → (Double, Double) → Double #-}
-toroidalDistanceSquared (x0, y0) (x1, y1)
-  = let xDist = case abs (x0 - x1) of
-                  xDist0
-                    | xDist0 > 0.5 → 1.0 - xDist0
-                    | otherwise    → xDist0
-        yDist = case abs (y0 - y1) of
-                  yDist0
-                    | yDist0 > 0.5 → 1.0 - yDist0
-                    | otherwise    → yDist0
+toroidalDistanceSquared (!x0, !y0) (!x1, !y1)
+  = let !xDist = case abs (x0 - x1) of
+                   xDist0
+                     | xDist0 > 0.5 → 1.0 - xDist0
+                     | otherwise    → xDist0
+        !yDist = case abs (y0 - y1) of
+                   yDist0
+                     | yDist0 > 0.5 → 1.0 - yDist0
+                     | otherwise    → yDist0
     in
-      xDist ⋅ xDist + yDist ⋅ yDist
+      xDist⋅xDist + yDist⋅yDist
 
 voronoi2D ∷ (Hashable r, Floating r, RealFrac r, UV.Unbox r)
           ⇒ VoronoiGen r
@@ -198,12 +199,12 @@ voronoi2D gen x0 y0
        -- This algorithm places the points about five times more
        -- frequently, so adjust the passed coordinates rather than
        -- recalibrating all the routes.
-       let x    = x0 / 5
-           y    = y0 / 5
-           pt   = (x, y)
+       let !x    = x0 / 5
+           !y    = y0 / 5
+           !pt   = (x, y)
 
-           xInt = fromInteger (floor x)
-           yInt = fromInteger (floor y)
+           !xInt = fromInteger (floor x)
+           !yInt = fromInteger (floor y)
 
        -- Evaluate the points for the square (xInt, yInt).
        evalPoint mv (areaPoints gen (xInt, yInt)) pt
@@ -281,7 +282,7 @@ genAreaPoints gen area@(areaX, areaY)
        used   ← GMV.replicate totalPoints False ∷ ST σ (UV.MVector σ Bool)
        result ← GMV.unsafeNew pointsPerTorus
 
-       let choosePoints index i
+       let choosePoints !index !i
              | i ≥ pointsPerTorus = return ()
              | otherwise
                = do advance ← uniformRM (0, totalPoints-1) random
@@ -314,12 +315,12 @@ evalPoint ∷ ∀r σ. (Floating r, Ord r, UV.Unbox r)
     ∷ MVoronoi2D σ Float  → UV.Vector (Float , Float ) → (Float , Float ) → ST σ () #-}
 {-# SPECIALISE evalPoint
     ∷ MVoronoi2D σ Double → UV.Vector (Double, Double) → (Double, Double) → ST σ () #-}
-evalPoint mv points (x, y) = GV.mapM_ update points
+evalPoint !mv !points (!x, !y) = GV.mapM_ update points
   where
     update ∷ (r, r) → ST σ ()
-    update (pX, pY)
-      = do let xDist = x - pX
-               yDist = y - pY
+    update (!pX, !pY)
+      = do let !xDist = x - pX
+               !yDist = y - pY
            shortest ← readSTRef $ mv2dShortestDistanceSq mv
            case xDist ⋅ xDist + yDist ⋅ yDist of
              distSq
@@ -328,8 +329,8 @@ evalPoint mv points (x, y) = GV.mapM_ update points
                       writeSTRef (mv2dShortestDistanceSq mv) distSq
                       writeSTRef (mv2dClosestX           mv) pX
                       writeSTRef (mv2dClosestY           mv) pY
-              | otherwise →
-                  writeSTRef (mv2dNextDistanceSq mv) distSq
+               | otherwise →
+                   writeSTRef (mv2dNextDistanceSq mv) distSq
 
 -- | Return 0 in the middle of a cell and 1 on the border.
 borderValue ∷ Fractional r ⇒ Voronoi2D r → r
