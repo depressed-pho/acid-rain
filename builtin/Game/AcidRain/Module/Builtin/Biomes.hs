@@ -1,3 +1,4 @@
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -88,20 +89,23 @@ data BiomeChooser
   = BiomeChooser
     { bcClimateBased ∷ !BiomeSet
     , bcOcean        ∷ !SomeBiomeGen
+    , bcRiver        ∷ !SomeBiomeGen
     }
 
 biomeChooser ∷ MonadThrow μ ⇒ TileRegistry → μ BiomeChooser
 biomeChooser tReg
   = do climateBased ← climateBasedBiomes tReg
        ocean        ← instantiate (Proxy ∷ Proxy Ocean) tReg
+       river        ← instantiate (Proxy ∷ Proxy River) tReg
        return BiomeChooser
          { bcClimateBased = climateBased
          , bcOcean        = SomeBiomeGen ocean
+         , bcRiver        = SomeBiomeGen river
          }
 
 chooseBiome ∷ Double → Double → Climate → BiomeChooser → SomeBiomeGen
 chooseBiome river height cli bc
---  | river > 0.7 = error "river"
+  | river > 0.7 = bcRiver bc
   | height < 0  = bcOcean bc
   | otherwise   = chooseBiomeForClimate cli (bcClimateBased bc)
 
@@ -127,19 +131,25 @@ remappedHeight height0
 -------------------------------------------------------------------------------
 -- Individual biomes
 -------------------------------------------------------------------------------
-data Ocean = Ocean { seawater ∷ !SomeTileState }
+data Ocean = Ocean { sand     ∷ !SomeTileState
+                   , seawater ∷ !SomeTileState }
 instance Biome (Proxy Ocean) where
   biomeID _ = "acid-rain:ocean"
 instance BiomeChunkGen Ocean where
   instantiate _ tReg
-    = do seawater ← defaultState <$> TR.get "acid-rain:seawater" tReg
-         return Ocean { seawater }
+    = do sand     ← defaultState <$> TR.get "acid-rain:sand"     tReg
+         seawater ← defaultState <$> TR.get "acid-rain:seawater" tReg
+         return Ocean { sand, seawater }
   climate _ = error "This biome is not climate-based"
-  terraform (Ocean { seawater }) _ wPos0
-    = for_ [lowestZ .. -1] $ \z →
-        do let wPos = wPos0 & wpZ .~ z
-               off  = convert wPos
-           putTileState off seawater
+  terraform (Ocean { sand, seawater }) height wPos0
+    = do let rHeight = remappedHeight height
+         for_ [lowestZ .. lowestZ+chunkHeight-1] $ \z →
+           do let wPos = wPos0 & wpZ .~ z
+                  off  = convert wPos
+              case z of
+                _ | z < 0 ∧ rHeight < lowestZ → putTileState off seawater
+                  | z ≤ rHeight               → putTileState off sand
+                  | otherwise                 → return ()
 
 data Plains = Plains { dirt  ∷ !SomeTileState
                      , water ∷ !SomeTileState }
@@ -155,7 +165,7 @@ instance BiomeChunkGen Plains where
               , cliHumidity    = 0.5
               , cliAltitude    = 400
               }
-  terraform (Plains { dirt, water })  height wPos0
+  terraform (Plains { dirt, water }) height wPos0
     = do let rHeight = remappedHeight height
          for_ [lowestZ .. lowestZ+chunkHeight-1] $ \z →
            do let wPos = wPos0 & wpZ .~ z
@@ -163,6 +173,26 @@ instance BiomeChunkGen Plains where
               case z of
                 _ | z < 0 ∧ rHeight < lowestZ → putTileState off water
                   | z ≤ rHeight               → putTileState off dirt
+                  | otherwise                 → return ()
+
+data River = River { gravel ∷ !SomeTileState
+                   , water  ∷ !SomeTileState }
+instance Biome (Proxy River) where
+  biomeID _ = "acid-rain:river"
+instance BiomeChunkGen River where
+  instantiate _ tReg
+    = do gravel ← defaultState <$> TR.get "acid-rain:gravel" tReg
+         water  ← defaultState <$> TR.get "acid-rain:water"  tReg
+         return River { gravel, water }
+  climate _ = error "This biome is not climate-based"
+  terraform (River { gravel, water }) height wPos0
+    = do let rHeight = remappedHeight height
+         for_ [lowestZ .. lowestZ+chunkHeight-1] $ \z →
+           do let wPos = wPos0 & wpZ .~ z
+                  off  = convert wPos
+              case z of
+                _ | z < 0 ∧ rHeight < lowestZ → putTileState off water
+                  | z ≤ rHeight               → putTileState off gravel
                   | otherwise                 → return ()
 -------------------------------------------------------------------------------
 
