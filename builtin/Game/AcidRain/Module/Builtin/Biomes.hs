@@ -240,6 +240,7 @@ loadBiomes ∷ ∀r. (Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ Ef
 loadBiomes
   = do traverse_ register' climateBasedBiomeProxies
        registerBiome (Proxy ∷ Proxy Ocean)
+       registerBiome (Proxy ∷ Proxy River)
   where
     register' ∷ SomeBiomeProxy → Eff r ()
     register' (SomeBiomeProxy bp)
