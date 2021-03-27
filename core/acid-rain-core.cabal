@@ -23,6 +23,7 @@ library
     Game.AcidRain.Module
     Game.AcidRain.Module.Loader
     Game.AcidRain.TUI
+    Game.AcidRain.TUI.Keystroke
     Game.AcidRain.World
     Game.AcidRain.World.Biome
     Game.AcidRain.World.Biome.Palette
@@ -31,6 +32,7 @@ library
     Game.AcidRain.World.Chunk.Generator
     Game.AcidRain.World.Chunk.Position
     Game.AcidRain.World.Climate
+    Game.AcidRain.World.Command
     Game.AcidRain.World.Direction
     Game.AcidRain.World.Entity
     Game.AcidRain.World.Entity.Catalogue
