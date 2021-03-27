@@ -33,6 +33,7 @@ library
     Game.AcidRain.World.Chunk.Position
     Game.AcidRain.World.Climate
     Game.AcidRain.World.Command
+    Game.AcidRain.World.Command.Registry
     Game.AcidRain.World.Direction
     Game.AcidRain.World.Entity
     Game.AcidRain.World.Entity.Catalogue

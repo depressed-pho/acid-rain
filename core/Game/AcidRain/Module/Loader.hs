@@ -28,6 +28,13 @@ module Game.AcidRain.Module.Loader
   , lookupEntityType
   , getEntityType
 
+    -- * Registering commands
+  , getCommandRegistry
+  , putCommandRegistry
+  , registerCommand
+  , lookupCommand
+  , getCommand
+
     -- * Modifying chunk generator
   , modifyChunkGenerator
 
@@ -36,9 +43,10 @@ module Game.AcidRain.Module.Loader
   , loadModules
   , lcWorldSeed
   , lcMods
-  , lcTiles
-  , lcBiomes
-  , lcEntityTypes
+  , lcTileReg
+  , lcBiomeReg
+  , lcEntityReg
+  , lcCommandReg
   , lcChunkGen
   ) where
 
@@ -51,12 +59,16 @@ import Data.Foldable (traverse_, toList)
 import qualified Data.HashMap.Strict as HM
 import Game.AcidRain.Module.Types
   ( Module(..), SomeModule(..), ModuleMap, LoaderContext(..)
-  , lcWorldSeed, lcMods, lcTiles, lcBiomes, lcEntityTypes, lcChunkGen )
+  , lcWorldSeed, lcMods, lcTileReg, lcBiomeReg
+  , lcEntityReg, lcCommandReg, lcChunkGen )
 import Game.AcidRain.World (WorldSeed)
 import Game.AcidRain.World.Biome (Biome, BiomeID, SomeBiome)
 import Game.AcidRain.World.Biome.Registry (BiomeRegistry)
 import qualified Game.AcidRain.World.Biome.Registry as BR
 import Game.AcidRain.World.Chunk.Generator (ChunkGenerator)
+import Game.AcidRain.World.Command (Command, CommandID, SomeCommand)
+import Game.AcidRain.World.Command.Registry (CommandRegistry)
+import qualified Game.AcidRain.World.Command.Registry as CR
 import Game.AcidRain.World.Entity (EntityType, EntityTypeID, SomeEntityType)
 import Game.AcidRain.World.Entity.Registry (EntityRegistry)
 import qualified Game.AcidRain.World.Entity.Registry as ER
@@ -70,12 +82,13 @@ import Prelude.Unicode ((∘))
 empty ∷ WorldSeed → LoaderContext
 empty seed
   = LoaderContext
-    { _lcWorldSeed   = seed
-    , _lcMods        = HM.empty
-    , _lcTiles       = TR.empty
-    , _lcBiomes      = BR.empty
-    , _lcEntityTypes = ER.empty
-    , _lcChunkGen    = def
+    { _lcWorldSeed  = seed
+    , _lcMods       = HM.empty
+    , _lcTileReg    = TR.empty
+    , _lcBiomeReg   = BR.empty
+    , _lcEntityReg  = ER.empty
+    , _lcCommandReg = CR.empty
+    , _lcChunkGen   = def
     }
 
 -- | Load a single module.
@@ -117,13 +130,13 @@ getWorldSeed = _lcWorldSeed <$> get
 -- don't need to use this directly. There are helper functions such as
 -- 'registerTile' to manipulate the tile registry in a loader.
 getTileRegistry ∷ Member (State LoaderContext) r ⇒ Eff r TileRegistry
-getTileRegistry = _lcTiles <$> get
+getTileRegistry = _lcTileReg <$> get
 
 -- | Put a tile registry to the context. Module loaders usually don't
 -- need to use this directly.
 putTileRegistry ∷ Member (State LoaderContext) r ⇒ TileRegistry → Eff r ()
 putTileRegistry tiles
-  = modify $ lcTiles .~ tiles
+  = modify $ lcTileReg .~ tiles
 
 -- | Register a tile. Throws if it's already been registered.
 registerTile ∷ (Tile τ, Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ τ → Eff r ()
@@ -144,13 +157,13 @@ getTile tid
 -- don't need to use this directly. There are helper functions such as
 -- 'registerBiome' to manipulate the biome registry in a loader.
 getBiomeRegistry ∷ Member (State LoaderContext) r ⇒ Eff r BiomeRegistry
-getBiomeRegistry = _lcBiomes <$> get
+getBiomeRegistry = _lcBiomeReg <$> get
 
 -- | Put a biome registry to the context. Module loaders usually don't
 -- need to use this directly.
 putBiomeRegistry ∷ Member (State LoaderContext) r ⇒ BiomeRegistry → Eff r ()
 putBiomeRegistry biomes
-  = modify $ lcBiomes .~ biomes
+  = modify $ lcBiomeReg .~ biomes
 
 -- | Register a biome. Throws if it's already been registered.
 registerBiome ∷ (Biome β, Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ β → Eff r ()
@@ -171,13 +184,13 @@ getBiome bid
 -- don't need to use this directly. There are helper functions such as
 -- 'registerEntityType' to manipulate the entity registry in a loader.
 getEntityRegistry ∷ Member (State LoaderContext) r ⇒ Eff r EntityRegistry
-getEntityRegistry = _lcEntityTypes <$> get
+getEntityRegistry = _lcEntityReg <$> get
 
 -- | Put an entity registry to the context. Module loaders usually
 -- don't need to use this directly.
 putEntityRegistry ∷ Member (State LoaderContext) r ⇒ EntityRegistry → Eff r ()
 putEntityRegistry entities
-  = modify $ lcEntityTypes .~ entities
+  = modify $ lcEntityReg .~ entities
 
 -- | Register an entity type. Throws if it's already been registered.
 registerEntityType ∷ (EntityType τ, Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ τ → Eff r ()
@@ -193,6 +206,33 @@ lookupEntityType etid
 getEntityType ∷ (Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ EntityTypeID → Eff r SomeEntityType
 getEntityType etid
   = getEntityRegistry >>= ER.get etid
+
+-- | Get the command registry from the context. Module loaders usually
+-- don't need to use this directly. There are helper functions such as
+-- 'registerCommand' to manipulate the command registry in a loader.
+getCommandRegistry ∷ Member (State LoaderContext) r ⇒ Eff r CommandRegistry
+getCommandRegistry = _lcCommandReg <$> get
+
+-- | Put a command registry to the context. Module loaders usually don't
+-- need to use this directly.
+putCommandRegistry ∷ Member (State LoaderContext) r ⇒ CommandRegistry → Eff r ()
+putCommandRegistry commands
+  = modify $ lcCommandReg .~ commands
+
+-- | Register a command. Throws if it's already been registered.
+registerCommand ∷ (Command c, Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ c → Eff r ()
+registerCommand command
+  = getCommandRegistry >>= CR.register command >>= putCommandRegistry
+
+-- | Lookup a command by its ID.
+lookupCommand ∷ Member (State LoaderContext) r ⇒ CommandID → Eff r (Maybe SomeCommand)
+lookupCommand cid
+  = getCommandRegistry >>= return ∘ CR.lookup cid
+
+-- | Get a command by its ID. Throws if it doesn't exist.
+getCommand ∷ (Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ CommandID → Eff r SomeCommand
+getCommand cid
+  = getCommandRegistry >>= CR.get cid
 
 -- | Modify the chunk generator by applying a given function.
 modifyChunkGenerator ∷ Member (State LoaderContext) r ⇒ (ChunkGenerator → ChunkGenerator) → Eff r ()

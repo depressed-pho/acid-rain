@@ -20,7 +20,7 @@ import Control.Monad.STM (STM, atomically, throwSTM)
 import qualified Data.UUID as U
 import Game.AcidRain.Module (SomeModule)
 import Game.AcidRain.Module.Loader
-  ( loadModules, lcTiles, lcBiomes, lcEntityTypes, lcChunkGen )
+  ( loadModules, lcTileReg, lcBiomeReg, lcEntityReg, lcChunkGen )
 import qualified Game.AcidRain.Module.Builtin.Entities as B
 import Game.AcidRain.World
   ( World(..), WorldMode(..), WorldState(..), WorldSeed, WorldStateChanged(..)
@@ -169,13 +169,13 @@ newWorld wm mods seed
                    -- order to construct the LCM, we need a tile
                    -- palette. Constructing a tile palette never fails
                    -- because we are doing it from scratch.
-                   let tReg = lc^.lcTiles
+                   let tReg = lc^.lcTileReg
                        tPal = TPal.fromRegistry tReg
                        -- And we also need a biome palette.
-                       bReg = lc^.lcBiomes
+                       bReg = lc^.lcBiomeReg
                        bPal = BPal.fromRegistry bReg
                        -- And an entity catalogue.
-                       eReg = lc^.lcEntityTypes
+                       eReg = lc^.lcEntityReg
                        eCat = ECat.fromRegistry eReg
                        -- And a chunk generator too.
                        cGen = lc^.lcChunkGen

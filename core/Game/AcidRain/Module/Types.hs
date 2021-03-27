@@ -9,7 +9,8 @@ module Game.AcidRain.Module.Types
   , SomeModule(..)
   , ModuleMap
   , LoaderContext(..)
-  , lcWorldSeed, lcMods, lcTiles, lcBiomes, lcEntityTypes, lcChunkGen
+  , lcWorldSeed, lcMods, lcTileReg, lcBiomeReg
+  , lcEntityReg, lcCommandReg, lcChunkGen
   ) where
 
 import Control.Eff (Eff, Member)
@@ -18,6 +19,7 @@ import Control.Monad.Catch (MonadThrow)
 import Data.HashMap.Strict (HashMap)
 import Data.Text (Text)
 import Game.AcidRain.World (WorldSeed)
+import Game.AcidRain.World.Command.Registry (CommandRegistry)
 import Game.AcidRain.World.Biome.Registry (BiomeRegistry)
 import Game.AcidRain.World.Chunk.Generator (ChunkGenerator)
 import Game.AcidRain.World.Entity.Registry (EntityRegistry)
@@ -68,18 +70,20 @@ data LoaderContext
   = LoaderContext
     { -- | Extract the world seed of which the world that the modules
       -- are being loaded for.
-      _lcWorldSeed   ∷ !WorldSeed
+      _lcWorldSeed  ∷ !WorldSeed
       -- | Extract modules that have been fully loaded. This doesn't
       -- include a module that is currently being loaded.
-    , _lcMods        ∷ !ModuleMap
+    , _lcMods       ∷ !ModuleMap
       -- | Extract the tile registry that has been constructed.
-    , _lcTiles       ∷ !TileRegistry
+    , _lcTileReg    ∷ !TileRegistry
       -- | Extract the biome registry that has been constructed.
-    , _lcBiomes      ∷ !BiomeRegistry
+    , _lcBiomeReg   ∷ !BiomeRegistry
       -- | Extract the entity registry that has been constructed.
-    , _lcEntityTypes ∷ !EntityRegistry
+    , _lcEntityReg  ∷ !EntityRegistry
+      -- | Extract the command registry that has been constructed.
+    , _lcCommandReg ∷ !CommandRegistry
       -- | Extract the chunk generator that has been composed.
-    , _lcChunkGen    ∷ !ChunkGenerator
+    , _lcChunkGen   ∷ !ChunkGenerator
     }
 
 makeLenses ''LoaderContext
