@@ -9,4 +9,6 @@ data Direction
   | West
   | East
   | Sourth
+  | Up
+  | Down
   deriving (Show, Eq)
