@@ -26,6 +26,7 @@ library
     Game.AcidRain.Module.Builtin.ChunkGen.PointAttrs
     Game.AcidRain.Module.Builtin.ChunkGen.WorldInfo
     Game.AcidRain.Module.Builtin.Biomes
+    Game.AcidRain.Module.Builtin.Commands
     Game.AcidRain.Module.Builtin.Tiles
 
   build-depends:

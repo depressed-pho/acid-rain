@@ -85,4 +85,5 @@ drawUI wv = [renderWorldView wv]
 appEvent ∷ Ord n ⇒ WorldView n → BrickEvent n (AppEvent n) → EventM n (Next (WorldView n))
 appEvent wv (VtyEvent (V.EvResize _ _)) = redrawWorldView wv >>= continue
 appEvent wv (AppEvent (Redraw _      )) = redrawWorldView wv >>= continue
+--appEvent wv ev = fail (show ev)
 appEvent wv _ = halt wv

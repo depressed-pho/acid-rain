@@ -1,4 +1,7 @@
-CABAL_BUILD_OPTS?= -j --enable-executable-dynamic --ghc-option=-fno-ignore-asserts
+CABAL_BUILD_OPTS?= \
+	-j \
+	--enable-executable-dynamic \
+	--ghc-option=-fno-ignore-asserts
 
 # Because the compilation mode of Emacs get confused by escape
 # sequences.

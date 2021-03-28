@@ -11,6 +11,7 @@ import Data.Proxy (Proxy)
 import qualified Game.AcidRain.Module.Builtin.ChunkGen as CG
 import Game.AcidRain.Module.Builtin.ChunkGen.WorldInfo (worldInfo)
 import Game.AcidRain.Module (Module(..))
+import Game.AcidRain.Module.Builtin.Commands (loadCommands)
 import Game.AcidRain.Module.Builtin.Biomes (loadBiomes)
 import Game.AcidRain.Module.Builtin.Entities (loadEntities)
 import Game.AcidRain.Module.Builtin.Tiles (loadTiles)
@@ -29,6 +30,7 @@ instance Module (Proxy BuiltinModule) where
     = do loadTiles
          loadEntities
          loadBiomes
+         loadCommands
          wi ← worldInfo <$> getWorldSeed
          modifyChunkGenerator $
            terraform %~ (>> runReader wi CG.terraform)

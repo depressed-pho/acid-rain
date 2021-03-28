@@ -4,6 +4,7 @@ module Game.AcidRain.World.Direction
   ) where
 
 
+-- Currently unused
 data Direction
   = North
   | West
