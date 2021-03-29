@@ -8,15 +8,16 @@ module Game.AcidRain.World.Local
   , newWorld
   ) where
 
-import Control.Concurrent (forkIO, threadDelay)
+import Control.Concurrent (forkIO)
 import Control.Concurrent.STM.TBQueue
   ( TBQueue, newTBQueueIO, tryReadTBQueue, readTBQueue, writeTBQueue )
 import Control.Concurrent.STM.TVar (TVar, newTVarIO, readTVar, writeTVar)
 import Data.Convertible.Base (convert)
 import Control.Exception (Exception(..), SomeException, handle)
-import Control.Monad (void)
+import Control.Monad (join, void)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.STM (STM, atomically, throwSTM)
+import Data.Maybe (isJust)
 import qualified Data.UUID as U
 import Game.AcidRain.Module (SomeModule)
 import Game.AcidRain.Module.Loader
@@ -24,11 +25,13 @@ import Game.AcidRain.Module.Loader
 import qualified Game.AcidRain.Module.Builtin.Entities as B
 import Game.AcidRain.World
   ( World(..), WorldMode(..), WorldState(..), WorldSeed, WorldStateChanged(..)
+  , ChunkArrived(..)
   , WorldNotRunningException(..), UnknownPlayerIDException(..) )
 import qualified Game.AcidRain.World.Biome.Palette as BPal
 import Game.AcidRain.World.Chunk (Chunk, putEntity)
 import Game.AcidRain.World.Chunk.Manager.Local (LocalChunkManager)
 import qualified Game.AcidRain.World.Chunk.Manager.Local as LCM
+import Game.AcidRain.World.Chunk.Position (ChunkPos)
 import qualified Game.AcidRain.World.Entity as E
 import qualified Game.AcidRain.World.Entity.Catalogue as ECat
 import Game.AcidRain.World.Event (Event(..), SomeEvent)
@@ -51,6 +54,7 @@ data LocalWorld
     , lwSeed   ∷ !WorldSeed
     , lwState  ∷ !(TVar (WorldState RunningState))
     , lwEvents ∷ !(TBQueue SomeEvent)
+    , lwChunkReqs ∷ !(TBQueue ChunkPos)
     }
 
 eventQueueCapacity ∷ Natural
@@ -67,18 +71,18 @@ data RunningState
 -- anywhere.
 assumeRunning ∷ LocalWorld → STM RunningState
 assumeRunning lw
-  = do ws ← readTVar $ lwState lw
+  = do ws ← readTVar (lwState lw)
        case ws of
          Running rs → return rs
          _          → throwSTM $ WorldNotRunningException ws
 
--- Keep running a supplied IO action while the world is running.
-repeatWhileRunning ∷ LocalWorld → (RunningState → IO ()) → IO ()
-repeatWhileRunning lw f
-  = do ws ← atomically $ readTVar $ lwState lw
+-- See if the world is running.
+isRunning ∷ LocalWorld → STM (Maybe RunningState)
+isRunning lw
+  = do ws ← readTVar (lwState lw)
        case ws of
-         Running rs → f rs >> repeatWhileRunning lw f
-         _          → return ()
+         Running rs → return (Just rs)
+         _          → return Nothing
 
 -- Fire a world event.
 fireEvent ∷ Event e ⇒ LocalWorld → e → STM ()
@@ -112,13 +116,12 @@ instance World LocalWorld where
   lookupChunk lw pos
     = liftIO $ atomically $
       do rs ← assumeRunning lw
-         LCM.lookup pos $ rsChunks rs
-
-  -- FIXME: Remove this later.
-  ensureChunkExists lw pos
-    = liftIO $ atomically $
-      do rs ← assumeRunning lw
-         void $ LCM.get pos $ rsChunks rs
+         mc ← LCM.lookup pos $ rsChunks rs
+         if isJust mc
+           then return mc
+           else do -- Put a chunk retrieval request on a queue.
+                   writeTBQueue (lwChunkReqs lw) pos
+                   return mc
 
   getPlayer lw pid
     = liftIO $ atomically $ assumeRunning lw >>= get'
@@ -149,11 +152,13 @@ newWorld wm mods seed
   = liftIO $
     do ws ← newTVarIO Loading
        es ← newTBQueueIO eventQueueCapacity
+       cReqs ← newTBQueueIO eventQueueCapacity
        let lw = LocalWorld
                 { lwMode   = wm
                 , lwSeed   = seed
                 , lwState  = ws
                 , lwEvents = es
+                , lwChunkReqs = cReqs
                 }
        void $ forkIO $ newWorld' lw >> runWorld lw
        return lw
@@ -217,12 +222,22 @@ catchWhileRunning lw a
 
 runWorld ∷ LocalWorld → IO ()
 runWorld lw
-  = repeatWhileRunning lw runWorld'
+  = catchWhileRunning lw loop
   where
-    runWorld' ∷ RunningState → IO ()
-    runWorld' _rs
-      = catchWhileRunning lw $
-        do threadDelay 10000000 -- FIXME
+    loop = join $ atomically $
+           do mrs ← isRunning lw
+              case mrs of
+                Nothing → return (return ())
+                Just rs →
+                  do cReq ← readTBQueue (lwChunkReqs lw)
+                     -- If the requested chunk is indeed not
+                     -- available, LCM.get spawns a thread and then
+                     -- retries the transaction. Thus we can respond
+                     -- to world termination immediately while
+                     -- generating the requested chunk.
+                     c ← LCM.get cReq (rsChunks rs)
+                     fireEvent lw $ ChunkArrived cReq c
+                     return loop
 
 -- | Get the coordinate of the initial spawn.
 initialSpawn ∷ RunningState → STM WorldPos

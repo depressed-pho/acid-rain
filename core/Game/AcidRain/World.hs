@@ -11,6 +11,7 @@ module Game.AcidRain.World
 
     -- * Events
   , WorldStateChanged(..)
+  , ChunkArrived(..)
 
     -- * Exceptions
   , WorldNotRunningException(..)
@@ -58,8 +59,6 @@ class World w where
   -- does not block. If the chunk isn't available yet, an event
   -- ChunkArrived will fire later.
   lookupChunk ∷ MonadIO μ ⇒ w → ChunkPos → μ (Maybe Chunk)
-  -- FIXME: Remove this later.
-  ensureChunkExists ∷ MonadIO μ ⇒ w → ChunkPos → μ ()
   -- | Get a player in the world having a given ID.
   getPlayer ∷ MonadIO μ ⇒ w → PlayerID → μ Player
 
@@ -79,7 +78,6 @@ instance World SomeWorld where
       eraseRunningState (Closed e)     = Closed e
   waitForEvent (SomeWorld w) = waitForEvent w
   lookupChunk (SomeWorld w) = lookupChunk w
-  ensureChunkExists (SomeWorld w) = ensureChunkExists w
   getPlayer (SomeWorld w) = getPlayer w
 
 data WorldMode
@@ -119,6 +117,21 @@ instance Show WorldStateChanged where
       appPrec = 10
 
 instance Event WorldStateChanged
+
+-- | An event to be fired when a chunk which was previously
+-- unavailable is now available.
+data ChunkArrived = ChunkArrived !ChunkPos !Chunk
+
+instance Show ChunkArrived where
+  showsPrec d (ChunkArrived cPos _)
+    = showParen (d > appPrec) $
+      showString "ChunkArrived " ∘
+      showsPrec (appPrec + 1) cPos ∘
+      showString " .."
+    where
+      appPrec = 10
+
+instance Event ChunkArrived
 
 -- | An exception to be thrown when a certain operation assuming the
 -- world is running is attempted, but it was actually not running.

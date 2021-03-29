@@ -137,8 +137,7 @@ redrawWorldView wv
                 → ChunkPos
                 → μ V.Image
     renderChunk wTopLeft wTopRight wBottomLeft cPos
-      = do ensureChunkExists (wv^.wvWorld) cPos
-           chunk' ← lookupChunk (wv^.wvWorld) cPos
+      = do chunk' ← lookupChunk (wv^.wvWorld) cPos
 
            -- Now the problem is how to determine the visible area of
            -- this chunk. For each chunk we know which area in the
@@ -154,7 +153,7 @@ redrawWorldView wv
 
            -- And we know which area in the world coords is visible.
            case chunk' of
-             Nothing    → return $ V.charFill V.defAttr ' ' (wxEnd - wxBegin) (wyEnd - wyBegin)
+             Nothing    → return $ V.charFill V.defAttr ' ' (wxEnd-wxBegin+1) (wyEnd-wyBegin+1)
              Just chunk →
                let wRow wy    = V.horizCat <$> mapM (flip wCol wy) [wxBegin .. wxEnd]
                    wCol wx wy = renderXY chunk wx wy
