@@ -1,8 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Command
   ( Command(..)
@@ -13,7 +10,7 @@ module Game.AcidRain.World.Command
 
 import Data.Hashable (Hashable(..))
 import Data.Text (Text)
-import Data.Typeable (Typeable, (:~:)(..), cast, eqT, typeOf)
+import Data.Typeable (Typeable, cast)
 import GHC.Generics (Generic)
 import Game.AcidRain.TUI.Keystroke (Keystroke)
 import Prelude.Unicode ((≡))
@@ -30,9 +27,7 @@ data CommandType
   | Interactive !(Maybe Keystroke)
   deriving (Eq, Show, Generic)
 
-instance Hashable CommandType
-
-class (Show c, Eq c, Hashable c, Typeable c) ⇒ Command c where
+class (Show c, Typeable c) ⇒ Command c where
   -- | Erase the type of the command.
   upcastCommand ∷ c → SomeCommand
   upcastCommand = SomeCommand
@@ -50,16 +45,15 @@ data SomeCommand = ∀c. Command c ⇒ SomeCommand !c
 instance Show SomeCommand where
   showsPrec d (SomeCommand c) = showsPrec d c
 
+-- | Two commands are equivalent if their IDs are identical.
 instance Eq SomeCommand where
-  (SomeCommand (a ∷ α)) == (SomeCommand (b ∷ β))
-    = case eqT @α @β of
-        Just Refl → a ≡ b
-        Nothing   → False
+  (SomeCommand a) == (SomeCommand b)
+    = (commandID a) ≡ (commandID b)
 
+-- | Hash value of a command is a hash value of its ID.
 instance Hashable SomeCommand where
   hashWithSalt salt (SomeCommand c)
-    = salt       `hashWithSalt`
-      (typeOf c) `hashWithSalt` c
+    = salt `hashWithSalt` commandID c
 
 instance Command SomeCommand where
   upcastCommand = id

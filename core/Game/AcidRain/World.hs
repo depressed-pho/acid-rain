@@ -20,11 +20,13 @@ module Game.AcidRain.World
 
 import Control.Exception (Exception, SomeException)
 import Control.Monad.IO.Class (MonadIO)
+import Data.HashSet (HashSet)
 import Data.Kind (Type)
 import Data.Int (Int64)
 import Data.Typeable (Typeable)
 import Game.AcidRain.World.Chunk (Chunk)
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
+import Game.AcidRain.World.Command (SomeCommand)
 import Game.AcidRain.World.Event (Event(..), SomeEvent)
 import Game.AcidRain.World.Player (Player, PlayerID)
 import Prelude.Unicode ((∘))
@@ -52,6 +54,10 @@ class World w where
   -- other methods of this class throws exceptions when invoked at a
   -- wrong state.
   getWorldState ∷ MonadIO μ ⇒ w → μ (WorldState (RunningStateT w))
+  -- | Get the entire set of available commands for this world. This
+  -- includes client-only ones that have nothing to do with server
+  -- side.
+  getAllCommands ∷ MonadIO μ ⇒ w → μ (HashSet SomeCommand)
   -- | Block until the next world event is fired, or return 'Nothing'
   -- if these is no chance that any more events can ever fire.
   waitForEvent ∷ MonadIO μ ⇒ w → μ (Maybe SomeEvent)
@@ -76,6 +82,7 @@ instance World SomeWorld where
       eraseRunningState (LoadFailed e) = LoadFailed e
       eraseRunningState (Running _)    = Running ()
       eraseRunningState (Closed e)     = Closed e
+  getAllCommands (SomeWorld w) = getAllCommands w
   waitForEvent (SomeWorld w) = waitForEvent w
   lookupChunk (SomeWorld w) = lookupChunk w
   getPlayer (SomeWorld w) = getPlayer w

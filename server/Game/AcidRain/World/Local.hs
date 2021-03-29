@@ -21,7 +21,7 @@ import Data.Maybe (isJust)
 import qualified Data.UUID as U
 import Game.AcidRain.Module (SomeModule)
 import Game.AcidRain.Module.Loader
-  ( loadModules, lcTileReg, lcBiomeReg, lcEntityReg, lcChunkGen )
+  ( loadModules, lcTileReg, lcBiomeReg, lcEntityReg, lcCommandReg, lcChunkGen )
 import qualified Game.AcidRain.Module.Builtin.Entities as B
 import Game.AcidRain.World
   ( World(..), WorldMode(..), WorldState(..), WorldSeed, WorldStateChanged(..)
@@ -32,6 +32,8 @@ import Game.AcidRain.World.Chunk (Chunk, putEntity)
 import Game.AcidRain.World.Chunk.Manager.Local (LocalChunkManager)
 import qualified Game.AcidRain.World.Chunk.Manager.Local as LCM
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
+import Game.AcidRain.World.Command.Registry (CommandRegistry)
+import qualified Game.AcidRain.World.Command.Registry as CR
 import qualified Game.AcidRain.World.Entity as E
 import qualified Game.AcidRain.World.Entity.Catalogue as ECat
 import Game.AcidRain.World.Event (Event(..), SomeEvent)
@@ -63,8 +65,9 @@ eventQueueCapacity = 256
 -- The state of running world. Not exposed to anywhere.
 data RunningState
   = RunningState
-    { rsChunks  ∷ !LocalChunkManager
-    , rsPlayers ∷ !LocalPlayerManager
+    { rsChunks   ∷ !LocalChunkManager
+    , rsPlayers  ∷ !LocalPlayerManager
+    , rsCommands ∷ !CommandRegistry
     } deriving Show
 
 -- Assume the world is running or throw an exception. Not exposed to
@@ -100,6 +103,10 @@ instance World LocalWorld where
 
   getWorldState
     = liftIO ∘ atomically ∘ readTVar ∘ lwState
+
+  getAllCommands lw
+    = liftIO $ atomically $ assumeRunning lw >>= \rs →
+        return $ CR.valuesSet (rsCommands rs)
 
   waitForEvent lw
     = liftIO $ atomically $
@@ -195,8 +202,9 @@ newWorld wm mods seed
                    -- it and start a new one. It's okay because we are
                    -- still in the Loading state.
                    return $ RunningState
-                     { rsChunks  = lcm
-                     , rsPlayers = lpm
+                     { rsChunks   = lcm
+                     , rsPlayers  = lpm
+                     , rsCommands = lc^.lcCommandReg
                      }
            atomically $
              do case wm of

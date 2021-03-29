@@ -15,16 +15,23 @@ module Game.AcidRain.World.Command.Registry
     -- * Querying registries
   , lookup
   , get
+  , valuesSet
 
     -- * Exceptions
   , ConflictingCommandIDException(..)
   , UnknownCommandIDException(..)
   ) where
 
+-- Registries have lots of similarities but TemplateHaskell doesn't
+-- support generating Haddock comments atm:
+-- https://gitlab.haskell.org/ghc/ghc/-/issues/5467
+
 import Control.Exception (Exception(..))
 import Control.Monad.Catch (MonadThrow, throwM)
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
+import Data.HashSet (HashSet)
+import qualified Data.HashSet as HS
 import Data.MonoTraversable
   ( Element, MonoFunctor, MonoFoldable, MonoTraversable, GrowingAppend
   , otraverse )
@@ -73,6 +80,11 @@ get cid reg
   = case lookup cid reg of
       Just command → return command
       Nothing      → throwM $ UnknownCommandIDException cid
+
+-- | Get the entire commands in the registry.
+valuesSet ∷ CommandRegistry → HashSet SomeCommand
+valuesSet (CommandRegistry reg)
+  = HM.foldr' HS.insert HS.empty reg
 
 -- | An exception to be thrown when two commands with the same ID is
 -- being registered.
