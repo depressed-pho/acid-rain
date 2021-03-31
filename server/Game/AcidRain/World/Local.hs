@@ -25,7 +25,7 @@ import Game.AcidRain.Module.Loader
 import qualified Game.AcidRain.Module.Builtin.Entities as B
 import Game.AcidRain.World
   ( World(..), WorldMode(..), WorldState(..), WorldSeed, WorldStateChanged(..)
-  , ChunkArrived(..)
+  , CommandSetUpdated(..), ChunkArrived(..)
   , WorldNotRunningException(..), UnknownPlayerIDException(..) )
 import qualified Game.AcidRain.World.Biome.Palette as BPal
 import Game.AcidRain.World.Chunk (Chunk, putEntity)
@@ -103,10 +103,6 @@ instance World LocalWorld where
 
   getWorldState
     = liftIO ∘ atomically ∘ readTVar ∘ lwState
-
-  getAllCommands lw
-    = liftIO $ atomically $ assumeRunning lw >>= \rs →
-        return $ CR.valuesSet (rsCommands rs)
 
   waitForEvent lw
     = liftIO $ atomically $
@@ -210,6 +206,8 @@ newWorld wm mods seed
              do case wm of
                   SinglePlayer → void $ newPlayer U.nil Administrator rs
                   _            → return ()
+                -- Notify clients of all the available commands.
+                fireEvent lw $ CommandSetUpdated $ CR.valuesSet (rsCommands rs)
                 -- Okay, now we can run the world but before that we
                 -- change the state.
                 changeState lw $ Running rs

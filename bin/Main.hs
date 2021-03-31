@@ -3,31 +3,22 @@
 module Main (main) where
 
 import qualified Brick.AttrMap as A
-import Brick.BChan (BChan, newBChan, writeBChan)
+import Brick.BChan (newBChan)
 import Brick.Main (
   App(..), neverShowCursor, continue, halt, customMain )
 import Brick.Types (BrickEvent(..), Widget, EventM, Next)
-import Brick.Widgets.Core (getName)
-import Control.Concurrent (forkIO)
 import Control.Monad (void)
 import Data.UUID (nil)
+import Data.Unique (Unique)
 import Data.Proxy (Proxy(..))
 import Game.AcidRain.Module (Module(..))
 import Game.AcidRain.Module.Builtin (BuiltinModule)
-import Game.AcidRain.TUI.Widgets.WorldView
-  ( WorldView, worldView, renderWorldView, redrawWorldView )
-import Game.AcidRain.World (World(..), WorldMode(..){-, WorldStateChanged-})
-import Game.AcidRain.World.Event
-  ( Event, EventDispatcher, dispatcher, {-addHandler, -}dispatch )
+import Game.AcidRain.TUI.AppEvent (SomeAppEvent)
+import Game.AcidRain.TUI.Client
+  ( Client, newClient, drawClient, handleClientEvent, isClientClosed )
+import Game.AcidRain.World (WorldMode(..))
 import Game.AcidRain.World.Local (newWorld)
 import qualified Graphics.Vty as V
-
-data Name = TheWorldView
-  deriving (Show, Eq, Ord)
-
-data AppEvent n
-  = Redraw !n
-  deriving Show
 
 main ∷ IO ()
 main
@@ -35,42 +26,13 @@ main
        lw ← newWorld SinglePlayer [upcastModule (Proxy ∷ Proxy BuiltinModule)] seed
 
        evChan ← newBChan 256
-       let wv = worldView TheWorldView True lw nil
-       void $ forkIO $ handleWorldEvents (getName wv) lw evChan
-
-       -- We don't need to send 'Redraw' to the channel here, because
-       -- we'll soon get a WorldStateChanged event.
-       --writeBChan evChan $ Redraw $ getName wv
+       cli    ← newClient True lw nil evChan
 
        let buildVty = V.mkVty V.defaultConfig
        initialVty ← buildVty
-       void $ customMain initialVty buildVty (Just evChan) theApp wv
+       void $ customMain initialVty buildVty (Just evChan) theApp cli
 
-handleWorldEvents ∷ World w ⇒ n → w → BChan (AppEvent n) → IO ()
-handleWorldEvents n w evChan
-  = do e' ← waitForEvent w
-       case e' of
-         Just e  → dispatch ed e *> handleWorldEvents n w evChan
-         Nothing → return ()
-  where
-    ed ∷ EventDispatcher () IO ()
-    ed = --addHandler catchWSC $
-         dispatcher catchAll
-
-{-
-    catchWSC ∷ WorldStateChanged → IO ()
-    catchWSC _ = writeBChan evChan $ Redraw n
--}
-
-    -- In theory we could be listening on all the events that can
-    -- possibly outdate the world view and be doing nothing in the
-    -- fallback handler, but that is very error-prone. Instead we do
-    -- the opposite. We listen on individual events that don't need to
-    -- redraw the view.
-    catchAll ∷ ∀e. Event e ⇒ e → IO ()
-    catchAll _ = writeBChan evChan $ Redraw n
-
-theApp ∷ App (WorldView Name) (AppEvent Name) Name
+theApp ∷ App Client SomeAppEvent Unique
 theApp = App
          { appDraw         = drawUI
          , appChooseCursor = neverShowCursor
@@ -79,11 +41,12 @@ theApp = App
          , appAttrMap      = const $ A.attrMap V.defAttr []
          }
 
-drawUI ∷ Ord n ⇒ WorldView n → [Widget n]
-drawUI wv = [renderWorldView wv]
+drawUI ∷ Client → [Widget Unique]
+drawUI = drawClient
 
-appEvent ∷ Ord n ⇒ WorldView n → BrickEvent n (AppEvent n) → EventM n (Next (WorldView n))
-appEvent wv (VtyEvent (V.EvResize _ _)) = redrawWorldView wv >>= continue
-appEvent wv (AppEvent (Redraw _      )) = redrawWorldView wv >>= continue
---appEvent wv ev = fail (show ev)
-appEvent wv _ = halt wv
+appEvent ∷ Client → BrickEvent Unique SomeAppEvent → EventM Unique (Next Client)
+appEvent cli be
+  = do cli' ← handleClientEvent cli be
+       if isClientClosed cli'
+         then halt cli'
+         else continue cli'

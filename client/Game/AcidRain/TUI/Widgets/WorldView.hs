@@ -18,7 +18,7 @@ import Brick.Types
   ( Location(..), Widget(..), Size(..), EventM, Extent(..)
   , availWidthL, availHeightL, emptyResult, getContext, imageL, locL )
 import Brick.Widgets.Center (center)
-import Brick.Widgets.Core (Named(..), fill, reportExtent, txt, txtWrap)
+import Brick.Widgets.Core (Named(..), fill, reportExtent, txt, txtWrap, vBox)
 import Control.Exception (SomeException, Handler(..), catches)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO, liftIO)
@@ -92,7 +92,7 @@ renderWorldView wv
 redrawWorldView ∷ ∀n. Eq n ⇒ WorldView n → EventM n (WorldView n)
 redrawWorldView wv
   = do ext ← lookupExtent (wv^.wvName)
-       w   ← mapM mkWidget ext
+       w   ← traverse mkWidget ext
        return $ wv & wvWidget .~ w
   where
     mkWidget ∷ Extent n → EventM n (Widget n)
@@ -239,7 +239,9 @@ catchWNRE ∷ WorldNotRunningException → IO (Widget n)
 catchWNRE (WorldNotRunningException ws)
   = return $
     case ws of
-      Loading       → center $ txt "Loading..."
+      Loading       → center $ vBox [ txt "Loading..."
+                                    , txt ""
+                                    , txt "Press ESC to cancel" ]
       LoadPending   → center $ txt "FIXME: LoadPending"
       LoadFailed e' → txtWrap $ "Load failed: " ⊕ pack (show e')
       Running _     → error "Impossible"

@@ -121,7 +121,7 @@ putClimate off cli
        lift $ writeClimate off cli mc
 
 -- | Put a biome type at a given @(x, y)@ tile offset.
-putBiome ∷ Biome β ⇒ Lifted ChunkGenM r ⇒ TileOffset → β → Eff r ()
+putBiome ∷ (Biome β, Lifted ChunkGenM r) ⇒ TileOffset → β → Eff r ()
 putBiome off b
   = lift $ ChunkGenM $
     do mc ← (^.cgChunk) <$> get

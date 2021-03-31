@@ -1,4 +1,6 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnicodeSyntax #-}
 -- | This is like 'Data.Multimap.Set' from the @multi-containers@
 -- package but uses unordered 'HashMap' and 'HashSet' instead of
@@ -37,6 +39,8 @@ module Data.MultiHashMap.Set.Strict
     -- * Transformations
   , map
   , mapWithKey
+  , traverseWithKey
+  , twist
 
     -- * Difference and intersection
   , difference
@@ -71,20 +75,67 @@ module Data.MultiHashMap.Set.Strict
   , fromList
   ) where
 
+import Control.Applicative (Applicative(..))
+import Control.DeepSeq (NFData)
 import qualified Data.Foldable as F
 import Data.Hashable (Hashable)
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import Data.HashSet (HashSet)
+import Data.Bifoldable (Bifoldable(..))
 import qualified Data.HashSet as HS
 import Data.Maybe (fromMaybe)
+import Data.MonoTraversable
+  ( Element, MonoFunctor(..), MonoFoldable(..), MonoTraversable(..)
+  , GrowingAppend )
+import Data.Monoid.Unicode ((⊕))
+import qualified GHC.Exts as Exts
 import Prelude hiding (null, lookup, map, foldr, foldl, filter)
 import Prelude.Unicode ((∘))
 
 
+-- | @'MultiHashMap' k@ isn't a 'Functor' because its 'fmap' would
+-- require @b@ to be 'Eq' and 'Hashable'. It's not a 'Traversable' for
+-- the same reason.
 newtype MultiHashMap k v
   = MultiHashMap (HashMap k (HashSet v))
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, NFData, Hashable)
+
+instance Bifoldable MultiHashMap where
+  bifoldMap f g = foldMapWithKey (\k v → f k ⊕ g v)
+  bifoldr   f g = foldrWithKey (\k v a → k `f` (v `g` a))
+  bifoldl   f g = foldlWithKey (\a k v → (a `f` k) `g` v)
+
+instance F.Foldable (MultiHashMap k) where
+  foldMap f = foldMapWithKey (\_ v → f v)
+  foldr     = foldr
+  foldl     = foldl
+  foldr'    = foldr'
+  foldl'    = foldl'
+  null      = null
+  length    = size
+
+instance (Eq k, Hashable k, Eq v, Hashable v) ⇒ Exts.IsList (MultiHashMap k v) where
+  type Item (MultiHashMap k v) = (k, v)
+  fromList = fromList
+  toList   = toList
+
+instance (Eq k, Hashable k, Eq v, Hashable v) ⇒ Semigroup (MultiHashMap k v) where
+  (<>) = (∪)
+
+instance (Eq k, Hashable k, Eq v, Hashable v) ⇒ Monoid (MultiHashMap k v) where
+  mempty = empty
+
+type instance Element (MultiHashMap k v) = v
+
+instance (Eq v, Hashable v) ⇒ MonoFunctor (MultiHashMap k v) where
+  omap = map
+
+instance MonoFoldable (MultiHashMap k v)
+instance GrowingAppend (MultiHashMap k v)
+
+instance (Eq v, Hashable v) ⇒ MonoTraversable (MultiHashMap k v) where
+  otraverse f = traverseWithKey (const f)
 
 unwrap ∷ MultiHashMap k v → HashMap k (HashSet v)
 {-# INLINE unwrap #-}
@@ -254,6 +305,29 @@ map = mapWithKey ∘ const
 -- and value.
 mapWithKey ∷ (Eq v2, Hashable v2) ⇒ (k → v1 → v2) → MultiHashMap k v1 → MultiHashMap k v2
 mapWithKey f = wrap ∘ HM.mapWithKey (HS.map ∘ f) ∘ unwrap
+
+-- | /O(n)/ Perform an 'Applicative' action for each key-value pair in
+-- a map and produce a map of all the results. Each map will be strict
+-- in all its values.
+traverseWithKey ∷ (Eq v2, Hashable v2, Applicative f)
+                ⇒ (k → v1 → f v2)
+                → MultiHashMap k v1
+                → f (MultiHashMap k v2)
+traverseWithKey f = (wrap <$>) ∘ HM.traverseWithKey g ∘ unwrap
+  where
+    -- HashSet is not a Traversable, probably because it would require
+    -- additional constraints on the value type. We need it
+    -- regardless, so we must somehow do it ourselves.
+    g k      = HS.foldl' (flip $ insF k) (pure HS.empty)
+    insF k v = liftA2 HS.insert (f k v)
+
+-- | /O(n)/ Reverse the positions of keys and values in a map.
+twist ∷ (Eq k, Hashable k, Eq v, Hashable v)
+      ⇒ MultiHashMap k v
+      → MultiHashMap v k
+twist = foldrWithKey' f empty
+  where
+    f k v = insert v k
 
 -- | Difference of two multi-maps.
 --

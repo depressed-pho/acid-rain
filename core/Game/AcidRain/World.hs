@@ -11,6 +11,7 @@ module Game.AcidRain.World
 
     -- * Events
   , WorldStateChanged(..)
+  , CommandSetUpdated(..)
   , ChunkArrived(..)
 
     -- * Exceptions
@@ -20,6 +21,7 @@ module Game.AcidRain.World
 
 import Control.Exception (Exception, SomeException)
 import Control.Monad.IO.Class (MonadIO)
+import Data.Default (Default(..))
 import Data.HashSet (HashSet)
 import Data.Kind (Type)
 import Data.Int (Int64)
@@ -54,10 +56,6 @@ class World w where
   -- other methods of this class throws exceptions when invoked at a
   -- wrong state.
   getWorldState ∷ MonadIO μ ⇒ w → μ (WorldState (RunningStateT w))
-  -- | Get the entire set of available commands for this world. This
-  -- includes client-only ones that have nothing to do with server
-  -- side.
-  getAllCommands ∷ MonadIO μ ⇒ w → μ (HashSet SomeCommand)
   -- | Block until the next world event is fired, or return 'Nothing'
   -- if these is no chance that any more events can ever fire.
   waitForEvent ∷ MonadIO μ ⇒ w → μ (Maybe SomeEvent)
@@ -74,15 +72,7 @@ data SomeWorld = ∀w. World w ⇒ SomeWorld !w
 instance World SomeWorld where
   type RunningStateT SomeWorld = ()
   upcastWorld = id
-  getWorldState (SomeWorld w) = eraseRunningState <$> getWorldState w
-    where
-      eraseRunningState ∷ WorldState rs → WorldState ()
-      eraseRunningState Loading        = Loading
-      eraseRunningState LoadPending    = LoadPending
-      eraseRunningState (LoadFailed e) = LoadFailed e
-      eraseRunningState (Running _)    = Running ()
-      eraseRunningState (Closed e)     = Closed e
-  getAllCommands (SomeWorld w) = getAllCommands w
+  getWorldState (SomeWorld w) = (() <$) <$> getWorldState w
   waitForEvent (SomeWorld w) = waitForEvent w
   lookupChunk (SomeWorld w) = lookupChunk w
   getPlayer (SomeWorld w) = getPlayer w
@@ -93,7 +83,7 @@ data WorldMode
   deriving (Show, Eq)
 
 data WorldState rs
-    -- | The world is being loaded.
+    -- | The world is being loaded. This is the initial state.
   = Loading
     -- | Concerns have been raised while loading the world. Players
     -- may choose to abort or continue loading the world, but until
@@ -106,6 +96,16 @@ data WorldState rs
     -- | The world has been closed.
   | Closed !(Maybe SomeException)
   deriving Show
+
+instance Default (WorldState rs) where
+  def = Loading
+
+instance Functor WorldState where
+  fmap _ Loading        = Loading
+  fmap _ LoadPending    = LoadPending
+  fmap _ (LoadFailed e) = LoadFailed e
+  fmap f (Running rs)   = Running (f rs)
+  fmap _ (Closed me)    = Closed me
 
 -- | World seed is a 64-bit signed integer. Chunks generate randomly
 -- but deterministically depending on the seed.
@@ -124,6 +124,12 @@ instance Show WorldStateChanged where
       appPrec = 10
 
 instance Event WorldStateChanged
+
+-- | An event to be fired when the set available commands have been
+-- updated. In particular, this event always fires right before a
+-- world starts running.
+newtype CommandSetUpdated = CommandSetUpdated (HashSet SomeCommand) deriving Show
+instance Event CommandSetUpdated
 
 -- | An event to be fired when a chunk which was previously
 -- unavailable is now available.
