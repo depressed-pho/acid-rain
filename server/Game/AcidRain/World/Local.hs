@@ -1,5 +1,7 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnicodeSyntax #-}
@@ -9,6 +11,7 @@ module Game.AcidRain.World.Local
   ) where
 
 import Control.Concurrent (forkIO)
+import Control.Concurrent.STM.Delay (Delay, newDelay, waitDelay)
 import Control.Concurrent.STM.TBQueue
   ( TBQueue, newTBQueueIO, tryReadTBQueue, readTBQueue, writeTBQueue )
 import Control.Concurrent.STM.TVar (TVar, newTVarIO, readTVar, writeTVar)
@@ -16,9 +19,11 @@ import Data.Convertible.Base (convert)
 import Control.Exception (Exception(..), SomeException, handle)
 import Control.Monad (join, void)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.STM (STM, atomically, throwSTM)
+import Control.Monad.STM (STM, atomically, throwSTM, orElse)
 import Data.Maybe (isJust)
+import Data.Text (Text)
 import qualified Data.UUID as U
+import GHC.Conc (unsafeIOToSTM)
 import Game.AcidRain.Module (SomeModule)
 import Game.AcidRain.Module.Loader
   ( loadModules, lcTileReg, lcBiomeReg, lcEntityReg, lcCommandReg, lcChunkGen )
@@ -32,6 +37,7 @@ import Game.AcidRain.World.Chunk (Chunk, putEntity)
 import Game.AcidRain.World.Chunk.Manager.Local (LocalChunkManager)
 import qualified Game.AcidRain.World.Chunk.Manager.Local as LCM
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
+import Game.AcidRain.World.Command (Command(..), SomeCommand)
 import Game.AcidRain.World.Command.Registry (CommandRegistry)
 import qualified Game.AcidRain.World.Command.Registry as CR
 import qualified Game.AcidRain.World.Entity as E
@@ -45,22 +51,29 @@ import qualified Game.AcidRain.World.Tile.Palette as TPal
 import Lens.Micro ((^.))
 import Numeric.Natural (Natural)
 import Prelude hiding (lcm)
-import Prelude.Unicode ((∘))
+import Prelude.Unicode ((∘), (⋅))
+import System.Clock (Clock(Monotonic), TimeSpec(..), getTime)
+
 
 -- | Local world is a server-side world which is owned by a
 -- server. The server accesses the world data directly. It is used
 -- both in single player mode and multi player mode.
 data LocalWorld
   = LocalWorld
-    { lwMode   ∷ !WorldMode
-    , lwSeed   ∷ !WorldSeed
-    , lwState  ∷ !(TVar (WorldState RunningState))
-    , lwEvents ∷ !(TBQueue SomeEvent)
+    { lwMode      ∷ !WorldMode
+    , lwSeed      ∷ !WorldSeed
+    , lwState     ∷ !(TVar (WorldState RunningState))
+    , lwEvents    ∷ !(TBQueue SomeEvent)
     , lwChunkReqs ∷ !(TBQueue ChunkPos)
+    , lwCommandQ  ∷ !(TBQueue (SomeCommand, [Text]))
     }
 
 eventQueueCapacity ∷ Natural
 eventQueueCapacity = 256
+
+-- | Ticking interval in μs.
+tickingInterval ∷ Int
+tickingInterval = 100 ⋅ 1000
 
 -- The state of running world. Not exposed to anywhere.
 data RunningState
@@ -116,6 +129,10 @@ instance World LocalWorld where
                   Closed     _ → return Nothing
                   _            → Just <$> readTBQueue (lwEvents lw)
 
+  scheduleCommand lw cmd args
+    = liftIO $ atomically $
+      writeTBQueue (lwCommandQ lw) (upcastCommand cmd, args)
+
   lookupChunk lw pos
     = liftIO $ atomically $
       do rs ← assumeRunning lw
@@ -153,15 +170,17 @@ instance World LocalWorld where
 newWorld ∷ (Foldable f, MonadIO μ) ⇒ WorldMode → f SomeModule → WorldSeed → μ LocalWorld
 newWorld wm mods seed
   = liftIO $
-    do ws ← newTVarIO Loading
-       es ← newTBQueueIO eventQueueCapacity
+    do ws    ← newTVarIO Loading
+       es    ← newTBQueueIO eventQueueCapacity
        cReqs ← newTBQueueIO eventQueueCapacity
+       cCmdQ ← newTBQueueIO eventQueueCapacity
        let lw = LocalWorld
-                { lwMode   = wm
-                , lwSeed   = seed
-                , lwState  = ws
-                , lwEvents = es
+                { lwMode      = wm
+                , lwSeed      = seed
+                , lwState     = ws
+                , lwEvents    = es
                 , lwChunkReqs = cReqs
+                , lwCommandQ  = cCmdQ
                 }
        void $ forkIO $ newWorld' lw >> runWorld lw
        return lw
@@ -228,22 +247,57 @@ catchWhileRunning lw a
 
 runWorld ∷ LocalWorld → IO ()
 runWorld lw
-  = catchWhileRunning lw loop
+  = do nextTick ← getNextTick 0
+       catchWhileRunning lw (loop nextTick)
   where
-    loop = join $ atomically $
-           do mrs ← isRunning lw
-              case mrs of
-                Nothing → return (return ())
-                Just rs →
-                  do cReq ← readTBQueue (lwChunkReqs lw)
-                     -- If the requested chunk is indeed not
-                     -- available, LCM.get spawns a thread and then
-                     -- retries the transaction. Thus we can respond
-                     -- to world termination immediately while
-                     -- generating the requested chunk.
-                     c ← LCM.get cReq (rsChunks rs)
-                     fireEvent lw $ ChunkArrived cReq c
-                     return loop
+    loop ∷ Delay → IO ()
+    loop nextTick
+      = join $ atomically $
+        do mrs ← isRunning lw
+           case mrs of
+             Nothing → return (return ())
+             Just rs →
+               do handleChunkReq rs
+                  return $ loop nextTick
+               `orElse`
+               do lastTick ← waitForNextTick nextTick
+                  (consumeCommandQ `orElse` tickWorld)
+                  return $ getNextTick lastTick >>= loop
+
+    handleChunkReq ∷ RunningState → STM ()
+    handleChunkReq rs
+      = do cReq ← readTBQueue (lwChunkReqs lw)
+           -- If the requested chunk is indeed not available, LCM.get
+           -- spawns a thread and then retries the transaction. Thus
+           -- we can respond to world termination immediately while
+           -- generating the requested chunk.
+           c ← LCM.get cReq (rsChunks rs)
+           fireEvent lw $ ChunkArrived cReq c
+
+    consumeCommandQ ∷ STM ()
+    consumeCommandQ = return () -- FIXME
+
+    tickWorld ∷ STM ()
+    tickWorld = return () -- FIXME
+
+    getNextTick ∷ TimeSpec → IO Delay
+    getNextTick lastTick
+      = do now ← getTime Monotonic
+           -- The next tick time is basically now + tickingInterval,
+           -- but if the world is lagging the interval becomes shorter
+           -- than that, and can even go negative (no delay).
+           let !elapsed = μs (now - lastTick)
+               !delay   = tickingInterval - elapsed
+           newDelay delay
+
+    μs ∷ TimeSpec → Int
+    μs !(TimeSpec {sec, nsec})
+      = fromIntegral $! (sec ⋅ 1000000) + (nsec `div` 1000)
+
+    waitForNextTick ∷ Delay → STM TimeSpec
+    waitForNextTick nextTick
+      = do waitDelay nextTick
+           unsafeIOToSTM $! getTime Monotonic
 
 -- | Get the coordinate of the initial spawn.
 initialSpawn ∷ RunningState → STM WorldPos

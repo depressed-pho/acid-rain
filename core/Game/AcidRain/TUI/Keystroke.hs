@@ -3,6 +3,7 @@
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.TUI.Keystroke
   ( Keystroke(..)
+  , keystroke
   , keyQ
   ) where
 
@@ -51,6 +52,9 @@ instance Lift Keystroke where
          }
        |]
 
+keystroke ∷ Key → [Modifier] → Keystroke
+keystroke key mods
+  = Keystroke key $ S.fromList mods
 
 -- | Quasi-quotation @['keyQ'| ... |]@ can generate an expression of
 -- type 'Keystroke' by parsing a keystroke represented in a special

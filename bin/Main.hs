@@ -11,6 +11,7 @@ import Control.Monad (void)
 import Data.UUID (nil)
 import Data.Unique (Unique)
 import Data.Proxy (Proxy(..))
+import GHC.Conc (setNumCapabilities, getNumProcessors)
 import Game.AcidRain.Module (Module(..))
 import Game.AcidRain.Module.Builtin (BuiltinModule)
 import Game.AcidRain.TUI.AppEvent (SomeAppEvent)
@@ -22,7 +23,10 @@ import qualified Graphics.Vty as V
 
 main ∷ IO ()
 main
-  = do let seed = 666
+  = do numProc ← getNumProcessors
+       setNumCapabilities $ max 1 (numProc - 1)
+
+       let seed = 666
        lw ← newWorld SinglePlayer [upcastModule (Proxy ∷ Proxy BuiltinModule)] seed
 
        evChan ← newBChan 256

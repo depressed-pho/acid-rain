@@ -7,7 +7,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.TUI.Widgets.WorldView
-  ( WorldView
+  ( WorldView, wvWorld
   , worldView
   , renderWorldView
   , redrawWorldView

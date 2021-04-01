@@ -20,21 +20,23 @@ import Control.Eff (Eff, Member, Lift, Lifted, lift, runLift)
 import Control.Eff.State.Strict (State, execState, get, put, modify)
 import Control.Monad (void)
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Data.Foldable (traverse_, foldr')
+import Data.Function (fix)
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import Data.HashSet (HashSet)
+import Data.Maybe (fromJust)
 import Data.MultiHashMap.Set.Strict (MultiHashMap)
 import qualified Data.MultiHashMap.Set.Strict as MHM
-import Data.Foldable (foldr')
-import Data.Function (fix)
 import Data.Unique (Unique, newUnique)
 import Game.AcidRain.World.Command
-  ( Command(..), CommandType(..), CommandID, SomeCommand )
+  ( Command(..), CommandType(..), CommandID, SomeCommand
+  , IClientCtx(..), ClientCtx )
 import Game.AcidRain.World.Player (PlayerID)
 import Game.AcidRain.TUI.AppEvent (AppEvent(..), SomeAppEvent)
-import Game.AcidRain.TUI.Keystroke (Keystroke)
+import Game.AcidRain.TUI.Keystroke (Keystroke, keystroke)
 import Game.AcidRain.TUI.Widgets.WorldView
-  ( WorldView, worldView, renderWorldView, redrawWorldView )
+  ( WorldView, wvWorld, worldView, renderWorldView, redrawWorldView )
 import Game.AcidRain.World
   ( World(..), WorldState(..), WorldStateChanged(..), CommandSetUpdated(..) )
 import qualified Game.AcidRain.World.Event as WE
@@ -60,6 +62,11 @@ data Client
     }
 
 makeLenses ''Client
+
+instance IClientCtx Client where
+  basicSendToWorld cli c args
+    = do let w = cli^.cliWorldView.wvWorld
+         scheduleCommand w c args
 
 newtype ClientEvent = ClientEvent WE.SomeEvent
   deriving Show
@@ -112,16 +119,53 @@ handleClientEvent cli be
       VtyEvent (V.EvResize _ _) →
         traverseOf cliWorldView redrawWorldView cli
 
-      -- FIXME: handle other keys
-
       AppEvent (downcastAppEvent → Just (ClientEvent we)) →
         handleWorldEvent cli we
 
       _ →
+        case cli^.cliWorldState of
+          Loading         → handleEventWhileLoading cli be
+          LoadPending     → fail "FIXME: not implemented"
+          LoadFailed _    → fail "FIXME: not implemented"
+          Running _       → handleEventWhileRunning cli be
+          Closed (Just _) → fail "FIXME: not implemented"
+          Closed Nothing  → return $ cli & cliClosed .~ True
+
+handleEventWhileLoading ∷ Client
+                        → BrickEvent Unique SomeAppEvent
+                        → EventM Unique Client
+handleEventWhileLoading cli be
+  = case be of
+      VtyEvent (V.EvKey V.KEsc []) →
+        return $ cli & cliClosed .~ True
+      _ → return cli
+
+handleEventWhileRunning ∷ Client
+                        → BrickEvent Unique SomeAppEvent
+                        → EventM Unique Client
+handleEventWhileRunning cli be
+  = case be of
+      VtyEvent (V.EvKey V.KEsc []) →
+        -- FIXME: Show pause screen
         return $ cli & cliClosed .~ True
 
+      VtyEvent (V.EvKey key mods) →
+        do let ks   = keystroke key mods
+               cmds = MHM.lookup ks (cli^.cliKeyMap)
+           withClientCtx cli $
+             traverse_ (flip runOnClient []) cmds
+
+      _ →
+        return cli
+
+withClientCtx ∷ MonadIO μ ⇒ Client → Eff '[State ClientCtx, Lift μ] () → μ Client
+withClientCtx cli m
+  = do ctx ← runLift $ execState (upcastClientCtx cli) $ m
+       return $ fromJust $ downcastClientCtx ctx
+
 handleWorldEvent ∷ Client → WE.SomeEvent → EventM Unique Client
-handleWorldEvent cli = runLift ∘ execState cli ∘ WE.dispatch (cli^.cliEvDispatcher)
+handleWorldEvent cli
+  = runLift ∘ execState cli ∘ WE.dispatch (cli^.cliEvDispatcher)
 
 initialEventDispatcher ∷ WE.EventDispatcher () (Eff '[State Client, Lift (EventM Unique)])
 initialEventDispatcher

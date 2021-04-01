@@ -25,10 +25,11 @@ import Data.Default (Default(..))
 import Data.HashSet (HashSet)
 import Data.Kind (Type)
 import Data.Int (Int64)
+import Data.Text (Text)
 import Data.Typeable (Typeable)
 import Game.AcidRain.World.Chunk (Chunk)
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
-import Game.AcidRain.World.Command (SomeCommand)
+import Game.AcidRain.World.Command (Command, SomeCommand)
 import Game.AcidRain.World.Event (Event(..), SomeEvent)
 import Game.AcidRain.World.Player (Player, PlayerID)
 import Prelude.Unicode ((∘))
@@ -59,6 +60,9 @@ class World w where
   -- | Block until the next world event is fired, or return 'Nothing'
   -- if these is no chance that any more events can ever fire.
   waitForEvent ∷ MonadIO μ ⇒ w → μ (Maybe SomeEvent)
+  -- | Schedule a command (along with arguments) to run on the world
+  -- context in the next game tick.
+  scheduleCommand ∷ (MonadIO μ, Command c) ⇒ w → c → [Text] → μ ()
   -- | Lookup a chunk at a certain position if it's available. This
   -- does not block. If the chunk isn't available yet, an event
   -- ChunkArrived will fire later.
@@ -74,6 +78,7 @@ instance World SomeWorld where
   upcastWorld = id
   getWorldState (SomeWorld w) = (() <$) <$> getWorldState w
   waitForEvent (SomeWorld w) = waitForEvent w
+  scheduleCommand (SomeWorld w) = scheduleCommand w
   lookupChunk (SomeWorld w) = lookupChunk w
   getPlayer (SomeWorld w) = getPlayer w
 

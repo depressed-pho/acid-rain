@@ -14,7 +14,8 @@ module Game.AcidRain.World.Chunk.Manager.Local
   , generate
   ) where
 
-import Control.Concurrent (forkIO)
+import Control.Concurrent (forkIO, getNumCapabilities)
+import Control.Concurrent.STM.TSem (TSem, newTSem, waitTSem, signalTSem)
 import Control.Exception (SomeException, catch)
 import Control.Monad (void)
 import Control.Monad.Catch (MonadThrow)
@@ -54,15 +55,18 @@ evalCell (LoadFailed e) = throwSTM e
 -- therefore not an LRU.
 data LocalChunkManager
   = LocalChunkManager
-    { lcmTileReg  ∷ !TileRegistry
-    , lcmTilePal  ∷ !TilePalette
-    , lcmBiomeReg ∷ !BiomeRegistry
-    , lcmBiomePal ∷ !BiomePalette
-    , lcmEntCat   ∷ !EntityCatalogue
-    , lcmChunkGen ∷ !ChunkGenerator
+    { lcmTileReg     ∷ !TileRegistry
+    , lcmTilePal     ∷ !TilePalette
+    , lcmBiomeReg    ∷ !BiomeRegistry
+    , lcmBiomePal    ∷ !BiomePalette
+    , lcmEntCat      ∷ !EntityCatalogue
+    , lcmChunkGen    ∷ !ChunkGenerator
       -- | Note that this is an STM map. Accessing it requires an STM
       -- transaction.
-    , lcmCells    ∷ !(Map ChunkPos ChunkCell)
+    , lcmCells       ∷ !(Map ChunkPos ChunkCell)
+      -- | A semaphore for limiting the number of concurrent chunk
+      -- generation and loading.
+    , lcmSemInFlight ∷ !TSem
     }
 
 instance Show LocalChunkManager where
@@ -91,14 +95,16 @@ new ∷ TileRegistry
     → STM LocalChunkManager
 new tReg tPal bReg bPal eCat cGen
   = do cells ← SM.new
+       sem   ← newTSem =<< fromIntegral <$> unsafeIOToSTM getNumCapabilities
        return $ LocalChunkManager
-         { lcmTileReg  = tReg
-         , lcmTilePal  = tPal
-         , lcmBiomeReg = bReg
-         , lcmBiomePal = bPal
-         , lcmEntCat   = eCat
-         , lcmChunkGen = cGen
-         , lcmCells    = cells
+         { lcmTileReg     = tReg
+         , lcmTilePal     = tPal
+         , lcmBiomeReg    = bReg
+         , lcmBiomePal    = bPal
+         , lcmEntCat      = eCat
+         , lcmChunkGen    = cGen
+         , lcmCells       = cells
+         , lcmSemInFlight = sem
          }
 
 -- | Get the chunk at a certain position if it's available. This has
@@ -121,11 +127,14 @@ get pos lcm
        case chunk' of
          Just cell → evalCell cell
          Nothing →
-           do void $ unsafeIOToSTM $ forkIO $
+           do waitTSem (lcmSemInFlight lcm)
+              void $ unsafeIOToSTM $ forkIO $
                 do cell ← (Loaded <$> loadOrGenerate)
                           `catch`
                           (return ∘ LoadFailed)
-                   atomically $ SM.focus (focIns cell) pos (lcmCells lcm)
+                   atomically $
+                     do SM.focus (focIns cell) pos (lcmCells lcm)
+                        signalTSem (lcmSemInFlight lcm)
               retry
   where
     loadOrGenerate ∷ (MonadThrow μ, MonadIO μ) ⇒ μ Chunk

@@ -1,13 +1,27 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Command
   ( Command(..)
   , CommandID
   , CommandType(..)
   , SomeCommand(..)
+
+    -- * Client-side context
+  , IClientCtx(..)
+  , ClientCtx
+  , sendToWorld
+
+    -- * Server-side context
+  , IServerCtx(..)
+  , ServerCtx
   ) where
 
+import Control.Eff (Eff, Member)
+import Control.Eff.State.Strict (State, get)
+import Control.Monad.IO.Class (MonadIO(..))
 import Data.Hashable (Hashable(..))
 import Data.Text (Text)
 import Data.Typeable (Typeable, cast)
@@ -38,6 +52,12 @@ class (Show c, Typeable c) ⇒ Command c where
   commandID ∷ c → CommandID
   -- | Get the command type.
   commandType ∷ c → CommandType
+  -- | Run the command on the client side.
+  runOnClient ∷ (MonadIO (Eff r), Member (State ClientCtx) r)
+              ⇒ c
+              → [Text]
+              → Eff r ()
+  runOnClient = sendToWorld
 
 -- | A type-erased 'Command'
 data SomeCommand = ∀c. Command c ⇒ SomeCommand !c
@@ -60,3 +80,67 @@ instance Command SomeCommand where
   downcastCommand = Just
   commandID (SomeCommand c) = commandID c
   commandType (SomeCommand c) = commandType c
+
+-------------------------------------------------------------------------------
+-- Client-side context
+-------------------------------------------------------------------------------
+
+-- | Command-evaluating context for the client side.
+class Typeable ctx ⇒ IClientCtx ctx where
+  -- This type class cannot mention 'World' because doing so would end
+  -- up in a dependency cycle.
+
+  -- | Erase the type of 'IClientCtx'.
+  upcastClientCtx ∷ ctx → ClientCtx
+  upcastClientCtx = ClientCtx
+  -- | Recover the type of 'IClientCtx'.
+  downcastClientCtx ∷ ClientCtx → Maybe ctx
+  downcastClientCtx (ClientCtx ctx) = cast ctx
+  -- | Schedule the command (along with arguments) to run on the world
+  -- context. Command implementations should use 'sendToWorld' instead
+  -- of invoking this directly.
+  basicSendToWorld ∷ (Command c, MonadIO μ) ⇒ ctx → c → [Text] → μ ()
+
+-- | Type-erased 'IClientCtx'. We hate this. What we really want to do
+-- is @('IClientCtx' ctx, 'Member' ('State' ctx) r) ⇒ 'Eff' r a@ and
+-- not @'Member' ('State' 'ClientCtx') r ⇒ 'Eff' r a@, but polymorphic
+-- effect types just don't play nice with open unions. So we work
+-- around the problem by temporarily erasing the type and recovering
+-- it afterwards.
+data ClientCtx = ∀ctx. IClientCtx ctx ⇒ ClientCtx !ctx
+
+instance IClientCtx ClientCtx where
+  upcastClientCtx = id
+  downcastClientCtx = Just
+  basicSendToWorld (ClientCtx ctx) = basicSendToWorld ctx
+
+-- | Schedule the command (along with arguments) to run on the world
+-- context.
+sendToWorld ∷ (MonadIO (Eff r), Member (State ClientCtx) r, Command c)
+            ⇒ c
+            → [Text]
+            → Eff r ()
+sendToWorld c args
+  = do ctx ← get
+       liftIO $ basicSendToWorld (ctx ∷ ClientCtx) c args
+
+-------------------------------------------------------------------------------
+-- Server-side context
+-------------------------------------------------------------------------------
+
+-- | Command-evaluating and ticking context for the server side.
+class Typeable ctx ⇒ IServerCtx ctx where
+  -- | Erase the type of 'IServerCtx'.
+  upcastServerCtx ∷ ctx → ServerCtx
+  upcastServerCtx = ServerCtx
+  -- | Recover the type of 'IServerCtx'.
+  downcastServerCtx ∷ ServerCtx → Maybe ctx
+  downcastServerCtx (ServerCtx ctx) = cast ctx
+
+-- | Type-erased 'IServerCtx'. We hate this for the same reason as
+-- 'ClientCtx'.
+data ServerCtx = ∀ctx. IServerCtx ctx ⇒ ServerCtx !ctx
+
+instance IServerCtx ServerCtx where
+  upcastServerCtx = id
+  downcastServerCtx = Just
