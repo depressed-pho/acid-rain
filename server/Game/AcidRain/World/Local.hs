@@ -20,7 +20,6 @@ import Control.Exception (Exception(..), SomeException, handle)
 import Control.Monad (join, void)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.STM (STM, atomically, throwSTM, orElse)
-import Data.Maybe (isJust)
 import Data.Text (Text)
 import qualified Data.UUID as U
 import GHC.Conc (unsafeIOToSTM)
@@ -136,12 +135,14 @@ instance World LocalWorld where
   lookupChunk lw pos
     = liftIO $ atomically $
       do rs ← assumeRunning lw
-         mc ← LCM.lookup pos $ rsChunks rs
-         if isJust mc
-           then return mc
-           else do -- Put a chunk retrieval request on a queue.
-                   writeTBQueue (lwChunkReqs lw) pos
-                   return mc
+         cs ← LCM.lookup pos $ rsChunks rs
+         case cs of
+           Just  LCM.Loading   → return Nothing
+           Just (LCM.Loaded c) → return $! Just c
+           Nothing →
+             -- Put a chunk retrieval request on a queue.
+             do writeTBQueue (lwChunkReqs lw) pos
+                return Nothing
 
   getPlayer lw pid
     = liftIO $ atomically $ assumeRunning lw >>= get'

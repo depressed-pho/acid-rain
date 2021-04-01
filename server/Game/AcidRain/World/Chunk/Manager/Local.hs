@@ -6,6 +6,8 @@
 -- management. Definitely not for user consumption.
 module Game.AcidRain.World.Chunk.Manager.Local
   ( LocalChunkManager
+  , ChunkStatus(..)
+
   , new
   , lookup
   , get
@@ -37,10 +39,11 @@ import StmContainers.Map (Map)
 import qualified StmContainers.Map as SM
 
 
-data ChunkCell
+data ChunkStatus
   = Loading
   | Loaded !Chunk
-  | LoadFailed !SomeException
+
+type ChunkCell = Either SomeException ChunkStatus
 
 -- | This is a server-side chunk manager. When a chunk is requested, it
 -- searches for the chunk in the loaded chunk map, or loads the chunk
@@ -106,14 +109,13 @@ new tReg tPal bReg bPal eCat cGen
 
 -- | Get the chunk at a certain position if it's available. This
 -- doesn't block nor has any side effects.
-lookup ∷ ChunkPos → LocalChunkManager → STM (Maybe Chunk)
+lookup ∷ ChunkPos → LocalChunkManager → STM (Maybe ChunkStatus)
 lookup pos lcm
   = do mCell ← SM.lookup pos (lcmCells lcm)
-       case mCell of
-         Just  Loading       → return Nothing
-         Just (Loaded c)     → return $! Just c
-         Just (LoadFailed e) → throwSTM e
-         Nothing             → return Nothing
+       traverse eval mCell
+  where
+    eval ∷ ChunkCell → STM ChunkStatus
+    eval = either throwSTM return
 
 -- | Get the chunk at a certain position. If it's
 -- not already loaded, a chunk will be loaded or generated on a
@@ -124,9 +126,9 @@ get pos lcm
   -- transaction.
   = do mCell ← SM.lookup pos (lcmCells lcm)
        case mCell of
-         Just  Loading       → retry
-         Just (Loaded c)     → return c
-         Just (LoadFailed e) → throwSTM e
+         Just (Right  Loading)   → retry
+         Just (Right (Loaded c)) → return c
+         Just (Left e)           → throwSTM e
          Nothing →
            do void $ unsafeIOToSTM $ forkIO $
                 -- Now we are in a separate thread. First put an empty
@@ -146,9 +148,9 @@ get pos lcm
                      -- The cell has just been marked as loading,
                      -- which guarantees there are no other threads
                      -- that are loading or generating this chunk.
-                     else do cell ← (Loaded <$> loadOrGenerate)
+                     else do cell ← (Right ∘ Loaded <$> loadOrGenerate)
                                     `catch`
-                                    (return ∘ LoadFailed)
+                                    (return ∘ Left)
                              atomically $
                                do SM.insert cell pos (lcmCells lcm)
                                   signalTSem (lcmSemInFlight lcm)
@@ -164,7 +166,7 @@ get pos lcm
       = do raced ← F.member
            if raced
              then return True
-             else F.insert Loading *> return False
+             else F.insert (Right Loading) *> return False
 
 -- | Apply a modification to the chunk at a certain position. If it's
 -- not already loaded, a chunk will be loaded or generated on a
@@ -172,7 +174,7 @@ get pos lcm
 modify ∷ (Chunk → Chunk) → ChunkPos → LocalChunkManager → STM ()
 modify f pos lcm
   = do chunk ← get pos lcm
-       SM.insert (Loaded (f chunk)) pos (lcmCells lcm)
+       SM.insert (Right $ Loaded $ f chunk) pos (lcmCells lcm)
 
 -- | Generate a chunk. Since chunk generation is a time consuming
 -- task, callers are highly advised to do it in a separate thread.
