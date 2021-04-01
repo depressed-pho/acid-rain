@@ -25,6 +25,7 @@ main ∷ IO ()
 main
   = do numProc ← getNumProcessors
        setNumCapabilities $ max 1 (numProc - 1)
+       setNumCapabilities 3 -- FIXME: remove this
 
        let seed = 666
        lw ← newWorld SinglePlayer [upcastModule (Proxy ∷ Proxy BuiltinModule)] seed

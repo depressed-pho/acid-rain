@@ -38,12 +38,9 @@ import qualified StmContainers.Map as SM
 
 
 data ChunkCell
-  = Loaded !Chunk
+  = Loading
+  | Loaded !Chunk
   | LoadFailed !SomeException
-
-evalCell ∷ ChunkCell → STM Chunk
-evalCell (Loaded c    ) = return c
-evalCell (LoadFailed e) = throwSTM e
 
 -- | This is a server-side chunk manager. When a chunk is requested, it
 -- searches for the chunk in the loaded chunk map, or loads the chunk
@@ -107,45 +104,67 @@ new tReg tPal bReg bPal eCat cGen
          , lcmSemInFlight = sem
          }
 
--- | Get the chunk at a certain position if it's available. This has
--- no side effects.
+-- | Get the chunk at a certain position if it's available. This
+-- doesn't block nor has any side effects.
 lookup ∷ ChunkPos → LocalChunkManager → STM (Maybe Chunk)
 lookup pos lcm
-  -- Smells like a point-free opportunity, but I don't like unreadable
-  -- code.
-  = mapM evalCell =<< (SM.lookup pos $ lcmCells lcm)
+  = do mCell ← SM.lookup pos (lcmCells lcm)
+       case mCell of
+         Just  Loading       → return Nothing
+         Just (Loaded c)     → return $! Just c
+         Just (LoadFailed e) → throwSTM e
+         Nothing             → return Nothing
 
 -- | Get the chunk at a certain position. If it's
 -- not already loaded, a chunk will be loaded or generated on a
 -- separate thread and the transaction will be retried.
 get ∷ ChunkPos → LocalChunkManager → STM Chunk
 get pos lcm
-  -- Loading chunks involves I/O, but we can't safely do that in an
-  -- STM transaction. So we do it outside of a transaction and discard
-  -- it if a race condition happens.
-  = do chunk' ← SM.lookup pos (lcmCells lcm)
-       case chunk' of
-         Just cell → evalCell cell
+  -- Loading chunks involves I/O so we have to do it outside of a
+  -- transaction.
+  = do mCell ← SM.lookup pos (lcmCells lcm)
+       case mCell of
+         Just  Loading       → retry
+         Just (Loaded c)     → return c
+         Just (LoadFailed e) → throwSTM e
          Nothing →
-           do waitTSem (lcmSemInFlight lcm)
-              void $ unsafeIOToSTM $ forkIO $
-                do cell ← (Loaded <$> loadOrGenerate)
-                          `catch`
-                          (return ∘ LoadFailed)
-                   atomically $
-                     do SM.focus (focIns cell) pos (lcmCells lcm)
-                        signalTSem (lcmSemInFlight lcm)
+           do void $ unsafeIOToSTM $ forkIO $
+                -- Now we are in a separate thread. First put an empty
+                -- cell in the map so no more transactions will
+                -- fork. But here is a catch: this forkIO can race so
+                -- at the time when we're here the cell can already be
+                -- populated.
+                do raced ← atomically $
+                           do raced ← SM.focus markAsLoading pos (lcmCells lcm)
+                              if raced
+                                then return True
+                                -- Also limit the number of
+                                -- simultaneously running threads.
+                                else waitTSem (lcmSemInFlight lcm) *> return False
+                   if raced
+                     then return ()
+                     -- The cell has just been marked as loading,
+                     -- which guarantees there are no other threads
+                     -- that are loading or generating this chunk.
+                     else do cell ← (Loaded <$> loadOrGenerate)
+                                    `catch`
+                                    (return ∘ LoadFailed)
+                             atomically $
+                               do SM.insert cell pos (lcmCells lcm)
+                                  signalTSem (lcmSemInFlight lcm)
+              -- We just spawned a thread to populate the
+              -- cell. Hopefully sleep until someone modifies the map.
               retry
   where
     loadOrGenerate ∷ (MonadThrow μ, MonadIO μ) ⇒ μ Chunk
     loadOrGenerate = generate pos lcm -- FIXME: load
 
-    focIns ∷ ChunkCell → F.Focus ChunkCell STM ()
-    focIns cell
+    markAsLoading ∷ F.Focus ChunkCell STM Bool
+    markAsLoading
       = do raced ← F.member
            if raced
-             then return ()
-             else F.insert cell
+             then return True
+             else F.insert Loading *> return False
 
 -- | Apply a modification to the chunk at a certain position. If it's
 -- not already loaded, a chunk will be loaded or generated on a
