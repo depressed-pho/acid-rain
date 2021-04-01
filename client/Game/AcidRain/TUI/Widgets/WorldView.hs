@@ -19,7 +19,7 @@ import Brick.Types
   , availWidthL, availHeightL, emptyResult, getContext, imageL, locL )
 import Brick.Widgets.Center (center)
 import Brick.Widgets.Core (Named(..), fill, reportExtent, txt, txtWrap, vBox)
-import Control.Exception (SomeException, Handler(..), catches)
+import Control.Exception (Handler(..), catches)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Convertible.Base (convert)
@@ -36,7 +36,6 @@ import Game.AcidRain.World.Position (WorldPos(..), wpX, wpY, wpZ, lowestZ)
 import qualified Graphics.Vty as V
 import Lens.Micro ((&), (.~), (^.), (+~), (-~), (%~), _1, _2, to)
 import Lens.Micro.TH (makeLenses)
-import Prelude.Unicode ((∘))
 
 
 -- | This is a Brick widget to render some part of the world centered
@@ -100,7 +99,6 @@ redrawWorldView wv
       = liftIO $
         -- Now we are in the IO monad.
         flip catches [ Handler catchWNRE
-                     , Handler catchAll
                      ] $
         do -- Draw all the tiles currently visible from the
            -- viewpoint. The easiest way to do this is to iterate on
@@ -231,9 +229,6 @@ addLoc ∷ Location → Location → Location
 addLoc a b
   = a & locL._1 +~ b^._1
       & locL._2 +~ b^._2
-
-catchAll ∷ SomeException → IO (Widget n)
-catchAll = return ∘ txtWrap ∘ pack ∘ show
 
 catchWNRE ∷ WorldNotRunningException → IO (Widget n)
 catchWNRE (WorldNotRunningException ws)
