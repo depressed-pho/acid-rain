@@ -19,9 +19,10 @@ import Data.Convertible.Base (convert)
 import Control.Exception (Exception(..), SomeException, handle)
 import Control.Monad (join, void)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.STM (STM, atomically, throwSTM, orElse)
+import Control.Monad.STM (STM, atomically, throwSTM, orElse, retry)
 import Data.Text (Text)
 import qualified Data.UUID as U
+import GHC.Clock (getMonotonicTime)
 import GHC.Conc (unsafeIOToSTM)
 import Game.AcidRain.Module (SomeModule)
 import Game.AcidRain.Module.Loader
@@ -51,7 +52,6 @@ import Lens.Micro ((^.))
 import Numeric.Natural (Natural)
 import Prelude hiding (lcm)
 import Prelude.Unicode ((∘), (⋅))
-import System.Clock (Clock(Monotonic), TimeSpec(..), getTime)
 
 
 -- | Local world is a server-side world which is owned by a
@@ -70,9 +70,9 @@ data LocalWorld
 eventQueueCapacity ∷ Natural
 eventQueueCapacity = 256
 
--- | Ticking interval in μs.
-tickingInterval ∷ Int
-tickingInterval = 100 ⋅ 1000
+-- | Ticking interval in seconds.
+tickingInterval ∷ Double
+tickingInterval = 0.1
 
 -- The state of running world. Not exposed to anywhere.
 data RunningState
@@ -246,59 +246,83 @@ catchWhileRunning lw a
     f ∷ SomeException → IO ()
     f = atomically ∘ changeState lw ∘ Closed ∘ Just ∘ toException
 
+data TickingState
+  = -- | We have completed the last tick and will need to wait before
+    -- starting the next tick.
+    Waiting
+    { _tsNextTick ∷ !Delay
+    }
+    -- | We are in the middle of ticking.
+  | MiddleOfTicking
+    { _tsTickStartedAt ∷ !Double
+    }
+
 runWorld ∷ LocalWorld → IO ()
 runWorld lw
-  = do nextTick ← getNextTick 0
-       catchWhileRunning lw (loop nextTick)
+  = do ts ← MiddleOfTicking <$> getMonotonicTime
+       catchWhileRunning lw (loop ts)
   where
-    loop ∷ Delay → IO ()
-    loop nextTick
+    loop ∷ TickingState → IO ()
+    loop ts
       = join $ atomically $
         do mrs ← isRunning lw
            case mrs of
              Nothing → return (return ())
              Just rs →
-               do handleChunkReq rs
-                  return $ loop nextTick
+               ( do handleChunkReq lw rs
+                    return $ loop ts
+               )
                `orElse`
-               do lastTick ← waitForNextTick nextTick
-                  (consumeCommandQ `orElse` tickWorld)
-                  return $ getNextTick lastTick >>= loop
-
-    handleChunkReq ∷ RunningState → STM ()
-    handleChunkReq rs
-      = do cReq ← readTBQueue (lwChunkReqs lw)
-           -- If the requested chunk is indeed not available, LCM.get
-           -- spawns a thread and then retries the transaction. Thus
-           -- we can respond to world termination immediately while
-           -- generating the requested chunk.
-           c ← LCM.get cReq (rsChunks rs)
-           fireEvent lw $ ChunkArrived cReq c
-
-    consumeCommandQ ∷ STM ()
-    consumeCommandQ = return () -- FIXME
+               ( do ts' ← waitForTickStart ts
+                    consumeCommandQ
+                    return $ loop ts'
+               )
+               `orElse`
+               ( do ts' ← waitForTickStart ts
+                    tickWorld
+                    return $ advanceTick ts' >>= loop
+               )
 
     tickWorld ∷ STM ()
     tickWorld = return () -- FIXME
 
-    getNextTick ∷ TimeSpec → IO Delay
-    getNextTick lastTick
-      = do now ← getTime Monotonic
+    waitForTickStart ∷ TickingState → STM TickingState
+    waitForTickStart (Waiting delay)
+      = do waitDelay delay
+           now ← unsafeIOToSTM $! getMonotonicTime
+           return $! MiddleOfTicking now
+    waitForTickStart ts@(MiddleOfTicking _)
+      = return ts
+
+    advanceTick ∷ TickingState → IO TickingState
+    advanceTick (Waiting _)
+      = fail "Logical error: we are not in the middle of ticking"
+    advanceTick (MiddleOfTicking startedAt)
+      = do now ← getMonotonicTime
            -- The next tick time is basically now + tickingInterval,
            -- but if the world is lagging the interval becomes shorter
            -- than that, and can even go negative (no delay).
-           let !elapsed = μs (now - lastTick)
+           let !elapsed = now - startedAt
                !delay   = tickingInterval - elapsed
-           newDelay delay
+           nextDelay ← newDelay (round (delay⋅1000000))
+           return $! Waiting nextDelay
 
-    μs ∷ TimeSpec → Int
-    μs !(TimeSpec {sec, nsec})
-      = fromIntegral $! (sec ⋅ 1000000) + (nsec `div` 1000)
+-- | Respond to chunk retrieval requests. This is run as a part of
+-- 'runWorld'.
+handleChunkReq ∷ LocalWorld → RunningState → STM ()
+handleChunkReq lw rs
+  = do cReq ← readTBQueue (lwChunkReqs lw)
+       -- If the requested chunk is indeed not available, LCM.get
+       -- spawns a thread and then retries the transaction. Thus we
+       -- can respond to world termination immediately while
+       -- generating the requested chunk.
+       c ← LCM.get cReq (rsChunks rs)
+       fireEvent lw $ ChunkArrived cReq c
 
-    waitForNextTick ∷ Delay → STM TimeSpec
-    waitForNextTick nextTick
-      = do waitDelay nextTick
-           unsafeIOToSTM $! getTime Monotonic
+-- | Run a single scheduled command in the world context. Retries when
+-- nothing is scheduled. This is run as a part of 'runWorld'.
+consumeCommandQ ∷ STM ()
+consumeCommandQ = retry -- FIXME
 
 -- | Get the coordinate of the initial spawn.
 initialSpawn ∷ RunningState → STM WorldPos

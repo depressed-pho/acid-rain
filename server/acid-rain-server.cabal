@@ -29,7 +29,6 @@ library
     acid-rain-builtin    ^>= 0.1.0.0,
     acid-rain-core       ^>= 0.1.0.0,
     base-unicode-symbols ^>= 0.2.4.2,
-    clock                ^>= 0.8.2,
     convertible          ^>= 1.1.1.0,
     exceptions           ^>= 0.10.4,
     focus                ^>= 1.0.2,
