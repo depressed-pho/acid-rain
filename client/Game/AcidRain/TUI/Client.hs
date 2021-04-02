@@ -36,7 +36,7 @@ import Game.AcidRain.World.Player (PlayerID)
 import Game.AcidRain.TUI.AppEvent (AppEvent(..), SomeAppEvent)
 import Game.AcidRain.TUI.Keystroke (Keystroke, keystroke)
 import Game.AcidRain.TUI.Widgets.WorldView
-  ( WorldView, wvWorld, worldView, renderWorldView, redrawWorldView )
+  ( WorldView, wvWorld, wvPlayer, worldView, renderWorldView, redrawWorldView )
 import Game.AcidRain.World
   ( World(..), WorldState(..), WorldStateChanged(..), CommandSetUpdated(..) )
 import qualified Game.AcidRain.World.Event as WE
@@ -64,9 +64,11 @@ data Client
 makeLenses ''Client
 
 instance IClientCtx Client where
+  basicGetClientPlayer = (^.cliWorldView.wvPlayer)
   basicSendToWorld cli c args
     = do let w = cli^.cliWorldView.wvWorld
-         scheduleCommand w c args
+             p = cli^.cliWorldView.wvPlayer
+         scheduleCommand w c (Just p) args
 
 newtype ClientEvent = ClientEvent WE.SomeEvent
   deriving Show

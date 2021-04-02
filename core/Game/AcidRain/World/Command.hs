@@ -12,21 +12,26 @@ module Game.AcidRain.World.Command
     -- * Client-side context
   , IClientCtx(..)
   , ClientCtx
+  , getClientPlayer
   , sendToWorld
 
-    -- * Server-side context
-  , IServerCtx(..)
-  , ServerCtx
+    -- * World-side context
+  , IWorldCtx(..)
+  , WorldCtx
+  , reportWorldCommandError
   ) where
 
-import Control.Eff (Eff, Member)
+import Control.Eff (Eff, Lifted, Member)
+import Control.Eff.Reader.Lazy (Reader)
 import Control.Eff.State.Strict (State, get)
 import Control.Monad.IO.Class (MonadIO(..))
+import Control.Monad.STM (STM)
 import Data.Hashable (Hashable(..))
 import Data.Text (Text)
 import Data.Typeable (Typeable, cast)
 import GHC.Generics (Generic)
 import Game.AcidRain.TUI.Keystroke (Keystroke)
+import Game.AcidRain.World.Player (PlayerID)
 import Prelude.Unicode ((≡))
 
 
@@ -52,12 +57,28 @@ class (Show c, Typeable c) ⇒ Command c where
   commandID ∷ c → CommandID
   -- | Get the command type.
   commandType ∷ c → CommandType
-  -- | Run the command on the client side.
+  -- | Run the command on the client-side context. The default
+  -- implementation simply redirects the command to the world.
   runOnClient ∷ (MonadIO (Eff r), Member (State ClientCtx) r)
               ⇒ c
               → [Text]
               → Eff r ()
   runOnClient = sendToWorld
+  -- | Run the command on the world-side context.
+  --
+  -- The argument @mPid@ indicates the player who invoked the command,
+  -- or 'Nothing' if there is no particular player who did it. Doing a
+  -- security check is a responsibility of this method which is
+  -- usually done via (FIXME: which functions can we use?)
+  --
+  -- Throwing exceptions in this method would result in a server
+  -- crash. It should therefore be avoided unless something
+  -- catastrophic happens.
+  runOnWorld ∷ (Lifted STM r, Member (Reader WorldCtx) r)
+             ⇒ c
+             → Maybe PlayerID -- ^ @mPid@
+             → [Text]         -- ^ Arguments
+             → Eff r ()
 
 -- | A type-erased 'Command'
 data SomeCommand = ∀c. Command c ⇒ SomeCommand !c
@@ -80,12 +101,14 @@ instance Command SomeCommand where
   downcastCommand = Just
   commandID (SomeCommand c) = commandID c
   commandType (SomeCommand c) = commandType c
+  runOnWorld (SomeCommand c) = runOnWorld c
 
 -------------------------------------------------------------------------------
 -- Client-side context
 -------------------------------------------------------------------------------
 
--- | Command-evaluating context for the client side.
+-- | Command-evaluating context for the client side. Command
+-- implementations should not invoke its methods directly.
 class Typeable ctx ⇒ IClientCtx ctx where
   -- This type class cannot mention 'World' because doing so would end
   -- up in a dependency cycle.
@@ -96,9 +119,10 @@ class Typeable ctx ⇒ IClientCtx ctx where
   -- | Recover the type of 'IClientCtx'.
   downcastClientCtx ∷ ClientCtx → Maybe ctx
   downcastClientCtx (ClientCtx ctx) = cast ctx
+  -- | Get the ID of the player whom the client controls.
+  basicGetClientPlayer ∷ ctx → PlayerID
   -- | Schedule the command (along with arguments) to run on the world
-  -- context. Command implementations should use 'sendToWorld' instead
-  -- of invoking this directly.
+  -- context.
   basicSendToWorld ∷ (Command c, MonadIO μ) ⇒ ctx → c → [Text] → μ ()
 
 -- | Type-erased 'IClientCtx'. We hate this. What we really want to do
@@ -112,7 +136,14 @@ data ClientCtx = ∀ctx. IClientCtx ctx ⇒ ClientCtx !ctx
 instance IClientCtx ClientCtx where
   upcastClientCtx = id
   downcastClientCtx = Just
+  basicGetClientPlayer (ClientCtx ctx) = basicGetClientPlayer ctx
   basicSendToWorld (ClientCtx ctx) = basicSendToWorld ctx
+
+-- | Get the ID of the player whom the client controls.
+getClientPlayer ∷ Member (State ClientCtx) r ⇒ Eff r PlayerID
+getClientPlayer
+  = do ctx ← get
+       return $ basicGetClientPlayer (ctx ∷ ClientCtx)
 
 -- | Schedule the command (along with arguments) to run on the world
 -- context.
@@ -125,22 +156,31 @@ sendToWorld c args
        liftIO $ basicSendToWorld (ctx ∷ ClientCtx) c args
 
 -------------------------------------------------------------------------------
--- Server-side context
+-- World-side context
 -------------------------------------------------------------------------------
 
--- | Command-evaluating and ticking context for the server side.
-class Typeable ctx ⇒ IServerCtx ctx where
-  -- | Erase the type of 'IServerCtx'.
-  upcastServerCtx ∷ ctx → ServerCtx
-  upcastServerCtx = ServerCtx
-  -- | Recover the type of 'IServerCtx'.
-  downcastServerCtx ∷ ServerCtx → Maybe ctx
-  downcastServerCtx (ServerCtx ctx) = cast ctx
+-- | Command-evaluating and ticking context for the world side
+-- (aka. server-side).
+class Typeable ctx ⇒ IWorldCtx ctx where
+  -- | Erase the type of 'IWorldCtx'.
+  upcastWorldCtx ∷ ctx → WorldCtx
+  upcastWorldCtx = WorldCtx
+  -- | Recover the type of 'IWorldCtx'.
+  downcastWorldCtx ∷ WorldCtx → Maybe ctx
+  downcastWorldCtx (WorldCtx ctx) = cast ctx
 
--- | Type-erased 'IServerCtx'. We hate this for the same reason as
+-- | Type-erased 'IWorldCtx'. We hate this for the same reason as
 -- 'ClientCtx'.
-data ServerCtx = ∀ctx. IServerCtx ctx ⇒ ServerCtx !ctx
+data WorldCtx = ∀ctx. IWorldCtx ctx ⇒ WorldCtx !ctx
 
-instance IServerCtx ServerCtx where
-  upcastServerCtx = id
-  downcastServerCtx = Just
+instance IWorldCtx WorldCtx where
+  upcastWorldCtx = id
+  downcastWorldCtx = Just
+
+reportWorldCommandError ∷ (Command c, Lifted STM r, Member (Reader WorldCtx) r)
+                        ⇒ c
+                        → Maybe PlayerID
+                        → [Text]
+                        → Eff r ()
+reportWorldCommandError cmd mPid args
+  = error ("FIXME: command error: " ++ show cmd ++ " " ++ show mPid ++ " " ++ show args)

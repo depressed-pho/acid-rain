@@ -15,11 +15,13 @@ import Control.Concurrent.STM.Delay (Delay, newDelay, waitDelay)
 import Control.Concurrent.STM.TBQueue
   ( TBQueue, newTBQueueIO, tryReadTBQueue, readTBQueue, writeTBQueue )
 import Control.Concurrent.STM.TVar (TVar, newTVarIO, readTVar, writeTVar)
+import Control.Eff (Eff, Lift, runLift)
+import Control.Eff.Reader.Lazy (Reader, runReader)
 import Data.Convertible.Base (convert)
 import Control.Exception (Exception(..), SomeException, handle)
 import Control.Monad (join, void)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.STM (STM, atomically, throwSTM, orElse, retry)
+import Control.Monad.STM (STM, atomically, throwSTM, orElse)
 import Data.Text (Text)
 import qualified Data.UUID as U
 import GHC.Clock (getMonotonicTime)
@@ -37,7 +39,8 @@ import Game.AcidRain.World.Chunk (Chunk, putEntity)
 import Game.AcidRain.World.Chunk.Manager.Local (LocalChunkManager)
 import qualified Game.AcidRain.World.Chunk.Manager.Local as LCM
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
-import Game.AcidRain.World.Command (Command(..), SomeCommand)
+import Game.AcidRain.World.Command
+  ( Command(..), SomeCommand, IWorldCtx(..), WorldCtx )
 import Game.AcidRain.World.Command.Registry (CommandRegistry)
 import qualified Game.AcidRain.World.Command.Registry as CR
 import qualified Game.AcidRain.World.Entity as E
@@ -64,8 +67,10 @@ data LocalWorld
     , lwState     ∷ !(TVar (WorldState RunningState))
     , lwEvents    ∷ !(TBQueue SomeEvent)
     , lwChunkReqs ∷ !(TBQueue ChunkPos)
-    , lwCommandQ  ∷ !(TBQueue (SomeCommand, [Text]))
+    , lwCommandQ  ∷ !(TBQueue (SomeCommand, Maybe PlayerID, [Text]))
     }
+
+instance IWorldCtx LocalWorld where
 
 eventQueueCapacity ∷ Natural
 eventQueueCapacity = 256
@@ -128,9 +133,9 @@ instance World LocalWorld where
                   Closed     _ → return Nothing
                   _            → Just <$> readTBQueue (lwEvents lw)
 
-  scheduleCommand lw cmd args
+  scheduleCommand lw cmd mPid args
     = liftIO $ atomically $
-      writeTBQueue (lwCommandQ lw) (upcastCommand cmd, args)
+      writeTBQueue (lwCommandQ lw) (upcastCommand cmd, mPid, args)
 
   lookupChunk lw pos
     = liftIO $ atomically $
@@ -274,7 +279,7 @@ runWorld lw
                )
                `orElse`
                ( do ts' ← waitForTickStart ts
-                    consumeCommandQ
+                    consumeCommandQ lw
                     return $ loop ts'
                )
                `orElse`
@@ -321,8 +326,15 @@ handleChunkReq lw rs
 
 -- | Run a single scheduled command in the world context. Retries when
 -- nothing is scheduled. This is run as a part of 'runWorld'.
-consumeCommandQ ∷ STM ()
-consumeCommandQ = retry -- FIXME
+consumeCommandQ ∷ LocalWorld → STM ()
+consumeCommandQ lw
+  = do (cmd, mPid, args) ← readTBQueue (lwCommandQ lw)
+       withWorldCtx lw $
+         runOnWorld cmd mPid args
+
+withWorldCtx ∷ LocalWorld → Eff '[Reader WorldCtx, Lift STM] () → STM ()
+withWorldCtx lw
+  = runLift ∘ runReader (upcastWorldCtx lw)
 
 -- | Get the coordinate of the initial spawn.
 initialSpawn ∷ RunningState → STM WorldPos

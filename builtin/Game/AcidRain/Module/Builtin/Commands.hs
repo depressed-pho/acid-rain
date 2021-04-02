@@ -15,13 +15,18 @@ import Data.Foldable (traverse_)
 import Data.Proxy (Proxy(..))
 import Game.AcidRain.Module.Loader (LoaderContext, registerCommand)
 import Game.AcidRain.TUI.Keystroke (keyQ)
-import Game.AcidRain.World.Command (Command(..), CommandType(..))
+import Game.AcidRain.World.Command
+  ( Command(..), CommandType(..), reportWorldCommandError )
 
 
 data WalkNorth
 instance Command (Proxy WalkNorth) where
   commandID   _ = "acid-rain:walk-north"
   commandType _ = Interactive $ Just [keyQ|k|]
+  runOnWorld _ (Just pid) []
+    = return ()
+  runOnWorld cmd mPid args
+    = reportWorldCommandError cmd mPid args
 
 loadCommands ∷ (Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ Eff r ()
 loadCommands

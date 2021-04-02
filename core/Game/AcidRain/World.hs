@@ -61,8 +61,15 @@ class World w where
   -- if these is no chance that any more events can ever fire.
   waitForEvent ∷ MonadIO μ ⇒ w → μ (Maybe SomeEvent)
   -- | Schedule a command (along with arguments) to run on the world
-  -- context in the next game tick.
-  scheduleCommand ∷ (MonadIO μ, Command c) ⇒ w → c → [Text] → μ ()
+  -- context in the next game tick. The argument @mPid@ indicates
+  -- the player who attempted to use the command, or 'Nothing' if
+  -- there is no particular player who did it.
+  scheduleCommand ∷ (MonadIO μ, Command c)
+                  ⇒ w
+                  → c
+                  → Maybe PlayerID -- ^ @mPid@
+                  → [Text]         -- ^ Arguments
+                  → μ ()
   -- | Lookup a chunk at a certain position if it's available. This
   -- does not block. If the chunk isn't available yet, an event
   -- ChunkArrived will fire later.
