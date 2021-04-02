@@ -105,8 +105,8 @@ biomeChooser tReg
 
 chooseBiome ∷ Double → Double → Climate → BiomeChooser → SomeBiomeGen
 chooseBiome river height cli bc
-  | river > 0.7 = bcRiver bc
   | height < 0  = bcOcean bc
+  | river > 0.7 = bcRiver bc
   | otherwise   = chooseBiomeForClimate cli (bcClimateBased bc)
 
 -- | Get a remapped height in @[-1, 0]@. The sea level becomes @-1@

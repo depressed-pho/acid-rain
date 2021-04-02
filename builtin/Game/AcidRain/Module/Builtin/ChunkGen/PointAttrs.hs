@@ -46,9 +46,9 @@ data PointAttrs
 -- coordinate is ignored.
 pointAttrs ∷ Member (Reader WorldInfo) r ⇒ BiomeChooser → WorldPos → Eff r PointAttrs
 pointAttrs bc pos
-  = do r  ← riverStrength pos
-       h  ← height r pos
-       c  ← climate h pos
+  = do r ← riverStrength pos
+       h ← height r pos
+       c ← climate h pos
        return PointAttrs
          { paHeight  = h
          , paClimate = c
@@ -82,7 +82,8 @@ height river pos
        let enhancedHeight
              = baseHeight⋅(abs baseHeight)⋅(wiMountainExp wi)
 
-       -- Then apply a river strength.
+       -- Then apply a river strength unless the height is already
+       -- under the sea level.
        return $ riverize enhancedHeight river
   where
     evalFBm ∷ SimplexGen → (Double, Double) → Double
