@@ -1,6 +1,8 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Entity
   ( -- * Entity types
@@ -13,9 +15,16 @@ module Game.AcidRain.World.Entity
   , SomeEntity
   ) where
 
+import Control.Eff (Eff, Lifted, type(<::))
+import Control.Eff.Exception (Exc)
+import Control.Eff.Reader.Lazy (Reader)
+import Control.Exception (SomeException)
+import Control.Monad.STM (STM)
 import Data.Kind (Type)
 import Data.Text (Text)
 import Game.AcidRain.TUI (HasAppearance(..))
+import Game.AcidRain.World.Command (WorldCtx)
+import Game.AcidRain.World.Position (WorldPos)
 
 
 type EntityTypeID = Text
@@ -81,6 +90,13 @@ class (EntityType (EntityTypeOf ε), HasAppearance ε, Show ε) ⇒ Entity ε wh
   upcastEntity = SomeEntity
   -- | Get the type of this entity.
   entityType ∷ ε → EntityTypeOf ε
+  -- | Called when an entity has been moved. Do nothing by default.
+  entityMoved ∷ (Lifted STM r, [Reader WorldCtx, Exc SomeException] <:: r)
+              ⇒ ε
+              → WorldPos -- ^ from
+              → WorldPos -- ^ to
+              → Eff r ()
+  entityMoved _ _ _ = return ()
 
 -- | A type-erased 'Entity'.
 data SomeEntity = ∀ε. Entity ε ⇒ SomeEntity !ε
@@ -95,3 +111,4 @@ instance Entity SomeEntity where
   type EntityTypeOf SomeEntity = SomeEntityType
   upcastEntity = id
   entityType (SomeEntity e) = SomeEntityType (entityType e)
+  entityMoved (SomeEntity e) = entityMoved e

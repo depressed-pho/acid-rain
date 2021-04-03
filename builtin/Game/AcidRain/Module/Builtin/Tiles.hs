@@ -22,13 +22,15 @@ import Prelude.Unicode ((≡))
 
 data Air
 instance Tile (Proxy Air) where
-  tileID _ = "acid-rain:air"
-  appearanceFor _ _ _ = InvisibleAppearance
+  tileID       _     = "acid-rain:air"
+  isSolidAt    _ _   = False
+  appearanceAt _ _ _ = InvisibleAppearance
 
 data Dirt
 instance Tile (Proxy Dirt) where
-  tileID _ = "acid-rain:dirt"
-  appearanceFor _ _ pos
+  tileID       _   = "acid-rain:dirt"
+  isSolidAt    _ _ = True
+  appearanceAt _ _ pos
     | pos^.wpZ ≡ lowestZ = begin ⊳ unicode "." ⊳ ascii '.' ⊳ fgColour colour ⊳ end
     | otherwise          = begin ⊳ unicode "#" ⊳ ascii '#' ⊳ fgColour colour ⊳ end
     where
@@ -36,8 +38,9 @@ instance Tile (Proxy Dirt) where
 
 data Gravel
 instance Tile (Proxy Gravel) where
-  tileID _ = "acid-rain:gravel"
-  appearanceFor _ _ pos
+  tileID       _   = "acid-rain:gravel"
+  isSolidAt    _ _ = True
+  appearanceAt _ _ pos
     | pos^.wpZ ≡ lowestZ = begin ⊳ unicode ":" ⊳ ascii ':' ⊳ fgColour colour ⊳ end
     | otherwise          = begin ⊳ unicode "%" ⊳ ascii '%' ⊳ fgColour colour ⊳ end
     where
@@ -45,8 +48,9 @@ instance Tile (Proxy Gravel) where
 
 data Sand
 instance Tile (Proxy Sand) where
-  tileID _ = "acid-rain:sand"
-  appearanceFor _ _ pos
+  tileID _         = "acid-rain:sand"
+  isSolidAt    _ _ = True
+  appearanceAt _ _ pos
     | pos^.wpZ ≡ lowestZ = begin ⊳ unicode ":" ⊳ ascii ':' ⊳ fgColour colour ⊳ end
     | otherwise          = begin ⊳ unicode "#" ⊳ ascii '#' ⊳ fgColour colour ⊳ end
     where
@@ -54,15 +58,17 @@ instance Tile (Proxy Sand) where
 
 data SeaWater
 instance Tile (Proxy SeaWater) where
-  tileID _ = "acid-rain:seawater"
-  appearanceFor _ _ _ = begin ⊳ unicode "~" ⊳ ascii '~' ⊳ fgColour colour ⊳ end
+  tileID       _     = "acid-rain:seawater"
+  isSolidAt    _ _   = False
+  appearanceAt _ _ _ = begin ⊳ unicode "~" ⊳ ascii '~' ⊳ fgColour colour ⊳ end
     where
       colour = hsl 195.0 1.0 0.4 -- Slightly darker than CSS3 deepskyblue
 
 data Water
 instance Tile (Proxy Water) where
-  tileID _ = "acid-rain:water"
-  appearanceFor _ _ _ = begin ⊳ unicode "~" ⊳ ascii '~' ⊳ fgColour colour ⊳ end
+  tileID       _     = "acid-rain:water"
+  isSolidAt    _ _   = False
+  appearanceAt _ _ _ = begin ⊳ unicode "~" ⊳ ascii '~' ⊳ fgColour colour ⊳ end
     where
       colour = hsl 195.0 1.0 0.5 -- CSS3 deepskyblue
 

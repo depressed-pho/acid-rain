@@ -18,11 +18,14 @@ module Game.AcidRain.World.Chunk
   , climateAt
   , biomeAt
   , entityAt
+  , hasEntityAt
+  , canEntityEnter
   ) where
 
 import Control.Monad.Catch (MonadThrow)
 import Data.Default (Default(..))
 import qualified Data.HashMap.Strict as HM
+import Data.Maybe (isJust)
 import qualified Data.Vector.Generic as GV
 import Game.AcidRain.World.Biome (Biome(..), SomeBiome)
 import Game.AcidRain.World.Biome.Palette (BiomePalette)
@@ -40,13 +43,13 @@ import Game.AcidRain.World.Chunk.Types
 import Game.AcidRain.World.Climate (Climate)
 import Game.AcidRain.World.Entity (Entity(..), SomeEntity)
 import Game.AcidRain.World.Entity.Catalogue (EntityCatalogue)
-import Game.AcidRain.World.Tile (TileState(..), SomeTileState)
+import Game.AcidRain.World.Tile (TileState(..), SomeTileState, isSolid)
 import Game.AcidRain.World.Tile.Palette (TilePalette)
 import qualified Game.AcidRain.World.Tile.Palette as TPal
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
 import qualified Game.AcidRain.World.Tile.Registry as TR
 import Lens.Micro ((&), (^.), (%~))
-import Prelude.Unicode ((⋅))
+import Prelude.Unicode ((⋅), (∘))
 
 
 -- | Create a chunk filled with a single specific tile which is
@@ -131,3 +134,19 @@ entityAt ∷ TileOffset → Chunk → Maybe SomeEntity
 entityAt off c
   = assertValidOffset off $
     HM.lookup off (c^.cEntities)
+
+-- | Return 'True' iff there is an entity at a given offset in a
+-- chunk.
+hasEntityAt ∷ TileOffset → Chunk → Bool
+hasEntityAt = (isJust ∘) ∘ entityAt
+
+-- | Return 'True' iff an entity can enter a given spot in a chunk. An
+-- entity can enter a spot iff (a) there is no entity at the spot, and
+-- (b) the tile there is not solid.
+canEntityEnter ∷ MonadThrow μ ⇒ TileOffset → Chunk → μ Bool
+canEntityEnter off c
+  = if hasEntityAt off c then
+      return False
+    else
+      do ts ← tileStateAt off c
+         return $ not $ isSolid ts

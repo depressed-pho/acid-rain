@@ -15,13 +15,14 @@ import Control.Concurrent.STM.Delay (Delay, newDelay, waitDelay)
 import Control.Concurrent.STM.TBQueue
   ( TBQueue, newTBQueueIO, tryReadTBQueue, readTBQueue, writeTBQueue )
 import Control.Concurrent.STM.TVar (TVar, newTVarIO, readTVar, writeTVar)
-import Control.Eff (Eff, Lift, runLift)
+import Control.Eff (Eff, Lift, runLift, lift)
+import Control.Eff.Exception (Exc, runError)
 import Control.Eff.Reader.Lazy (Reader, runReader)
-import Data.Convertible.Base (convert)
 import Control.Exception (Exception(..), SomeException, handle)
 import Control.Monad (join, void)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.STM (STM, atomically, throwSTM, orElse)
+import Data.Convertible.Base (convert)
 import Data.Text (Text)
 import qualified Data.UUID as U
 import GHC.Clock (getMonotonicTime)
@@ -35,12 +36,14 @@ import Game.AcidRain.World
   , CommandSetUpdated(..), ChunkArrived(..)
   , WorldNotRunningException(..), UnknownPlayerIDException(..) )
 import qualified Game.AcidRain.World.Biome.Palette as BPal
-import Game.AcidRain.World.Chunk (Chunk, putEntity)
+import Game.AcidRain.World.Chunk
+  ( Chunk, putEntity, deleteEntity, entityAt, canEntityEnter )
 import Game.AcidRain.World.Chunk.Manager.Local (LocalChunkManager)
 import qualified Game.AcidRain.World.Chunk.Manager.Local as LCM
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
 import Game.AcidRain.World.Command
-  ( Command(..), SomeCommand, IWorldCtx(..), WorldCtx )
+  ( Command(..), SomeCommand, IWorldCtx(..), WorldCtx
+  , throwSomeExc )
 import Game.AcidRain.World.Command.Registry (CommandRegistry)
 import qualified Game.AcidRain.World.Command.Registry as CR
 import qualified Game.AcidRain.World.Entity as E
@@ -54,7 +57,7 @@ import qualified Game.AcidRain.World.Tile.Palette as TPal
 import Lens.Micro ((^.))
 import Numeric.Natural (Natural)
 import Prelude hiding (lcm)
-import Prelude.Unicode ((∘), (⋅))
+import Prelude.Unicode ((∘), (⋅), (≡))
 
 
 -- | Local world is a server-side world which is owned by a
@@ -70,8 +73,6 @@ data LocalWorld
     , lwCommandQ  ∷ !(TBQueue (SomeCommand, Maybe PlayerID, [Text]))
     }
 
-instance IWorldCtx LocalWorld where
-
 eventQueueCapacity ∷ Natural
 eventQueueCapacity = 256
 
@@ -86,6 +87,48 @@ data RunningState
     , rsPlayers  ∷ !LocalPlayerManager
     , rsCommands ∷ !CommandRegistry
     } deriving Show
+
+instance IWorldCtx RunningState where
+  basicGetPlayer rs pid
+    = do mp ← lift $ LPM.lookup pid (rsPlayers rs)
+         case mp of
+           Just p  → return p
+           Nothing → throwSomeExc $ UnknownPlayerIDException pid
+
+  basicModifyPlayer rs f pid
+    = lift $ LPM.modify f pid (rsPlayers rs)
+
+  basicTryMoveEntity rs from to
+    = let cpFrom  = convert from
+          cpTo    = convert to
+          offFrom = convert from
+          offTo   = convert to
+      in
+        if cpFrom ≡ cpTo
+        then
+          -- Both the source and the destination are in the same
+          -- chunk. So we only need to update one chunk.
+          do let move c = error "fixme"
+             lift $ LCM.modify move cpFrom (rsChunks rs)
+             error "aaa"
+        else
+          -- We are moving it across a chunk boundary.
+          do cFrom ← lift $ LCM.get cpFrom (rsChunks rs)
+             case entityAt offFrom cFrom of
+               Nothing  → return False -- But there's no entity here.
+               Just ent →
+                 -- The entity does exist. But can it really move to
+                 -- the destination?
+                 do cTo      ← lift $ LCM.get cpTo (rsChunks rs)
+                    canEnter ← canEntityEnter offTo cTo
+                    if canEnter
+                      then do lift $ LCM.modify (deleteEntity offFrom) cpFrom (rsChunks rs)
+                              lift $ LCM.modify (putEntity offTo ent)  cpTo   (rsChunks rs)
+                              runReader (upcastWorldCtx rs)
+                                $ E.entityMoved ent from to
+                              -- FIXME: Notify clients about this
+                              return True
+                      else return False
 
 -- Assume the world is running or throw an exception. Not exposed to
 -- anywhere.
@@ -279,7 +322,7 @@ runWorld lw
                )
                `orElse`
                ( do ts' ← waitForTickStart ts
-                    consumeCommandQ lw
+                    consumeCommandQ lw rs
                     return $ loop ts'
                )
                `orElse`
@@ -326,15 +369,20 @@ handleChunkReq lw rs
 
 -- | Run a single scheduled command in the world context. Retries when
 -- nothing is scheduled. This is run as a part of 'runWorld'.
-consumeCommandQ ∷ LocalWorld → STM ()
-consumeCommandQ lw
+consumeCommandQ ∷ LocalWorld → RunningState → STM ()
+consumeCommandQ lw rs
   = do (cmd, mPid, args) ← readTBQueue (lwCommandQ lw)
-       withWorldCtx lw $
+       withWorldCtx rs $
          runOnWorld cmd mPid args
 
-withWorldCtx ∷ LocalWorld → Eff '[Reader WorldCtx, Lift STM] () → STM ()
-withWorldCtx lw
-  = runLift ∘ runReader (upcastWorldCtx lw)
+withWorldCtx ∷ RunningState → Eff '[Reader WorldCtx, Exc SomeException, Lift STM] () → STM ()
+withWorldCtx rs
+  = (handleCmdExc =<<) ∘ runLift ∘ runError ∘ runReader (upcastWorldCtx rs)
+  where
+    -- FIXME: Report it to the client without crashing the world.
+    handleCmdExc ∷ Either SomeException a → STM a
+    handleCmdExc (Left  e) = error ("FIXME: command failed: " ++ show e)
+    handleCmdExc (Right a) = return a
 
 -- | Get the coordinate of the initial spawn.
 initialSpawn ∷ RunningState → STM WorldPos
@@ -361,9 +409,9 @@ newPlayer ∷ PlayerID → Permission → RunningState → STM Player
 newPlayer pid perm rs
   = do spawn ← initialSpawn rs
        let pl = Player
-                { plID   = pid
-                , plPerm = perm
-                , plPos  = spawn
+                { _plID   = pid
+                , _plPerm = perm
+                , _plPos  = spawn
                 }
        LPM.put pl $ rsPlayers rs
        void $ spawnEntity spawn (B.Player pid) rs

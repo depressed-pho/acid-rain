@@ -1,12 +1,14 @@
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Player
   ( Permission(..)
-  , Player(..)
+  , Player(..), plID, plPerm, plPos
   , PlayerID
   ) where
 
 import Data.UUID (UUID)
 import Game.AcidRain.World.Position (WorldPos)
+import Lens.Micro.TH (makeLenses)
 
 
 data Permission
@@ -20,15 +22,6 @@ data Permission
     -- interact with tiles though.
   | Visitor
   deriving (Show, Eq)
-
-
-data Player
-  = Player
-    { plID   ∷ !PlayerID
-    , plPerm ∷ !Permission
-    , plPos  ∷ !WorldPos
-    } deriving (Show)
-
 
 -- | Player ID is a UUID or any version to uniquely identify a player
 -- in a world.
@@ -70,3 +63,12 @@ data Player
 -- identity. Nil UUID is not usable in multi player mode. Even the
 -- local administrator can't use it.
 type PlayerID = UUID
+
+data Player
+  = Player
+    { _plID   ∷ !PlayerID
+    , _plPerm ∷ !Permission
+    , _plPos  ∷ !WorldPos
+    } deriving (Show)
+
+makeLenses ''Player

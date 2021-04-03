@@ -203,7 +203,7 @@ worldPosAt ∷ MonadIO μ
 worldPosAt wv ext lp
   = do -- Get the player position
        pl ← getPlayer (wv^.wvWorld) (wv^.wvPlayer)
-       let pposW  = plPos pl
+       let pposW  = pl^.plPos
 
        -- Get the player position in the widget coords.
        let centerL = getCenter ext

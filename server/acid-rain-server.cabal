@@ -34,6 +34,7 @@ library
     extensible-effects   ^>= 5.0.0.1,
     focus                ^>= 1.0.2,
     microlens            ^>= 0.4.12.0,
+    microlens-th         ^>= 0.4.3.9,
     stm                  ^>= 2.5.0.0,
     stm-containers       ^>= 1.2,
     stm-delay            ^>= 0.1.1.1,

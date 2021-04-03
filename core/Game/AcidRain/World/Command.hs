@@ -1,7 +1,11 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE ExplicitNamespaces #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Command
   ( Command(..)
@@ -9,21 +13,30 @@ module Game.AcidRain.World.Command
   , CommandType(..)
   , SomeCommand(..)
 
+    -- * Errors while running commands
+  , BadArgumentsException(..)
+  , throwSomeExc
+  , throwSomeExc_
+
     -- * Client-side context
   , IClientCtx(..)
   , ClientCtx
-  , getClientPlayer
+  , getClientPlayerID
   , sendToWorld
 
     -- * World-side context
   , IWorldCtx(..)
   , WorldCtx
-  , reportWorldCommandError
+  , getPlayer
+  , modifyPlayer
+  , tryMoveEntity
   ) where
 
-import Control.Eff (Eff, Lifted, Member)
-import Control.Eff.Reader.Lazy (Reader)
+import Control.Eff (Eff, Lifted, Member, type(<::))
+import Control.Eff.Exception (Exc, throwError, throwError_)
+import Control.Eff.Reader.Lazy (Reader, ask)
 import Control.Eff.State.Strict (State, get)
+import Control.Exception (Exception(..), SomeException, toException)
 import Control.Monad.IO.Class (MonadIO(..))
 import Control.Monad.STM (STM)
 import Data.Hashable (Hashable(..))
@@ -31,8 +44,9 @@ import Data.Text (Text)
 import Data.Typeable (Typeable, cast)
 import GHC.Generics (Generic)
 import Game.AcidRain.TUI.Keystroke (Keystroke)
-import Game.AcidRain.World.Player (PlayerID)
-import Prelude.Unicode ((≡))
+import Game.AcidRain.World.Player (Player, PlayerID)
+import Game.AcidRain.World.Position (WorldPos)
+import Prelude.Unicode ((∘), (≡))
 
 
 type CommandID = Text
@@ -71,10 +85,10 @@ class (Show c, Typeable c) ⇒ Command c where
   -- security check is a responsibility of this method which is
   -- usually done via (FIXME: which functions can we use?)
   --
-  -- Throwing exceptions in this method would result in a server
-  -- crash. It should therefore be avoided unless something
-  -- catastrophic happens.
-  runOnWorld ∷ (Lifted STM r, Member (Reader WorldCtx) r)
+  -- Throwing dynamic exceptions in this method would result in a
+  -- server crash. It should therefore be avoided unless something
+  -- catastrophic happens. For regular errors use 'Exc'.
+  runOnWorld ∷ (Lifted STM r, [Reader WorldCtx, Exc SomeException] <:: r)
              ⇒ c
              → Maybe PlayerID -- ^ @mPid@
              → [Text]         -- ^ Arguments
@@ -104,6 +118,17 @@ instance Command SomeCommand where
   runOnWorld (SomeCommand c) = runOnWorld c
 
 -------------------------------------------------------------------------------
+-- Errors while running commands
+-------------------------------------------------------------------------------
+data BadArgumentsException = BadArgumentsException deriving (Show, Exception)
+
+throwSomeExc ∷ (Exception e, Member (Exc SomeException) r) ⇒ e → Eff r a
+throwSomeExc = throwError ∘ toException
+
+throwSomeExc_ ∷ (Exception e, Member (Exc SomeException) r) ⇒ e → Eff r ()
+throwSomeExc_ = throwError_ ∘ toException
+
+-------------------------------------------------------------------------------
 -- Client-side context
 -------------------------------------------------------------------------------
 
@@ -120,7 +145,7 @@ class Typeable ctx ⇒ IClientCtx ctx where
   downcastClientCtx ∷ ClientCtx → Maybe ctx
   downcastClientCtx (ClientCtx ctx) = cast ctx
   -- | Get the ID of the player whom the client controls.
-  basicGetClientPlayer ∷ ctx → PlayerID
+  basicGetClientPlayerID ∷ ctx → PlayerID
   -- | Schedule the command (along with arguments) to run on the world
   -- context.
   basicSendToWorld ∷ (Command c, MonadIO μ) ⇒ ctx → c → [Text] → μ ()
@@ -136,14 +161,14 @@ data ClientCtx = ∀ctx. IClientCtx ctx ⇒ ClientCtx !ctx
 instance IClientCtx ClientCtx where
   upcastClientCtx = id
   downcastClientCtx = Just
-  basicGetClientPlayer (ClientCtx ctx) = basicGetClientPlayer ctx
+  basicGetClientPlayerID (ClientCtx ctx) = basicGetClientPlayerID ctx
   basicSendToWorld (ClientCtx ctx) = basicSendToWorld ctx
 
 -- | Get the ID of the player whom the client controls.
-getClientPlayer ∷ Member (State ClientCtx) r ⇒ Eff r PlayerID
-getClientPlayer
+getClientPlayerID ∷ Member (State ClientCtx) r ⇒ Eff r PlayerID
+getClientPlayerID
   = do ctx ← get
-       return $ basicGetClientPlayer (ctx ∷ ClientCtx)
+       return $ basicGetClientPlayerID (ctx ∷ ClientCtx)
 
 -- | Schedule the command (along with arguments) to run on the world
 -- context.
@@ -168,6 +193,23 @@ class Typeable ctx ⇒ IWorldCtx ctx where
   -- | Recover the type of 'IWorldCtx'.
   downcastWorldCtx ∷ WorldCtx → Maybe ctx
   downcastWorldCtx (WorldCtx ctx) = cast ctx
+  -- | Get a player in the world having a given ID.
+  basicGetPlayer ∷ (Lifted STM r, Member (Exc SomeException) r)
+                 ⇒ ctx
+                 → PlayerID
+                 → Eff r Player
+  -- | Modify a player in the world having a given ID.
+  basicModifyPlayer ∷ (Lifted STM r, Member (Exc SomeException) r)
+                    ⇒ ctx
+                    → (Player → Player)
+                    → PlayerID
+                    → Eff r ()
+  -- | Move an entity in the world and return 'True' iff successful.
+  basicTryMoveEntity ∷ (Lifted STM r, Member (Exc SomeException) r)
+                     ⇒ ctx
+                     → WorldPos -- ^ from
+                     → WorldPos -- ^ to
+                     → Eff r Bool
 
 -- | Type-erased 'IWorldCtx'. We hate this for the same reason as
 -- 'ClientCtx'.
@@ -176,11 +218,32 @@ data WorldCtx = ∀ctx. IWorldCtx ctx ⇒ WorldCtx !ctx
 instance IWorldCtx WorldCtx where
   upcastWorldCtx = id
   downcastWorldCtx = Just
+  basicGetPlayer (WorldCtx ctx) = basicGetPlayer ctx
+  basicModifyPlayer (WorldCtx ctx) = basicModifyPlayer ctx
+  basicTryMoveEntity (WorldCtx ctx) = basicTryMoveEntity ctx
 
-reportWorldCommandError ∷ (Command c, Lifted STM r, Member (Reader WorldCtx) r)
-                        ⇒ c
-                        → Maybe PlayerID
-                        → [Text]
-                        → Eff r ()
-reportWorldCommandError cmd mPid args
-  = error ("FIXME: command error: " ++ show cmd ++ " " ++ show mPid ++ " " ++ show args)
+-- | Get a player in the world having a given ID.
+getPlayer ∷ (Lifted STM r, [Reader WorldCtx, Exc SomeException] <:: r)
+          ⇒ PlayerID
+          → Eff r Player
+getPlayer pid
+  = do ctx ← ask
+       basicGetPlayer (ctx ∷ WorldCtx) pid
+
+-- | Modify a player in the world having a given ID.
+modifyPlayer ∷ (Lifted STM r, [Reader WorldCtx, Exc SomeException] <:: r)
+             ⇒ (Player → Player)
+             → PlayerID
+             → Eff r ()
+modifyPlayer f pid
+  = do ctx ← ask
+       basicModifyPlayer (ctx ∷ WorldCtx) f pid
+
+-- | Move an entity in the world and return 'True' iff successful.
+tryMoveEntity ∷ (Lifted STM r, [Reader WorldCtx, Exc SomeException] <:: r)
+              ⇒ WorldPos -- ^ from
+              → WorldPos -- ^ to
+              → Eff r Bool
+tryMoveEntity from to
+  = do ctx ← ask
+       basicTryMoveEntity (ctx ∷ WorldCtx) from to

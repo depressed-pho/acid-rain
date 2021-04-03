@@ -64,7 +64,7 @@ data Client
 makeLenses ''Client
 
 instance IClientCtx Client where
-  basicGetClientPlayer = (^.cliWorldView.wvPlayer)
+  basicGetClientPlayerID = (^.cliWorldView.wvPlayer)
   basicSendToWorld cli c args
     = do let w = cli^.cliWorldView.wvWorld
              p = cli^.cliWorldView.wvPlayer

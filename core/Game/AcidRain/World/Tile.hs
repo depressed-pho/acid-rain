@@ -10,6 +10,7 @@ module Game.AcidRain.World.Tile
   , TileStateValue
   , SomeTileState
   , defaultState
+  , isSolid
   ) where
 
 import Data.Text (Text)
@@ -17,6 +18,8 @@ import Data.Typeable (Typeable, cast)
 import Data.Word (Word32)
 import Game.AcidRain.TUI (Appearance, HasAppearance(..))
 import Game.AcidRain.World.Position (WorldPos)
+import Prelude.Unicode ((∘))
+
 
 type TileID = Text
 
@@ -46,9 +49,12 @@ class (Show τ, Typeable τ) ⇒ Tile τ where
   -- | Get the default state value of the tile.
   defaultStateValue ∷ τ → TileStateValue
   defaultStateValue _ = 0
+  -- | Return 'True' iff the tile in a given state prevents entities
+  -- from entering the spot where the tile exists.
+  isSolidAt ∷ τ → TileStateValue → Bool
   -- | Get the appearance of the tile for the given state and
   -- position.
-  appearanceFor ∷ τ → TileStateValue → WorldPos → Appearance
+  appearanceAt ∷ τ → TileStateValue → WorldPos → Appearance
 
 -- | A type-erased 'Tile'.
 data SomeTile = ∀τ. Tile τ ⇒ SomeTile !τ
@@ -61,7 +67,8 @@ instance Tile SomeTile where
   downcastTile = Just
   tileID (SomeTile t) = tileID t
   defaultStateValue (SomeTile t) = defaultStateValue t
-  appearanceFor (SomeTile t) pos = appearanceFor t pos
+  isSolidAt (SomeTile τ) = isSolidAt τ
+  appearanceAt (SomeTile t) = appearanceAt t
 
 -- | TileState is a type containing a 'Tile' and a single integral
 -- state value. The interpretation of the state value depends on the
@@ -72,9 +79,19 @@ data TileState τ where
     , tsValue ∷ {-# UNPACK #-} !TileStateValue
     } → TileState τ
 
+instance Show τ ⇒ Show (TileState τ) where
+  showsPrec d ts
+    = showParen (d > appPrec) $
+      showString "TileState " ∘
+      showString "{ tsTile = "  ∘ showsPrec (appPrec + 1) (tsTile  ts) ∘
+      showString ", tsValue = " ∘ showsPrec (appPrec + 1) (tsValue ts) ∘
+      showString "}"
+    where
+      appPrec = 10
+
 instance Tile τ ⇒ HasAppearance (TileState τ, WorldPos) where
   appearance (ts, pos)
-    = appearanceFor (tsTile ts) (tsValue ts) pos
+    = appearanceAt (tsTile ts) (tsValue ts) pos
 
 -- | A type-erased version of 'TileState'.
 type SomeTileState = TileState SomeTile
@@ -85,5 +102,9 @@ defaultState t
     { tsTile  = t
     , tsValue = defaultStateValue t
     }
+
+isSolid ∷ Tile τ ⇒ TileState τ → Bool
+isSolid ts
+  = isSolidAt (tsTile ts) (tsValue ts)
 
 type TileStateValue = Word32

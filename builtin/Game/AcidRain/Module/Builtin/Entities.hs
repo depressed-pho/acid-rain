@@ -18,8 +18,10 @@ import Data.Proxy (Proxy(..))
 import Game.AcidRain.TUI
   ( HasAppearance(..), begin, end, (⊳), unicode, ascii, bold )
 import Game.AcidRain.Module.Loader (LoaderContext, registerEntityType)
+import Game.AcidRain.World.Command (modifyPlayer)
 import Game.AcidRain.World.Entity (EntityType(..), Entity(..))
-import Game.AcidRain.World.Player (PlayerID)
+import Game.AcidRain.World.Player (PlayerID, plPos)
+import Lens.Micro ((.~))
 
 
 instance EntityType (Proxy Player) where
@@ -30,6 +32,10 @@ data Player = Player !PlayerID deriving Show
 instance Entity Player where
   type EntityTypeOf Player = Proxy Player
   entityType _ = Proxy
+  entityMoved (Player pid) _ to
+    = let f = plPos .~ to
+      in
+        modifyPlayer f pid
 
 instance HasAppearance Player where
   appearance _
