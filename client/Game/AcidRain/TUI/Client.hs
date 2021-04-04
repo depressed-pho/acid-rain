@@ -14,7 +14,7 @@ module Game.AcidRain.TUI.Client
   ) where
 
 import Brick.BChan (BChan, writeBChan)
-import Brick.Types (BrickEvent(..), Widget, EventM)
+import Brick.Types (BrickEvent(..), Location(..), Widget, EventM)
 import Control.Concurrent (forkIO)
 import Control.Eff (Eff, Member, Lift, Lifted, lift, runLift)
 import Control.Eff.State.Strict (State, execState, get, put, modify)
@@ -32,11 +32,13 @@ import Data.Unique (Unique, newUnique)
 import Game.AcidRain.World.Command
   ( Command(..), CommandType(..), CommandID, SomeCommand
   , IClientCtx(..), ClientCtx )
-import Game.AcidRain.World.Player (PlayerID)
+import Game.AcidRain.World.Player (PlayerID, PlayerMoved(..))
+import Game.AcidRain.World.Position (wpX, wpY)
 import Game.AcidRain.TUI.AppEvent (AppEvent(..), SomeAppEvent)
 import Game.AcidRain.TUI.Keystroke (Keystroke, keystroke)
 import Game.AcidRain.TUI.Widgets.WorldView
-  ( WorldView, wvWorld, wvPlayer, worldView, renderWorldView, redrawWorldView )
+  ( WorldView, wvWorld, wvPlayer, worldView
+  , renderWorldView, redrawWorldView, updatePlayerOffset )
 import Game.AcidRain.World
   ( World(..), WorldState(..), WorldStateChanged(..), CommandSetUpdated(..) )
 import qualified Game.AcidRain.World.Event as WE
@@ -173,6 +175,7 @@ initialEventDispatcher ∷ WE.EventDispatcher () (Eff '[State Client, Lift (Even
 initialEventDispatcher
   = WE.addHandler handleWSC $
     WE.addHandler handleCSU $
+    WE.addHandler handlePM  $
     WE.dispatcher handleAll
   where
     handleCSU ∷ Member (State Client) r ⇒ CommandSetUpdated → Eff r ()
@@ -186,6 +189,18 @@ initialEventDispatcher
     handleWSC (WorldStateChanged ws)
       = do modify $ cliWorldState .~ (() <$ ws)
            redraw
+
+    handlePM ∷ (Member (State Client) r, Lifted (EventM Unique) r)
+             ⇒ PlayerMoved
+             → Eff r ()
+    handlePM (PlayerMoved _ src dest)
+      = do let δx = fromIntegral $ dest^.wpX - src^.wpX
+               δy = fromIntegral $ dest^.wpY - src^.wpY
+               δ  = Location (δx, δy)
+           cli0 ← get
+           cli1 ← lift $ traverseOf cliWorldView (updatePlayerOffset δ) cli0
+           put cli1
+           redraw -- FIXME: remove this
 
     -- In theory we could be listening on all the events that can
     -- possibly outdate the world view and be doing nothing in the

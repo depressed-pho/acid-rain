@@ -11,6 +11,7 @@ module Game.AcidRain.World.Chunk.Manager.Local
   , new
   , lookup
   , get
+  , put
   , modify
 
   , generate
@@ -167,6 +168,11 @@ get pos lcm
            if raced
              then return True
              else F.insert (Right Loading) *> return False
+
+-- | Put or overwrite a chunk at a certain position.
+put ∷ ChunkPos → Chunk → LocalChunkManager → STM ()
+put pos chunk lcm
+  = SM.insert (Right $ Loaded chunk) pos (lcmCells lcm)
 
 -- | Apply a modification to the chunk at a certain position. If it's
 -- not already loaded, a chunk will be loaded or generated on a

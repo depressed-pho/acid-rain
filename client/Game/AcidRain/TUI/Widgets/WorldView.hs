@@ -11,6 +11,7 @@ module Game.AcidRain.TUI.Widgets.WorldView
   , worldView
   , renderWorldView
   , redrawWorldView
+  , updatePlayerOffset
   ) where
 
 import Brick.Main (lookupExtent)
@@ -34,8 +35,9 @@ import Game.AcidRain.World.Chunk.Position (ChunkPos(..), cpX, cpY, toWorldPos)
 import Game.AcidRain.World.Player (PlayerID, plPos)
 import Game.AcidRain.World.Position (WorldPos(..), wpX, wpY, wpZ, lowestZ)
 import qualified Graphics.Vty as V
-import Lens.Micro ((&), (.~), (^.), (+~), (-~), (%~), _1, _2, to)
+import Lens.Micro (Getting, (&), (.~), (^.), (+~), (-~), (%~), _1, _2, to)
 import Lens.Micro.TH (makeLenses)
+import Prelude.Unicode ((≤), (≥))
 
 
 -- | This is a Brick widget to render some part of the world centered
@@ -90,8 +92,8 @@ renderWorldView wv
 -- | Redraw a world view.
 redrawWorldView ∷ ∀n. Eq n ⇒ WorldView n → EventM n (WorldView n)
 redrawWorldView wv
-  = do ext ← lookupExtent (wv^.wvName)
-       w   ← traverse mkWidget ext
+  = do mExt ← lookupExtent (wv^.wvName)
+       w    ← traverse mkWidget mExt
        return $ wv & wvWidget .~ w
   where
     mkWidget ∷ Extent n → EventM n (Widget n)
@@ -193,6 +195,36 @@ redrawWorldView wv
             else V.char  vaAttr vaAscii
           InvisibleAppearance → Nothing
 
+-- | We don't want to scroll the view each time a player moves. We
+-- only do it when a player goes to proximities of the view
+-- border. This function take that in account and only scroll the view
+-- when necessary.
+updatePlayerOffset ∷ ∀n. Eq n ⇒ Location → WorldView n → EventM n (WorldView n)
+updatePlayerOffset δ wv
+  = do mExt ← lookupExtent (wv^.wvName)
+       case mExt of
+         Just ext →
+           do let off0 = (wv^.wvPlayerOffset) `addLoc` δ
+                  off1 = off0 & locL._1 %~ constraint ext _1
+                              & locL._2 %~ constraint ext _2
+              return $ wv & wvPlayerOffset .~ off1
+         Nothing →
+           return wv
+  where
+    constraint ∷ Extent n → Getting Int (Int, Int) Int → Int → Int
+    constraint ext compL comp
+      = let extSize  = ext^.to extentSize.compL
+            extBegin = negate (extSize `div` 2)
+            extEnd   = extBegin + extSize
+            comp'
+              | comp ≤ extBegin + borderSize ext compL = 0
+              | comp ≥ extEnd   - borderSize ext compL = 0
+              | otherwise                              = comp
+        in comp'
+
+    borderSize ∷ Extent n → Getting Int (Int, Int) Int → Int
+    borderSize ext compL
+      = min 1 $ (ext^.to extentSize.compL) `div` 5
 
 -- Convert a point in the local coords to that of the world coords.
 worldPosAt ∷ MonadIO μ

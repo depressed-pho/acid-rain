@@ -27,6 +27,7 @@ module Game.AcidRain.World.Command
     -- * World-side context
   , IWorldCtx(..)
   , WorldCtx
+  , fireEvent
   , getPlayer
   , modifyPlayer
   , tryMoveEntity
@@ -44,6 +45,7 @@ import Data.Text (Text)
 import Data.Typeable (Typeable, cast)
 import GHC.Generics (Generic)
 import Game.AcidRain.TUI.Keystroke (Keystroke)
+import Game.AcidRain.World.Event (Event)
 import Game.AcidRain.World.Player (Player, PlayerID)
 import Game.AcidRain.World.Position (WorldPos)
 import Prelude.Unicode ((∘), (≡))
@@ -193,6 +195,8 @@ class Typeable ctx ⇒ IWorldCtx ctx where
   -- | Recover the type of 'IWorldCtx'.
   downcastWorldCtx ∷ WorldCtx → Maybe ctx
   downcastWorldCtx (WorldCtx ctx) = cast ctx
+  -- | Fire a world event.
+  basicFireEvent ∷ (Lifted STM r, Event e) ⇒ ctx → e → Eff r ()
   -- | Get a player in the world having a given ID.
   basicGetPlayer ∷ (Lifted STM r, Member (Exc SomeException) r)
                  ⇒ ctx
@@ -207,8 +211,8 @@ class Typeable ctx ⇒ IWorldCtx ctx where
   -- | Move an entity in the world and return 'True' iff successful.
   basicTryMoveEntity ∷ (Lifted STM r, Member (Exc SomeException) r)
                      ⇒ ctx
-                     → WorldPos -- ^ from
-                     → WorldPos -- ^ to
+                     → WorldPos -- ^ source
+                     → WorldPos -- ^ destination
                      → Eff r Bool
 
 -- | Type-erased 'IWorldCtx'. We hate this for the same reason as
@@ -218,9 +222,16 @@ data WorldCtx = ∀ctx. IWorldCtx ctx ⇒ WorldCtx !ctx
 instance IWorldCtx WorldCtx where
   upcastWorldCtx = id
   downcastWorldCtx = Just
+  basicFireEvent (WorldCtx ctx) = basicFireEvent ctx
   basicGetPlayer (WorldCtx ctx) = basicGetPlayer ctx
   basicModifyPlayer (WorldCtx ctx) = basicModifyPlayer ctx
   basicTryMoveEntity (WorldCtx ctx) = basicTryMoveEntity ctx
+
+-- | Fire a world event.
+fireEvent ∷ (Lifted STM r, Member (Reader WorldCtx) r, Event e) ⇒ e → Eff r ()
+fireEvent e
+  = do ctx ← ask
+       basicFireEvent (ctx ∷ WorldCtx) e
 
 -- | Get a player in the world having a given ID.
 getPlayer ∷ (Lifted STM r, [Reader WorldCtx, Exc SomeException] <:: r)
@@ -241,9 +252,9 @@ modifyPlayer f pid
 
 -- | Move an entity in the world and return 'True' iff successful.
 tryMoveEntity ∷ (Lifted STM r, [Reader WorldCtx, Exc SomeException] <:: r)
-              ⇒ WorldPos -- ^ from
-              → WorldPos -- ^ to
+              ⇒ WorldPos -- ^ source
+              → WorldPos -- ^ destination
               → Eff r Bool
-tryMoveEntity from to
+tryMoveEntity src dest
   = do ctx ← ask
-       basicTryMoveEntity (ctx ∷ WorldCtx) from to
+       basicTryMoveEntity (ctx ∷ WorldCtx) src dest

@@ -1,12 +1,17 @@
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Player
   ( Permission(..)
   , Player(..), plID, plPerm, plPos
   , PlayerID
+
+    -- * Events
+  , PlayerMoved(..)
   ) where
 
 import Data.UUID (UUID)
+import Game.AcidRain.World.Event (Event(..))
 import Game.AcidRain.World.Position (WorldPos)
 import Lens.Micro.TH (makeLenses)
 
@@ -72,3 +77,15 @@ data Player
     } deriving (Show)
 
 makeLenses ''Player
+
+-- | World event to be fired when a player moves. The sole purpose of
+-- this event is to let its controlling client update the player
+-- offset in 'WorldView', so it is only sent to the controlling client
+-- and is not broadcasted. It doesn't even intended to redraw the
+-- 'WorldView'.
+data PlayerMoved
+  = PlayerMoved
+    !PlayerID
+    !WorldPos -- ^ source
+    !WorldPos -- ^ destination
+  deriving (Show, Event)

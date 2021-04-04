@@ -2,6 +2,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnicodeSyntax #-}
@@ -55,6 +56,7 @@ import Game.AcidRain.World.Position (WorldPos(..))
 import qualified Game.AcidRain.World.Player.Manager.Local as LPM
 import qualified Game.AcidRain.World.Tile.Palette as TPal
 import Lens.Micro ((^.))
+import Lens.Micro.TH (makeLenses)
 import Numeric.Natural (Natural)
 import Prelude hiding (lcm)
 import Prelude.Unicode ((∘), (⋅), (≡))
@@ -65,76 +67,97 @@ import Prelude.Unicode ((∘), (⋅), (≡))
 -- both in single player mode and multi player mode.
 data LocalWorld
   = LocalWorld
-    { lwMode      ∷ !WorldMode
+    { _lwMode      ∷ !WorldMode
     , lwSeed      ∷ !WorldSeed
-    , lwState     ∷ !(TVar (WorldState RunningState))
-    , lwEvents    ∷ !(TBQueue SomeEvent)
-    , lwChunkReqs ∷ !(TBQueue ChunkPos)
-    , lwCommandQ  ∷ !(TBQueue (SomeCommand, Maybe PlayerID, [Text]))
+    , _lwState     ∷ !(TVar (WorldState RunningState))
+    , _lwEvents    ∷ !(TBQueue SomeEvent)
+    , _lwChunkReqs ∷ !(TBQueue ChunkPos)
+    , _lwCommandQ  ∷ !(TBQueue (SomeCommand, Maybe PlayerID, [Text]))
     }
-
-eventQueueCapacity ∷ Natural
-eventQueueCapacity = 256
-
--- | Ticking interval in seconds.
-tickingInterval ∷ Double
-tickingInterval = 0.1
 
 -- The state of running world. Not exposed to anywhere.
 data RunningState
   = RunningState
-    { rsChunks   ∷ !LocalChunkManager
-    , rsPlayers  ∷ !LocalPlayerManager
-    , rsCommands ∷ !CommandRegistry
+    { _rsChunks   ∷ !LocalChunkManager
+    , _rsPlayers  ∷ !LocalPlayerManager
+    , _rsCommands ∷ !CommandRegistry
     } deriving Show
 
-instance IWorldCtx RunningState where
-  basicGetPlayer rs pid
-    = do mp ← lift $ LPM.lookup pid (rsPlayers rs)
+data LocalWorldCtx
+  = LocalWorldCtx
+    { _ctxLw ∷ !LocalWorld
+    , _ctxRs ∷ !RunningState
+    }
+
+makeLenses ''LocalWorld
+makeLenses ''RunningState
+makeLenses ''LocalWorldCtx
+
+instance IWorldCtx LocalWorldCtx where
+  basicFireEvent ctx
+    = lift ∘ fireEvent (ctx^.ctxLw)
+
+  basicGetPlayer ctx pid
+    = do mp ← lift $ LPM.lookup pid (ctx^.ctxRs.rsPlayers)
          case mp of
            Just p  → return p
            Nothing → throwSomeExc $ UnknownPlayerIDException pid
 
-  basicModifyPlayer rs f pid
-    = lift $ LPM.modify f pid (rsPlayers rs)
+  basicModifyPlayer ctx f pid
+    = lift $ LPM.modify f pid (ctx^.ctxRs.rsPlayers)
 
-  basicTryMoveEntity rs from to
-    = let cpFrom  = convert from
-          cpTo    = convert to
-          offFrom = convert from
-          offTo   = convert to
-      in
-        if cpFrom ≡ cpTo
-        then
-          -- Both the source and the destination are in the same
-          -- chunk. So we only need to update one chunk.
-          do let move c = error "fixme"
-             lift $ LCM.modify move cpFrom (rsChunks rs)
-             error "aaa"
-        else
-          -- We are moving it across a chunk boundary.
-          do cFrom ← lift $ LCM.get cpFrom (rsChunks rs)
-             case entityAt offFrom cFrom of
-               Nothing  → return False -- But there's no entity here.
-               Just ent →
-                 -- The entity does exist. But can it really move to
-                 -- the destination?
-                 do cTo      ← lift $ LCM.get cpTo (rsChunks rs)
-                    canEnter ← canEntityEnter offTo cTo
-                    if canEnter
-                      then do lift $ LCM.modify (deleteEntity offFrom) cpFrom (rsChunks rs)
-                              lift $ LCM.modify (putEntity offTo ent)  cpTo   (rsChunks rs)
-                              runReader (upcastWorldCtx rs)
-                                $ E.entityMoved ent from to
-                              -- FIXME: Notify clients about this
-                              return True
-                      else return False
+  basicTryMoveEntity ctx src dest
+    = do let lcm     = ctx^.ctxRs.rsChunks
+             cpSrc   = convert src
+             cpDest  = convert dest
+             offSrc  = convert src
+             offDest = convert dest
+         cSrc ← lift $ LCM.get cpSrc lcm
+         case entityAt offSrc cSrc of
+           Nothing  → return False -- But there's no entity here.
+           Just ent →
+             -- The entity does exist. We still don't know if the
+             -- entity really can enter the destination.
+             if cpSrc ≡ cpDest
+             then
+               -- Both the source and the destination are in the same
+               -- chunk. So we only need to update one chunk.
+               do let cp = cpSrc -- or cpDest. It doesn't matter.
+                  c        ← lift $ LCM.get cp lcm
+                  canEnter ← canEntityEnter offDest c
+                  if canEnter
+                    then do let c' = putEntity offDest ent $ deleteEntity offSrc cSrc
+                            lift $ LCM.put cp c' lcm
+                            runReader (upcastWorldCtx ctx)
+                              $ E.entityMoved ent src dest
+                            -- FIXME: Notify clients about this
+                            return True
+                    else return False
+             else
+               -- We are moving across a chunk boundary.
+               do cDest    ← lift $ LCM.get cpDest lcm
+                  canEnter ← canEntityEnter offDest cDest
+                  if canEnter
+                    then do lift $ LCM.modify (deleteEntity offSrc)   cpSrc  lcm
+                            lift $ LCM.modify (putEntity offDest ent) cpDest lcm
+                            runReader (upcastWorldCtx ctx)
+                              $ E.entityMoved ent src dest
+                            -- FIXME: Notify clients about this
+                            return True
+                    else return False
+
+eventQueueCapacity ∷ Natural
+eventQueueCapacity = 256
+
+-- Ticking interval in seconds.
+tickingInterval ∷ Double
+tickingInterval = 0.1
 
 -- Assume the world is running or throw an exception. Not exposed to
 -- anywhere.
 assumeRunning ∷ LocalWorld → STM RunningState
 assumeRunning lw
-  = do ws ← readTVar (lwState lw)
+  = do ws ← readTVar (lw^.lwState)
        case ws of
          Running rs → return rs
          _          → throwSTM $ WorldNotRunningException ws
@@ -142,7 +165,7 @@ assumeRunning lw
 -- See if the world is running.
 isRunning ∷ LocalWorld → STM (Maybe RunningState)
 isRunning lw
-  = do ws ← readTVar (lwState lw)
+  = do ws ← readTVar (lw^.lwState)
        case ws of
          Running rs → return (Just rs)
          _          → return Nothing
@@ -150,69 +173,69 @@ isRunning lw
 -- Fire a world event.
 fireEvent ∷ Event e ⇒ LocalWorld → e → STM ()
 fireEvent lw e
-  = writeTBQueue (lwEvents lw) (upcastEvent e)
+  = writeTBQueue (lw^.lwEvents) (upcastEvent e)
 
 -- Change the world state.
 changeState ∷ LocalWorld → WorldState RunningState → STM ()
 changeState lw ws
-  = do writeTVar (lwState lw) ws
+  = do writeTVar (lw^.lwState) ws
        fireEvent lw $ WorldStateChanged ws
 
 instance World LocalWorld where
   type RunningStateT LocalWorld = RunningState
 
   getWorldState
-    = liftIO ∘ atomically ∘ readTVar ∘ lwState
+    = liftIO ∘ atomically ∘ readTVar ∘ (^.lwState)
 
   waitForEvent lw
     = liftIO $ atomically $
-      do ev' ← tryReadTBQueue (lwEvents lw)
+      do ev' ← tryReadTBQueue (lw^.lwEvents)
          case ev' of
            Just ev → return (Just ev)
            Nothing →
-             do ws ← readTVar (lwState lw)
+             do ws ← readTVar (lw^.lwState)
                 case ws of
                   LoadFailed _ → return Nothing
                   Closed     _ → return Nothing
-                  _            → Just <$> readTBQueue (lwEvents lw)
+                  _            → Just <$> readTBQueue (lw^.lwEvents)
 
   scheduleCommand lw cmd mPid args
     = liftIO $ atomically $
-      writeTBQueue (lwCommandQ lw) (upcastCommand cmd, mPid, args)
+      writeTBQueue (lw^.lwCommandQ) (upcastCommand cmd, mPid, args)
 
   lookupChunk lw pos
     = liftIO $ atomically $
       do rs ← assumeRunning lw
-         cs ← LCM.lookup pos $ rsChunks rs
+         cs ← LCM.lookup pos (rs^.rsChunks)
          case cs of
            Just  LCM.Loading   → return Nothing
            Just (LCM.Loaded c) → return $! Just c
            Nothing →
              -- Put a chunk retrieval request on a queue.
-             do writeTBQueue (lwChunkReqs lw) pos
+             do writeTBQueue (lw^.lwChunkReqs) pos
                 return Nothing
 
   getPlayer lw pid
     = liftIO $ atomically $ assumeRunning lw >>= get'
     where
-      get' rs | U.null pid = case lwMode lw of
+      get' rs | U.null pid = case lw^.lwMode of
                                SinglePlayer →
                                  -- The Nil player must have been
                                  -- spawned.
-                                 LPM.get pid $ rsPlayers rs
+                                 LPM.get pid (rs^.rsPlayers)
                                MultiPlayer →
                                  -- Nil player can't exist in multi
                                  -- player mode.
                                  throwSTM $ UnknownPlayerIDException pid
 
-              | otherwise  = case lwMode lw of
+              | otherwise  = case lw^.lwMode of
                                SinglePlayer →
                                  -- Only the Nil player can exist in
                                  -- single player mode.
                                  throwSTM $ UnknownPlayerIDException pid
                                MultiPlayer →
                                  -- Throw if the player doesn't exist.
-                                 LPM.get pid $ rsPlayers rs
+                                 LPM.get pid (rs^.rsPlayers)
 
 -- | Create a new world out of thin air. The world will be
 -- asynchronously created on a separate thread.
@@ -224,12 +247,12 @@ newWorld wm mods seed
        cReqs ← newTBQueueIO eventQueueCapacity
        cCmdQ ← newTBQueueIO eventQueueCapacity
        let lw = LocalWorld
-                { lwMode      = wm
+                { _lwMode      = wm
                 , lwSeed      = seed
-                , lwState     = ws
-                , lwEvents    = es
-                , lwChunkReqs = cReqs
-                , lwCommandQ  = cCmdQ
+                , _lwState     = ws
+                , _lwEvents    = es
+                , _lwChunkReqs = cReqs
+                , _lwCommandQ  = cCmdQ
                 }
        void $ forkIO $ newWorld' lw >> runWorld lw
        return lw
@@ -266,16 +289,16 @@ newWorld wm mods seed
                    -- it and start a new one. It's okay because we are
                    -- still in the Loading state.
                    return $ RunningState
-                     { rsChunks   = lcm
-                     , rsPlayers  = lpm
-                     , rsCommands = lc^.lcCommandReg
+                     { _rsChunks   = lcm
+                     , _rsPlayers  = lpm
+                     , _rsCommands = lc^.lcCommandReg
                      }
            atomically $
              do case wm of
                   SinglePlayer → void $ newPlayer U.nil Administrator rs
                   _            → return ()
                 -- Notify clients of all the available commands.
-                fireEvent lw $ CommandSetUpdated $ CR.valuesSet (rsCommands rs)
+                fireEvent lw $ CommandSetUpdated $ CR.valuesSet (rs^.rsCommands)
                 -- Okay, now we can run the world but before that we
                 -- change the state.
                 changeState lw $ Running rs
@@ -359,26 +382,32 @@ runWorld lw
 -- 'runWorld'.
 handleChunkReq ∷ LocalWorld → RunningState → STM ()
 handleChunkReq lw rs
-  = do cReq ← readTBQueue (lwChunkReqs lw)
+  = do cReq ← readTBQueue (lw^.lwChunkReqs)
        -- If the requested chunk is indeed not available, LCM.get
        -- spawns a thread and then retries the transaction. Thus we
        -- can respond to world termination immediately while
        -- generating the requested chunk.
-       c ← LCM.get cReq (rsChunks rs)
+       c ← LCM.get cReq (rs^.rsChunks)
        fireEvent lw $ ChunkArrived cReq c
 
 -- | Run a single scheduled command in the world context. Retries when
 -- nothing is scheduled. This is run as a part of 'runWorld'.
 consumeCommandQ ∷ LocalWorld → RunningState → STM ()
 consumeCommandQ lw rs
-  = do (cmd, mPid, args) ← readTBQueue (lwCommandQ lw)
-       withWorldCtx rs $
+  = do (cmd, mPid, args) ← readTBQueue (lw^.lwCommandQ)
+       withWorldCtx lw rs $
          runOnWorld cmd mPid args
 
-withWorldCtx ∷ RunningState → Eff '[Reader WorldCtx, Exc SomeException, Lift STM] () → STM ()
-withWorldCtx rs
-  = (handleCmdExc =<<) ∘ runLift ∘ runError ∘ runReader (upcastWorldCtx rs)
+withWorldCtx ∷ LocalWorld
+             → RunningState
+             → Eff '[Reader WorldCtx, Exc SomeException, Lift STM] ()
+             → STM ()
+withWorldCtx lw rs
+  = (handleCmdExc =<<) ∘ runLift ∘ runError ∘ runReader ctx
   where
+    ctx ∷ WorldCtx
+    ctx = upcastWorldCtx $ LocalWorldCtx lw rs
+
     -- FIXME: Report it to the client without crashing the world.
     handleCmdExc ∷ Either SomeException a → STM a
     handleCmdExc (Left  e) = error ("FIXME: command failed: " ++ show e)
@@ -399,7 +428,7 @@ spawnEntity ∷ E.Entity ε
             → RunningState
             → STM ()
 spawnEntity pos e rs
-  = LCM.modify ins (convert pos) (rsChunks rs)
+  = LCM.modify ins (convert pos) (rs^.rsChunks)
   where
     ins ∷ Chunk → Chunk
     ins = putEntity (convert pos) e
@@ -413,6 +442,6 @@ newPlayer pid perm rs
                 , _plPerm = perm
                 , _plPos  = spawn
                 }
-       LPM.put pl $ rsPlayers rs
+       LPM.put pl (rs^.rsPlayers)
        void $ spawnEntity spawn (B.Player pid) rs
        return pl
