@@ -35,8 +35,7 @@ module Game.AcidRain.World.Command
 
 import Control.Eff (Eff, Lifted, Member, type(<::))
 import Control.Eff.Exception (Exc, throwError, throwError_)
-import Control.Eff.Reader.Lazy (Reader, ask)
-import Control.Eff.State.Strict (State, get)
+import Control.Eff.State.Strict (State, get, put)
 import Control.Exception (Exception(..), SomeException, toException)
 import Control.Monad.IO.Class (MonadIO(..))
 import Control.Monad.STM (STM)
@@ -90,7 +89,7 @@ class (Show c, Typeable c) ⇒ Command c where
   -- Throwing dynamic exceptions in this method would result in a
   -- server crash. It should therefore be avoided unless something
   -- catastrophic happens. For regular errors use 'Exc'.
-  runOnWorld ∷ (Lifted STM r, [Reader WorldCtx, Exc SomeException] <:: r)
+  runOnWorld ∷ (Lifted STM r, [State WorldCtx, Exc SomeException] <:: r)
              ⇒ c
              → Maybe PlayerID -- ^ @mPid@
              → [Text]         -- ^ Arguments
@@ -208,12 +207,12 @@ class Typeable ctx ⇒ IWorldCtx ctx where
                     → (Player → Player)
                     → PlayerID
                     → Eff r ()
-  -- | Move an entity in the world and return 'True' iff successful.
+  -- | Move an entity in the world and return 'Just' iff successful.
   basicTryMoveEntity ∷ (Lifted STM r, Member (Exc SomeException) r)
                      ⇒ ctx
                      → WorldPos -- ^ source
                      → WorldPos -- ^ destination
-                     → Eff r Bool
+                     → Eff r (Maybe ctx)
 
 -- | Type-erased 'IWorldCtx'. We hate this for the same reason as
 -- 'ClientCtx'.
@@ -225,36 +224,40 @@ instance IWorldCtx WorldCtx where
   basicFireEvent (WorldCtx ctx) = basicFireEvent ctx
   basicGetPlayer (WorldCtx ctx) = basicGetPlayer ctx
   basicModifyPlayer (WorldCtx ctx) = basicModifyPlayer ctx
-  basicTryMoveEntity (WorldCtx ctx) = basicTryMoveEntity ctx
+  basicTryMoveEntity (WorldCtx ctx) src dest
+    = (WorldCtx <$>) <$> basicTryMoveEntity ctx src dest
 
 -- | Fire a world event.
-fireEvent ∷ (Lifted STM r, Member (Reader WorldCtx) r, Event e) ⇒ e → Eff r ()
+fireEvent ∷ (Lifted STM r, Member (State WorldCtx) r, Event e) ⇒ e → Eff r ()
 fireEvent e
-  = do ctx ← ask
+  = do ctx ← get
        basicFireEvent (ctx ∷ WorldCtx) e
 
 -- | Get a player in the world having a given ID.
-getPlayer ∷ (Lifted STM r, [Reader WorldCtx, Exc SomeException] <:: r)
+getPlayer ∷ (Lifted STM r, [State WorldCtx, Exc SomeException] <:: r)
           ⇒ PlayerID
           → Eff r Player
 getPlayer pid
-  = do ctx ← ask
+  = do ctx ← get
        basicGetPlayer (ctx ∷ WorldCtx) pid
 
 -- | Modify a player in the world having a given ID.
-modifyPlayer ∷ (Lifted STM r, [Reader WorldCtx, Exc SomeException] <:: r)
+modifyPlayer ∷ (Lifted STM r, [State WorldCtx, Exc SomeException] <:: r)
              ⇒ (Player → Player)
              → PlayerID
              → Eff r ()
 modifyPlayer f pid
-  = do ctx ← ask
+  = do ctx ← get
        basicModifyPlayer (ctx ∷ WorldCtx) f pid
 
 -- | Move an entity in the world and return 'True' iff successful.
-tryMoveEntity ∷ (Lifted STM r, [Reader WorldCtx, Exc SomeException] <:: r)
+tryMoveEntity ∷ (Lifted STM r, [State WorldCtx, Exc SomeException] <:: r)
               ⇒ WorldPos -- ^ source
               → WorldPos -- ^ destination
               → Eff r Bool
 tryMoveEntity src dest
-  = do ctx ← ask
-       basicTryMoveEntity (ctx ∷ WorldCtx) src dest
+  = do ctx  ← get
+       mCtx ← basicTryMoveEntity (ctx ∷ WorldCtx) src dest
+       case mCtx of
+         Just ctx' → put ctx' *> return True
+         Nothing   → return False

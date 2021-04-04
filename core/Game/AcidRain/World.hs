@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnicodeSyntax #-}
@@ -13,10 +14,12 @@ module Game.AcidRain.World
   , WorldStateChanged(..)
   , CommandSetUpdated(..)
   , ChunkArrived(..)
+  , ChunkUpdated(..)
 
     -- * Exceptions
   , WorldNotRunningException(..)
   , UnknownPlayerIDException(..)
+  , PlayerOfflineException(..)
   ) where
 
 import Control.Exception (Exception, SomeException)
@@ -74,6 +77,14 @@ class World w where
   -- does not block. If the chunk isn't available yet, an event
   -- ChunkArrived will fire later.
   lookupChunk ∷ MonadIO μ ⇒ w → ChunkPos → μ (Maybe Chunk)
+  -- | Subscribe to 'ChunkUpdated' events that will fire for a client
+  -- controlling a given player. Previous subscription will be
+  -- cancelled.
+  subscribeToChunks ∷ MonadIO μ
+                    ⇒ w
+                    → PlayerID
+                    → (ChunkPos, ChunkPos) -- ^ @(topLeft, bottomRight)@
+                    → μ ()
   -- | Get a player in the world having a given ID.
   getPlayer ∷ MonadIO μ ⇒ w → PlayerID → μ Player
 
@@ -87,6 +98,7 @@ instance World SomeWorld where
   waitForEvent (SomeWorld w) = waitForEvent w
   scheduleCommand (SomeWorld w) = scheduleCommand w
   lookupChunk (SomeWorld w) = lookupChunk w
+  subscribeToChunks (SomeWorld w) = subscribeToChunks w
   getPlayer (SomeWorld w) = getPlayer w
 
 data WorldMode
@@ -123,9 +135,10 @@ instance Functor WorldState where
 -- but deterministically depending on the seed.
 type WorldSeed = Int64
 
--- | An event to be fired when the 'WorldState' changes.
+-- | Event to be fired when the 'WorldState' changes.
 data WorldStateChanged
   = ∀rs. (Show rs, Typeable rs) ⇒ WorldStateChanged !(WorldState rs)
+  deriving Event
 
 instance Show WorldStateChanged where
   -- GHC can't derive Show for this, but why?
@@ -135,17 +148,16 @@ instance Show WorldStateChanged where
     where
       appPrec = 10
 
-instance Event WorldStateChanged
-
--- | An event to be fired when the set available commands have been
+-- | Event to be fired when the set available commands have been
 -- updated. In particular, this event always fires right before a
 -- world starts running.
-newtype CommandSetUpdated = CommandSetUpdated (HashSet SomeCommand) deriving Show
-instance Event CommandSetUpdated
+newtype CommandSetUpdated = CommandSetUpdated (HashSet SomeCommand)
+  deriving (Show, Event)
 
--- | An event to be fired when a chunk which was previously
--- unavailable is now available.
+-- | Event to be fired when a chunk which was previously unavailable
+-- is now available.
 data ChunkArrived = ChunkArrived !ChunkPos !Chunk
+  deriving Event
 
 instance Show ChunkArrived where
   showsPrec d (ChunkArrived cPos _)
@@ -156,12 +168,21 @@ instance Show ChunkArrived where
     where
       appPrec = 10
 
-instance Event ChunkArrived
+-- | Event to be fired when the contents of a chunk have changed. This
+-- event is fired only when there is at least one player which is
+-- subscribing to the chunk.
+data ChunkUpdated
+  = ChunkUpdated
+    !(HashSet PlayerID) -- ^ Set of players who have subscribed to the chunk.
+    !ChunkPos
+    -- !ChunkDiff -- FIXME
+  deriving (Show, Event)
 
--- | An exception to be thrown when a certain operation assuming the
+-- | Exception to be thrown when a certain operation assuming the
 -- world is running is attempted, but it was actually not running.
 data WorldNotRunningException
   = ∀rs. (Show rs, Typeable rs) ⇒ WorldNotRunningException !(WorldState rs)
+  deriving Exception
 
 instance Show WorldNotRunningException where
   -- GHC can't derive Show for this, but why?
@@ -171,11 +192,12 @@ instance Show WorldNotRunningException where
     where
       appPrec = 10
 
-instance Exception WorldNotRunningException
+-- | Exception to be thrown when there was no player having the given
+-- ID.
+data UnknownPlayerIDException = UnknownPlayerIDException !PlayerID
+  deriving (Show, Exception)
 
--- | An exception to be thrown when there was no player having the
--- given ID.
-data UnknownPlayerIDException = UnknownPlayerIDException PlayerID
-  deriving Show
-
-instance Exception UnknownPlayerIDException
+-- | Exception to be thrown when an operation expecting a player to be
+-- online is attempted while the player is offline.
+data PlayerOfflineException = PlayerOfflineException !PlayerID
+  deriving (Show, Exception)

@@ -17,7 +17,7 @@ module Game.AcidRain.World.Entity
 
 import Control.Eff (Eff, Lifted, type(<::))
 import Control.Eff.Exception (Exc)
-import Control.Eff.Reader.Lazy (Reader)
+import Control.Eff.State.Strict (State)
 import Control.Exception (SomeException)
 import Control.Monad.STM (STM)
 import Data.Kind (Type)
@@ -91,7 +91,7 @@ class (EntityType (EntityTypeOf ε), HasAppearance ε, Show ε) ⇒ Entity ε wh
   -- | Get the type of this entity.
   entityType ∷ ε → EntityTypeOf ε
   -- | Called when an entity has been moved. Do nothing by default.
-  entityMoved ∷ (Lifted STM r, [Reader WorldCtx, Exc SomeException] <:: r)
+  entityMoved ∷ (Lifted STM r, [State WorldCtx, Exc SomeException] <:: r)
               ⇒ ε
               → WorldPos -- ^ from
               → WorldPos -- ^ to

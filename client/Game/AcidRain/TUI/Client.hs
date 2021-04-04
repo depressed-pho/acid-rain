@@ -200,7 +200,6 @@ initialEventDispatcher
            cli0 ← get
            cli1 ← lift $ traverseOf cliWorldView (updatePlayerOffset δ) cli0
            put cli1
-           redraw -- FIXME: remove this
 
     -- In theory we could be listening on all the events that can
     -- possibly outdate the world view and be doing nothing in the

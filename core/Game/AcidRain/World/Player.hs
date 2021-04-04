@@ -3,7 +3,7 @@
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Player
   ( Permission(..)
-  , Player(..), plID, plPerm, plPos
+  , Player(..), plID, plPerm, plPos, plIsOnline
   , PlayerID
 
     -- * Events
@@ -71,9 +71,10 @@ type PlayerID = UUID
 
 data Player
   = Player
-    { _plID   ∷ !PlayerID
-    , _plPerm ∷ !Permission
-    , _plPos  ∷ !WorldPos
+    { _plID       ∷ !PlayerID
+    , _plPerm     ∷ !Permission
+    , _plPos      ∷ !WorldPos
+    , _plIsOnline ∷ !Bool
     } deriving (Show)
 
 makeLenses ''Player

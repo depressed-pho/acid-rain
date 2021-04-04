@@ -30,6 +30,7 @@ library
     acid-rain-core       ^>= 0.1.0.0,
     base-unicode-symbols ^>= 0.2.4.2,
     convertible          ^>= 1.1.1.0,
+    deferred-folds       ^>= 0.9.17,
     exceptions           ^>= 0.10.4,
     extensible-effects   ^>= 5.0.0.1,
     focus                ^>= 1.0.2,

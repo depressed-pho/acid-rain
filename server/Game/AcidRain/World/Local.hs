@@ -16,14 +16,18 @@ import Control.Concurrent.STM.Delay (Delay, newDelay, waitDelay)
 import Control.Concurrent.STM.TBQueue
   ( TBQueue, newTBQueueIO, tryReadTBQueue, readTBQueue, writeTBQueue )
 import Control.Concurrent.STM.TVar (TVar, newTVarIO, readTVar, writeTVar)
-import Control.Eff (Eff, Lift, runLift, lift)
+import Control.Eff (Eff, Member, Lift, Lifted, runLift, lift)
 import Control.Eff.Exception (Exc, runError)
-import Control.Eff.Reader.Lazy (Reader, runReader)
+import Control.Eff.State.Strict (State, execState, runState, get, put)
 import Control.Exception (Exception(..), SomeException, handle)
 import Control.Monad (join, void)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.STM (STM, atomically, throwSTM, orElse)
 import Data.Convertible.Base (convert)
+import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HM
+import qualified Data.HashSet as HS
+import Data.Maybe (fromJust)
 import Data.Text (Text)
 import qualified Data.UUID as U
 import GHC.Clock (getMonotonicTime)
@@ -33,8 +37,9 @@ import Game.AcidRain.Module.Loader
   ( loadModules, lcTileReg, lcBiomeReg, lcEntityReg, lcCommandReg, lcChunkGen )
 import qualified Game.AcidRain.Module.Builtin.Entities as B
 import Game.AcidRain.World
-  ( World(..), WorldMode(..), WorldState(..), WorldSeed, WorldStateChanged(..)
-  , CommandSetUpdated(..), ChunkArrived(..)
+  ( World(..), WorldMode(..), WorldState(..)
+  , WorldSeed, WorldStateChanged(..), CommandSetUpdated(..), ChunkArrived(..)
+  , ChunkUpdated(..)
   , WorldNotRunningException(..), UnknownPlayerIDException(..) )
 import qualified Game.AcidRain.World.Biome.Palette as BPal
 import Game.AcidRain.World.Chunk
@@ -55,8 +60,8 @@ import Game.AcidRain.World.Player (Player(..), Permission(..), PlayerID)
 import Game.AcidRain.World.Position (WorldPos(..))
 import qualified Game.AcidRain.World.Player.Manager.Local as LPM
 import qualified Game.AcidRain.World.Tile.Palette as TPal
-import Lens.Micro ((^.))
-import Lens.Micro.TH (makeLenses)
+import Lens.Micro ((^.), (&), (.~), traverseOf, traverseOf_)
+import Lens.Micro.TH (makeLenses, makeLensesFor)
 import Numeric.Natural (Natural)
 import Prelude hiding (lcm)
 import Prelude.Unicode ((∘), (⋅), (≡))
@@ -68,7 +73,7 @@ import Prelude.Unicode ((∘), (⋅), (≡))
 data LocalWorld
   = LocalWorld
     { _lwMode      ∷ !WorldMode
-    , lwSeed      ∷ !WorldSeed
+    , lwSeed       ∷ !WorldSeed
     , _lwState     ∷ !(TVar (WorldState RunningState))
     , _lwEvents    ∷ !(TBQueue SomeEvent)
     , _lwChunkReqs ∷ !(TBQueue ChunkPos)
@@ -85,13 +90,33 @@ data RunningState
 
 data LocalWorldCtx
   = LocalWorldCtx
-    { _ctxLw ∷ !LocalWorld
-    , _ctxRs ∷ !RunningState
+    { _ctxLw        ∷ !LocalWorld
+    , _ctxRs        ∷ !RunningState
+      -- | Snapshots of all the chunks that can possibly be updated
+      -- while ticking.
+    , _ctxSnapshots ∷ !(HashMap ChunkPos Chunk)
+    }
+
+data TickingState
+  = -- | We have completed the last tick and will need to wait before
+    -- starting the next tick.
+    Waiting
+    { _tsNextTick ∷ !Delay
+    }
+    -- | We are at a beginning of a tick.
+  | BeginningOfTick
+    { _tsTickBeganAt ∷ !Double
+    }
+    -- | We are in the middle of a tick.
+  | MiddleOfTick
+    { _tsTickBeganAt    ∷ !Double
+    , _tsLocalWorldCtx ∷ !LocalWorldCtx
     }
 
 makeLenses ''LocalWorld
 makeLenses ''RunningState
 makeLenses ''LocalWorldCtx
+makeLensesFor [("_tsLocalWorldCtx", "tsLocalWorldCtx")] ''TickingState
 
 instance IWorldCtx LocalWorldCtx where
   basicFireEvent ctx
@@ -106,45 +131,52 @@ instance IWorldCtx LocalWorldCtx where
   basicModifyPlayer ctx f pid
     = lift $ LPM.modify f pid (ctx^.ctxRs.rsPlayers)
 
-  basicTryMoveEntity ctx src dest
-    = do let lcm     = ctx^.ctxRs.rsChunks
-             cpSrc   = convert src
-             cpDest  = convert dest
-             offSrc  = convert src
-             offDest = convert dest
-         cSrc ← lift $ LCM.get cpSrc lcm
-         case entityAt offSrc cSrc of
-           Nothing  → return False -- But there's no entity here.
-           Just ent →
-             -- The entity does exist. We still don't know if the
-             -- entity really can enter the destination.
-             if cpSrc ≡ cpDest
-             then
-               -- Both the source and the destination are in the same
-               -- chunk. So we only need to update one chunk.
-               do let cp = cpSrc -- or cpDest. It doesn't matter.
-                  c        ← lift $ LCM.get cp lcm
-                  canEnter ← canEntityEnter offDest c
-                  if canEnter
-                    then do let c' = putEntity offDest ent $ deleteEntity offSrc cSrc
-                            lift $ LCM.put cp c' lcm
-                            runReader (upcastWorldCtx ctx)
-                              $ E.entityMoved ent src dest
-                            -- FIXME: Notify clients about this
-                            return True
-                    else return False
-             else
-               -- We are moving across a chunk boundary.
-               do cDest    ← lift $ LCM.get cpDest lcm
-                  canEnter ← canEntityEnter offDest cDest
-                  if canEnter
-                    then do lift $ LCM.modify (deleteEntity offSrc)   cpSrc  lcm
-                            lift $ LCM.modify (putEntity offDest ent) cpDest lcm
-                            runReader (upcastWorldCtx ctx)
-                              $ E.entityMoved ent src dest
-                            -- FIXME: Notify clients about this
-                            return True
-                    else return False
+  basicTryMoveEntity ctx0 src dest
+    = do (succeeded, ctx1) ← runState ctx0 go
+         if succeeded
+           then return $ Just ctx1
+           else return Nothing
+    where
+      go = do let lcm     = ctx0^.ctxRs.rsChunks
+                  cpSrc   = convert src
+                  cpDest  = convert dest
+                  offSrc  = convert src
+                  offDest = convert dest
+              cSrc ← lift $ LCM.get cpSrc lcm
+              case entityAt offSrc cSrc of
+                Nothing  → return False -- But there's no entity here.
+                Just ent →
+                  -- The entity does exist. We still don't know if the
+                  -- entity really can enter the destination.
+                  if cpSrc ≡ cpDest
+                  then
+                    -- Both the source and the destination are in the
+                    -- same chunk. So we only need to update one
+                    -- chunk.
+                    do let cp = cpSrc -- or cpDest. It doesn't matter.
+                       c        ← lift $ LCM.get cp lcm
+                       canEnter ← canEntityEnter offDest c
+                       if canEnter
+                         then do let c' = putEntity offDest ent $ deleteEntity offSrc cSrc
+                                 snapshotChunk cp
+                                 lift $ LCM.put cp c' lcm
+                                 withWorldCtxUpcasted $
+                                   E.entityMoved ent src dest
+                                 return True
+                         else return False
+                  else
+                    -- We are moving across a chunk boundary.
+                    do cDest    ← lift $ LCM.get cpDest lcm
+                       canEnter ← canEntityEnter offDest cDest
+                       if canEnter
+                         then do snapshotChunk cpSrc
+                                 snapshotChunk cpDest
+                                 lift $ LCM.modify (deleteEntity offSrc)   cpSrc  lcm
+                                 lift $ LCM.modify (putEntity offDest ent) cpDest lcm
+                                 withWorldCtxUpcasted $
+                                   E.entityMoved ent src dest
+                                 return $ True
+                         else return False
 
 eventQueueCapacity ∷ Natural
 eventQueueCapacity = 256
@@ -215,6 +247,11 @@ instance World LocalWorld where
              do writeTBQueue (lw^.lwChunkReqs) pos
                 return Nothing
 
+  subscribeToChunks lw pid chunks
+    = liftIO $ atomically $
+      do rs ← assumeRunning lw
+         LPM.subscribeToChunks pid chunks (rs^.rsPlayers)
+
   getPlayer lw pid
     = liftIO $ atomically $ assumeRunning lw >>= get'
     where
@@ -248,7 +285,7 @@ newWorld wm mods seed
        cCmdQ ← newTBQueueIO eventQueueCapacity
        let lw = LocalWorld
                 { _lwMode      = wm
-                , lwSeed      = seed
+                , lwSeed       = seed
                 , _lwState     = ws
                 , _lwEvents    = es
                 , _lwChunkReqs = cReqs
@@ -317,58 +354,56 @@ catchWhileRunning lw a
     f ∷ SomeException → IO ()
     f = atomically ∘ changeState lw ∘ Closed ∘ Just ∘ toException
 
-data TickingState
-  = -- | We have completed the last tick and will need to wait before
-    -- starting the next tick.
-    Waiting
-    { _tsNextTick ∷ !Delay
-    }
-    -- | We are in the middle of ticking.
-  | MiddleOfTicking
-    { _tsTickStartedAt ∷ !Double
-    }
-
 runWorld ∷ LocalWorld → IO ()
 runWorld lw
-  = do ts ← MiddleOfTicking <$> getMonotonicTime
+  = do ts ← BeginningOfTick <$> getMonotonicTime
        catchWhileRunning lw (loop ts)
   where
     loop ∷ TickingState → IO ()
-    loop ts
+    loop ts0
       = join $ atomically $
         do mrs ← isRunning lw
            case mrs of
              Nothing → return (return ())
              Just rs →
                ( do handleChunkReq lw rs
-                    return $ loop ts
+                    return $ loop ts0
                )
                `orElse`
-               ( do ts' ← waitForTickStart ts
-                    consumeCommandQ lw rs
-                    return $ loop ts'
+               ( do ts1 ← waitForTickStart ts0 rs
+                    ts2 ← traverseOf tsLocalWorldCtx consumeCommandQ ts1
+                    return $ loop ts2
                )
                `orElse`
-               ( do ts' ← waitForTickStart ts
+               ( do ts1 ← waitForTickStart ts0 rs
                     tickWorld
-                    return $ advanceTick ts' >>= loop
+                    traverseOf_ tsLocalWorldCtx notifyChunkUpdates ts1
+                    return $ advanceTick ts1 >>= loop
                )
 
     tickWorld ∷ STM ()
     tickWorld = return () -- FIXME
 
-    waitForTickStart ∷ TickingState → STM TickingState
-    waitForTickStart (Waiting delay)
+    waitForTickStart ∷ TickingState → RunningState → STM TickingState
+    waitForTickStart (Waiting delay) rs
       = do waitDelay delay
            now ← unsafeIOToSTM $! getMonotonicTime
-           return $! MiddleOfTicking now
-    waitForTickStart ts@(MiddleOfTicking _)
+           let ctx = LocalWorldCtx lw rs HM.empty
+           return $! MiddleOfTick now ctx
+
+    waitForTickStart (BeginningOfTick beganAt) rs
+      = do let ctx = LocalWorldCtx lw rs HM.empty
+           return $ MiddleOfTick beganAt ctx
+
+    waitForTickStart ts@(MiddleOfTick _ _) _
       = return ts
 
     advanceTick ∷ TickingState → IO TickingState
     advanceTick (Waiting _)
       = fail "Logical error: we are not in the middle of ticking"
-    advanceTick (MiddleOfTicking startedAt)
+    advanceTick (BeginningOfTick _)
+      = fail "Logical error: we are not in the middle of ticking"
+    advanceTick (MiddleOfTick startedAt _)
       = do now ← getMonotonicTime
            -- The next tick time is basically now + tickingInterval,
            -- but if the world is lagging the interval becomes shorter
@@ -392,26 +427,70 @@ handleChunkReq lw rs
 
 -- | Run a single scheduled command in the world context. Retries when
 -- nothing is scheduled. This is run as a part of 'runWorld'.
-consumeCommandQ ∷ LocalWorld → RunningState → STM ()
-consumeCommandQ lw rs
-  = do (cmd, mPid, args) ← readTBQueue (lw^.lwCommandQ)
-       withWorldCtx lw rs $
+consumeCommandQ ∷ LocalWorldCtx → STM LocalWorldCtx
+consumeCommandQ ctx
+  = do (cmd, mPid, args) ← readTBQueue (ctx^.ctxLw.lwCommandQ)
+       withWorldCtx ctx $
          runOnWorld cmd mPid args
 
-withWorldCtx ∷ LocalWorld
-             → RunningState
-             → Eff '[Reader WorldCtx, Exc SomeException, Lift STM] ()
-             → STM ()
-withWorldCtx lw rs
-  = (handleCmdExc =<<) ∘ runLift ∘ runError ∘ runReader ctx
+withWorldCtx ∷ LocalWorldCtx
+             → Eff '[State WorldCtx, Exc SomeException, Lift STM] ()
+             → STM LocalWorldCtx
+withWorldCtx ctx m
+  = do eRes ← runLift $ runError $ execState (upcastWorldCtx ctx) m
+       ctx' ←  handleCmdExc eRes
+       return $ fromJust $ downcastWorldCtx ctx'
   where
-    ctx ∷ WorldCtx
-    ctx = upcastWorldCtx $ LocalWorldCtx lw rs
-
     -- FIXME: Report it to the client without crashing the world.
     handleCmdExc ∷ Either SomeException a → STM a
     handleCmdExc (Left  e) = error ("FIXME: command failed: " ++ show e)
     handleCmdExc (Right a) = return a
+
+withWorldCtxUpcasted ∷ Member (State LocalWorldCtx) r
+                     ⇒ Eff (State WorldCtx : r) a
+                     → Eff r a
+withWorldCtxUpcasted m
+  = do ctx0      ← get
+       (a, ctx1) ← runState (upcastWorldCtx (ctx0 ∷ LocalWorldCtx)) m
+       put (fromJust $ downcastWorldCtx ctx1 ∷ LocalWorldCtx)
+       return a
+
+-- Take a snapshot of a chunk before it can possibly be updated during
+-- a tick.
+snapshotChunk ∷ (Lifted STM r, Member (State LocalWorldCtx) r)
+              ⇒ ChunkPos
+              → Eff r ()
+snapshotChunk cp
+  = do ctx ← get
+       ss' ← HM.alterF (f ctx) cp (ctx^.ctxSnapshots)
+       put $ ctx & ctxSnapshots .~ ss'
+  where
+    f _   s@(Just _) = return s -- A snapshot has already been taken.
+    f ctx Nothing    = do c ← lift $ LCM.get cp (ctx^.ctxRs.rsChunks)
+                          return $ Just c
+
+-- While ticking we take a snapshot of each chunk that can possibly be
+-- updated. And now we are at the end of a tick. For each chunk we
+-- compare it with the current state and if it's modified we notify
+-- clients that are subscribing to the chunk.
+--
+-- But for now we assume all the chunks that have a snapshot have been
+-- modified, because we aren't sure if we really want to make them
+-- derive 'Eq'.
+notifyChunkUpdates ∷ LocalWorldCtx → STM ()
+notifyChunkUpdates ctx
+  -- Pretty sure this isn't how foldrWithKey' is intended to be used,
+  -- but HashMap just doesn't have a monadic variant of it.
+  = HM.foldrWithKey' go (return ()) (ctx^.ctxSnapshots)
+  where
+    -- Is anyone subscribing to this chunk? If so fire 'ChunkUpdated'.
+    go ∷ ChunkPos → Chunk → STM () → STM ()
+    go cPos _ m
+      = m *>
+        do pls ← LPM.getSubscribers cPos (ctx^.ctxRs.rsPlayers)
+           if not (HS.null pls)
+             then fireEvent (ctx^.ctxLw) $ ChunkUpdated pls cPos
+             else return ()
 
 -- | Get the coordinate of the initial spawn.
 initialSpawn ∷ RunningState → STM WorldPos
@@ -438,9 +517,10 @@ newPlayer ∷ PlayerID → Permission → RunningState → STM Player
 newPlayer pid perm rs
   = do spawn ← initialSpawn rs
        let pl = Player
-                { _plID   = pid
-                , _plPerm = perm
-                , _plPos  = spawn
+                { _plID       = pid
+                , _plPerm     = perm
+                , _plPos      = spawn
+                , _plIsOnline = True
                 }
        LPM.put pl (rs^.rsPlayers)
        void $ spawnEntity spawn (B.Player pid) rs

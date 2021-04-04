@@ -109,16 +109,20 @@ redrawWorldView wv
            -- and would be terribly inefficient. So we iterate on
            -- visible chunks instead, and render their visible parts.
            wTopLeft ← worldPosAt wv ext $ Location (0, 0)
-           let wTopRight   = wTopLeft & wpX %~ \x → x + fromIntegral (ext^.to extentSize._1) - 1
-               wBottomLeft = wTopLeft & wpY %~ \y → y + fromIntegral (ext^.to extentSize._2) - 1
-               cTopLeft    = convert wTopLeft
-               cTopRight   = convert wTopRight
-               cBottomLeft = convert wBottomLeft
+           let wTopRight    = wTopLeft & wpX %~ \x → x + fromIntegral (ext^.to extentSize._1) - 1
+               wBottomLeft  = wTopLeft & wpY %~ \y → y + fromIntegral (ext^.to extentSize._2) - 1
+               cTopLeft     = convert wTopLeft
+               cTopRight    = convert wTopRight
+               cBottomLeft  = convert wBottomLeft
+               cBottomRight = cBottomLeft & cpX .~ (cTopRight^.cpX)
 
            let cRow cy    = V.horizCat <$> mapM (flip cCol cy) [cTopLeft^.cpX .. cTopRight^.cpX]
                cCol cx cy = let cPos = ChunkPos cx cy
                             in renderChunk wTopLeft wTopRight wBottomLeft cPos
            cRows ← V.vertCat <$> mapM cRow [cTopLeft^.cpY .. cBottomLeft^.cpY]
+
+           -- Subscribe to ChunkUpdated events for these chunks.
+           subscribeToChunks (wv^.wvWorld) (wv^.wvPlayer) (cTopLeft, cBottomRight)
 
            -- The RenderM is required to fill up the entire space
            -- reported by availWidthL and availHeightL, but the size
