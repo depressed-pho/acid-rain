@@ -14,12 +14,13 @@ module Game.AcidRain.World.Local
 import Control.Concurrent (forkIO)
 import Control.Concurrent.STM.Delay (Delay, newDelay, waitDelay)
 import Control.Concurrent.STM.TBQueue
-  ( TBQueue, newTBQueueIO, tryReadTBQueue, readTBQueue, writeTBQueue )
+  ( TBQueue, newTBQueueIO, tryReadTBQueue, readTBQueue
+  , flushTBQueue, writeTBQueue )
 import Control.Concurrent.STM.TVar (TVar, newTVarIO, readTVar, writeTVar)
 import Control.Eff (Eff, Member, Lift, Lifted, runLift, lift)
 import Control.Eff.Exception (Exc, runError)
 import Control.Eff.State.Strict (State, execState, runState, get, put)
-import Control.Exception (Exception(..), SomeException, handle)
+import Control.Exception (Exception(..), SomeException, assert, handle)
 import Control.Monad (join, void)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.STM (STM, atomically, throwSTM, orElse)
@@ -77,8 +78,15 @@ data LocalWorld
     , _lwState     ∷ !(TVar (WorldState RunningState))
     , _lwEvents    ∷ !(TBQueue SomeEvent)
     , _lwChunkReqs ∷ !(TBQueue ChunkPos)
-    , _lwCommandQ  ∷ !(TBQueue (SomeCommand, Maybe PlayerID, [Text]))
+    , _lwCommandQ  ∷ !(TBQueue QueuedCommand)
     }
+
+data QueuedCommand
+  = QueuedCommand
+    { _qcCmd  ∷ !SomeCommand
+    , _qcMPid ∷ !(Maybe PlayerID)
+    , _qcArgs ∷ ![Text]
+    } deriving Show
 
 -- The state of running world. Not exposed to anywhere.
 data RunningState
@@ -90,11 +98,13 @@ data RunningState
 
 data LocalWorldCtx
   = LocalWorldCtx
-    { _ctxLw        ∷ !LocalWorld
-    , _ctxRs        ∷ !RunningState
+    { _ctxLw            ∷ !LocalWorld
+    , _ctxRs            ∷ !RunningState
+      -- | Commands to run in the current tick.
+    , _ctxCommandsToRun ∷ ![QueuedCommand]
       -- | Snapshots of all the chunks that can possibly be updated
       -- while ticking.
-    , _ctxSnapshots ∷ !(HashMap ChunkPos Chunk)
+    , _ctxSnapshots     ∷ !(HashMap ChunkPos Chunk)
     }
 
 data TickingState
@@ -109,11 +119,12 @@ data TickingState
     }
     -- | We are in the middle of a tick.
   | MiddleOfTick
-    { _tsTickBeganAt    ∷ !Double
+    { _tsTickBeganAt   ∷ !Double
     , _tsLocalWorldCtx ∷ !LocalWorldCtx
     }
 
 makeLenses ''LocalWorld
+makeLenses ''QueuedCommand
 makeLenses ''RunningState
 makeLenses ''LocalWorldCtx
 makeLensesFor [("_tsLocalWorldCtx", "tsLocalWorldCtx")] ''TickingState
@@ -183,7 +194,7 @@ eventQueueCapacity = 256
 
 -- Ticking interval in seconds.
 tickingInterval ∷ Double
-tickingInterval = 0.1
+tickingInterval = 1/20
 
 -- Assume the world is running or throw an exception. Not exposed to
 -- anywhere.
@@ -233,7 +244,12 @@ instance World LocalWorld where
 
   scheduleCommand lw cmd mPid args
     = liftIO $ atomically $
-      writeTBQueue (lw^.lwCommandQ) (upcastCommand cmd, mPid, args)
+      writeTBQueue (lw^.lwCommandQ) $
+      QueuedCommand
+      { _qcCmd  = upcastCommand cmd
+      , _qcMPid = mPid
+      , _qcArgs = args
+      }
 
   lookupChunk lw pos
     = liftIO $ atomically $
@@ -372,13 +388,11 @@ runWorld lw
                `orElse`
                ( do ts1 ← waitForTickStart ts0 rs
                     ts2 ← traverseOf tsLocalWorldCtx consumeCommandQ ts1
-                    return $ loop ts2
-               )
-               `orElse`
-               ( do ts1 ← waitForTickStart ts0 rs
-                    tickWorld
-                    traverseOf_ tsLocalWorldCtx notifyChunkUpdates ts1
-                    return $ advanceTick ts1 >>= loop
+                    if hasCommandsToRun ts2
+                      then return $ loop ts2
+                      else do tickWorld
+                              traverseOf_ tsLocalWorldCtx notifyChunkUpdates ts2
+                              return $ advanceTick ts2 >>= loop
                )
 
     tickWorld ∷ STM ()
@@ -387,12 +401,14 @@ runWorld lw
     waitForTickStart ∷ TickingState → RunningState → STM TickingState
     waitForTickStart (Waiting delay) rs
       = do waitDelay delay
-           now ← unsafeIOToSTM $! getMonotonicTime
-           let ctx = LocalWorldCtx lw rs HM.empty
+           now  ← unsafeIOToSTM $! getMonotonicTime
+           cmds ← flushTBQueue (lw^.lwCommandQ)
+           let ctx = LocalWorldCtx lw rs cmds HM.empty
            return $! MiddleOfTick now ctx
 
     waitForTickStart (BeginningOfTick beganAt) rs
-      = do let ctx = LocalWorldCtx lw rs HM.empty
+      = do cmds ← flushTBQueue (lw^.lwCommandQ)
+           let ctx = LocalWorldCtx lw rs cmds HM.empty
            return $ MiddleOfTick beganAt ctx
 
     waitForTickStart ts@(MiddleOfTick _ _) _
@@ -403,8 +419,9 @@ runWorld lw
       = fail "Logical error: we are not in the middle of ticking"
     advanceTick (BeginningOfTick _)
       = fail "Logical error: we are not in the middle of ticking"
-    advanceTick (MiddleOfTick startedAt _)
-      = do now ← getMonotonicTime
+    advanceTick (MiddleOfTick startedAt ctx)
+      = assert (null (ctx^.ctxCommandsToRun)) $
+        do now ← getMonotonicTime
            -- The next tick time is basically now + tickingInterval,
            -- but if the world is lagging the interval becomes shorter
            -- than that, and can even go negative (no delay).
@@ -425,13 +442,20 @@ handleChunkReq lw rs
        c ← LCM.get cReq (rs^.rsChunks)
        fireEvent lw $ ChunkArrived cReq c
 
+-- | Check if a ticking state has commands to run.
+hasCommandsToRun ∷ TickingState → Bool
+hasCommandsToRun (MiddleOfTick _ ctx) = not $ null (ctx^.ctxCommandsToRun)
+hasCommandsToRun _                    = False
+
 -- | Run a single scheduled command in the world context. Retries when
 -- nothing is scheduled. This is run as a part of 'runWorld'.
 consumeCommandQ ∷ LocalWorldCtx → STM LocalWorldCtx
 consumeCommandQ ctx
-  = do (cmd, mPid, args) ← readTBQueue (ctx^.ctxLw.lwCommandQ)
-       withWorldCtx ctx $
-         runOnWorld cmd mPid args
+  = case ctx^.ctxCommandsToRun of
+      []     → return ctx
+      (c:cs) → do ctx' ← withWorldCtx ctx $
+                         runOnWorld (c^.qcCmd) (c^.qcMPid) (c^.qcArgs)
+                  return (ctx' & ctxCommandsToRun .~ cs)
 
 withWorldCtx ∷ LocalWorldCtx
              → Eff '[State WorldCtx, Exc SomeException, Lift STM] ()
