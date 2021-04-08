@@ -17,7 +17,9 @@ import Brick.BChan (BChan, writeBChan)
 import Brick.Types (BrickEvent(..), Location(..), Widget, EventM)
 import Control.Concurrent (forkIO)
 import Control.Eff (Eff, Member, Lift, Lifted, lift, runLift)
+import Control.Eff.Exception (Exc, runError)
 import Control.Eff.State.Strict (State, execState, get, put, modify)
+import Control.Exception (SomeException)
 import Control.Monad (void)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Foldable (traverse_, foldr')
@@ -162,10 +164,19 @@ handleEventWhileRunning cli be
       _ →
         return cli
 
-withClientCtx ∷ MonadIO μ ⇒ Client → Eff '[State ClientCtx, Lift μ] () → μ Client
+withClientCtx ∷ MonadIO μ
+              ⇒ Client
+              → Eff '[State ClientCtx, Exc SomeException, Lift μ] ()
+              → μ Client
 withClientCtx cli m
-  = do ctx ← runLift $ execState (upcastClientCtx cli) $ m
+  = do eRes ← runLift $ runError $ execState (upcastClientCtx cli) $ m
+       ctx  ← handleCmdExc eRes
        return $ fromJust $ downcastClientCtx ctx
+  where
+    -- FIXME: Report it to the player without crashing the client.
+    handleCmdExc ∷ MonadIO μ ⇒ Either SomeException a → μ a
+    handleCmdExc (Left  e) = error ("FIXME: command failed: " ++ show e)
+    handleCmdExc (Right a) = return a
 
 handleWorldEvent ∷ Client → WE.SomeEvent → EventM Unique Client
 handleWorldEvent cli

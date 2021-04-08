@@ -15,6 +15,7 @@ module Game.AcidRain.World.Command
 
     -- * Errors while running commands
   , BadArgumentsException(..)
+  , ClientOnlyCommandException(..)
   , throwSomeExc
   , throwSomeExc_
 
@@ -74,7 +75,7 @@ class (Show c, Typeable c) ⇒ Command c where
   commandType ∷ c → CommandType
   -- | Run the command on the client-side context. The default
   -- implementation simply redirects the command to the world.
-  runOnClient ∷ (MonadIO (Eff r), Member (State ClientCtx) r)
+  runOnClient ∷ (MonadIO (Eff r), [State ClientCtx, Exc SomeException] <:: r)
               ⇒ c
               → [Text]
               → Eff r ()
@@ -116,12 +117,18 @@ instance Command SomeCommand where
   downcastCommand = Just
   commandID (SomeCommand c) = commandID c
   commandType (SomeCommand c) = commandType c
+  runOnClient (SomeCommand c) = runOnClient c
   runOnWorld (SomeCommand c) = runOnWorld c
 
 -------------------------------------------------------------------------------
 -- Errors while running commands
 -------------------------------------------------------------------------------
-data BadArgumentsException = BadArgumentsException deriving (Show, Exception)
+data BadArgumentsException = BadArgumentsException deriving
+  (Show, Exception)
+
+-- | Attempted to run a client-only command on the world-side.
+data ClientOnlyCommandException = ClientOnlyCommandException
+  deriving (Show, Exception)
 
 throwSomeExc ∷ (Exception e, Member (Exc SomeException) r) ⇒ e → Eff r a
 throwSomeExc = throwError ∘ toException
@@ -137,7 +144,7 @@ throwSomeExc_ = throwError_ ∘ toException
 -- implementations should not invoke its methods directly.
 class Typeable ctx ⇒ IClientCtx ctx where
   -- This type class cannot mention 'World' because doing so would end
-  -- up in a dependency cycle.
+  -- up with a dependency cycle.
 
   -- | Erase the type of 'IClientCtx'.
   upcastClientCtx ∷ ctx → ClientCtx

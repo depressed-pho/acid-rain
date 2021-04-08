@@ -17,7 +17,9 @@ import Data.Proxy (Proxy(..))
 import Game.AcidRain.Module.Builtin.Commands.TH (mkWalkCmd)
 import Game.AcidRain.Module.Loader (LoaderContext, registerCommand)
 import Game.AcidRain.TUI.Keystroke (keyQ)
-import Game.AcidRain.World.Command (Command(..))
+import Game.AcidRain.World.Command
+  ( Command(..), CommandType(..), BadArgumentsException(..)
+  , ClientOnlyCommandException(..), throwSomeExc )
 import Game.AcidRain.World.Position (wpX, wpY)
 import Lens.Micro ((-~), (+~))
 import Prelude.Unicode ((∘))
@@ -50,6 +52,18 @@ mkWalkCmd "RunNorthEast" "acid-rain:run-north-east" [keyQ|U|] [| (wpX +~ 16) ∘
 mkWalkCmd "RunSouthEast" "acid-rain:run-south-east" [keyQ|N|] [| (wpX +~ 16) ∘ (wpY +~ 16) |]
 mkWalkCmd "RunSouthWest" "acid-rain:run-south-west" [keyQ|B|] [| (wpX -~ 16) ∘ (wpY +~ 16) |]
 
+-------------------------------------------------------------------------------
+-- Misc
+data ToggleDebug
+instance Command (Proxy ToggleDebug) where
+  commandID   _ = "acid-rain:toggle-debug"
+  commandType _ = Interactive $ Just [keyQ|<f3>|]
+  runOnClient _ []
+    = error "FIXME"
+  runOnClient _ _
+    = throwSomeExc BadArgumentsException
+  runOnWorld _ _ _ = throwSomeExc ClientOnlyCommandException
+
 loadCommands ∷ (Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ Eff r ()
 loadCommands
   = traverse_ registerCommand
@@ -70,4 +84,6 @@ loadCommands
     , upcastCommand (Proxy ∷ Proxy RunNorthEast)
     , upcastCommand (Proxy ∷ Proxy RunSouthEast)
     , upcastCommand (Proxy ∷ Proxy RunSouthWest)
+
+    , upcastCommand (Proxy ∷ Proxy ToggleDebug)
     ]
