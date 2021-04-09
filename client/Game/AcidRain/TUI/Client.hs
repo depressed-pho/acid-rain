@@ -30,6 +30,9 @@ import Data.HashSet (HashSet)
 import Data.Maybe (fromJust)
 import Data.MultiHashMap.Set.Strict (MultiHashMap)
 import qualified Data.MultiHashMap.Set.Strict as MHM
+import Data.Sequence (Seq)
+import qualified Data.Sequence as S
+import Data.Sequence.Unicode ((⊳), (⋈))
 import Data.Unique (Unique, newUnique)
 import Game.AcidRain.World
   ( Command(..), CommandType(..), CommandID, SomeCommand
@@ -44,11 +47,12 @@ import Game.AcidRain.TUI.Widgets.WorldView
   , renderWorldView, redrawWorldView, updatePlayerOffset )
 import Game.AcidRain.World
   ( World(..), WorldState(..), WorldStateChanged(..) )
+import Game.AcidRain.TUI.Window (Window(..), WindowType(..), SomeWindow)
 import qualified Game.AcidRain.World.Event as WE
 import qualified Graphics.Vty as V
 import Lens.Micro ((^.), (.~), (&), (%~), traverseOf)
 import Lens.Micro.TH (makeLenses)
-import Prelude.Unicode ((∘))
+import Prelude.Unicode ((∘), (≡), (≢))
 
 
 -- | The purpose of the data type 'Client' is to render and handle
@@ -58,6 +62,8 @@ import Prelude.Unicode ((∘))
 data Client
   = Client
     { _cliWorldView    ∷ !(WorldView Unique)
+      -- | Invariant: no 'Modal' windows come before 'HUD'.
+    , _cliWindows      ∷ !(Seq SomeWindow)
       -- | The latest 'WorldState' we have observed.
     , _cliWorldState   ∷ !(WorldState ())
     , _cliAllCommands  ∷ !(HashSet SomeCommand)
@@ -71,6 +77,15 @@ makeLenses ''Client
 instance IClientCtx Client where
   basicGetClientWorld = (^.cliWorldView.wvWorld)
   basicGetClientPlayerID = (^.cliWorldView.wvPlayer)
+  basicHasWindow wid = any ((≡ wid) ∘ windowID) ∘ (^.cliWindows)
+  basicInsertWindow win = cliWindows %~ insWin
+    where
+      insWin ∷ Seq SomeWindow → Seq SomeWindow
+      insWin ws
+        = let (huds, modals) = S.spanl ((≡ HUD) ∘ windowType) ws
+          in
+            (huds ⊳ upcastWindow win) ⋈ modals
+  basicDeleteWindow wid = cliWindows %~ S.filter ((≢ wid) ∘ windowID)
 
 newtype ClientEvent = ClientEvent WE.SomeEvent
   deriving Show
@@ -101,6 +116,7 @@ newClient uni w pid evChan
        ws ← getWorldState w
        return Client
          { _cliWorldView    = worldView name uni w pid
+         , _cliWindows      = mempty
          , _cliWorldState   = () <$ ws
          , _cliAllCommands  = mempty
          , _cliKeyMap       = defaultKeyMap mempty
@@ -112,7 +128,8 @@ newClient uni w pid evChan
 -- this function returns a list of them.
 drawClient ∷ Client → [Widget Unique]
 drawClient cli
-  = [ renderWorldView (cli^.cliWorldView) ]
+  = renderWorldView (cli^.cliWorldView)
+    : concatMap renderWindow (cli^.cliWindows)
 
 isClientClosed ∷ Client → Bool
 isClientClosed = (^.cliClosed)

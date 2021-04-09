@@ -14,11 +14,15 @@ import Control.Eff.State.Strict (State)
 import Control.Monad.Catch (MonadThrow)
 import Data.Foldable (traverse_)
 import Data.Proxy (Proxy(..))
+import Game.AcidRain.Module.Builtin.Window.HUD.DebugInfo (debugInfo)
 import Game.AcidRain.Module.Builtin.Commands.TH (mkWalkCmd)
 import Game.AcidRain.Module.Loader (LoaderContext, registerCommand)
 import Game.AcidRain.TUI.Keystroke (keyQ)
+import Game.AcidRain.TUI.Window (Window(..))
 import Game.AcidRain.World
   ( Command(..), CommandType(..), BadArgumentsException(..)
+  , getClientWorld, getClientPlayerID
+  , hasWindow, insertWindow, deleteWindow
   , ClientOnlyCommandException(..), throwSomeExc )
 import Game.AcidRain.World.Position (wpX, wpY)
 import Lens.Micro ((-~), (+~))
@@ -59,7 +63,13 @@ instance Command (Proxy ToggleDebug) where
   commandID   _ = "acid-rain:toggle-debug"
   commandType _ = Interactive $ Just [keyQ|<f3>|]
   runOnClient _ []
-    = error "FIXME"
+    = do w   ← getClientWorld
+         pid ← getClientPlayerID
+         dbg ← debugInfo w pid
+         h   ← hasWindow (windowID dbg)
+         if h
+           then deleteWindow (windowID dbg)
+           else insertWindow dbg
   runOnClient _ _
     = throwSomeExc BadArgumentsException
   runOnWorld _ _ _ = throwSomeExc ClientOnlyCommandException

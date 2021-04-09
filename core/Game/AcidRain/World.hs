@@ -26,6 +26,9 @@ module Game.AcidRain.World
   , getClientWorld
   , getClientPlayerID
   , sendToWorld
+  , hasWindow
+  , insertWindow
+  , deleteWindow
 
     -- * World-side context
   , IWorldCtx(..)
@@ -71,6 +74,7 @@ import Game.AcidRain.World.Event (Event(..), SomeEvent)
 import Game.AcidRain.World.Player (Player, PlayerID)
 import Game.AcidRain.World.Position (WorldPos)
 import Game.AcidRain.TUI.Keystroke (Keystroke)
+import Game.AcidRain.TUI.Window (Window, WindowID)
 import Prelude.Unicode ((∘), (≡))
 
 
@@ -259,6 +263,12 @@ class Typeable ctx ⇒ IClientCtx ctx where
   basicGetClientWorld ∷ ctx → SomeWorld
   -- | Get the ID of the player whom the client controls.
   basicGetClientPlayerID ∷ ctx → PlayerID
+  -- | Return 'True' iff a window with the given ID is shown.
+  basicHasWindow ∷ WindowID → ctx → Bool
+  -- | Insert a new window to the client.
+  basicInsertWindow ∷ Window w ⇒ w → ctx → ctx
+  -- | Delete windows with the given ID from the client.
+  basicDeleteWindow ∷ WindowID → ctx → ctx
 
 -- | Type-erased 'IClientCtx'. We hate this. What we really want to do
 -- is @('IClientCtx' ctx, 'Member' ('State' ctx) r) ⇒ 'Eff' r a@ and
@@ -273,6 +283,9 @@ instance IClientCtx ClientCtx where
   downcastClientCtx = Just
   basicGetClientWorld (ClientCtx ctx) = basicGetClientWorld ctx
   basicGetClientPlayerID (ClientCtx ctx) = basicGetClientPlayerID ctx
+  basicHasWindow wid (ClientCtx ctx) = basicHasWindow wid ctx
+  basicInsertWindow w (ClientCtx ctx) = ClientCtx $ basicInsertWindow w ctx
+  basicDeleteWindow wid (ClientCtx ctx) = ClientCtx $ basicDeleteWindow wid ctx
 
 -- | Get the world the client controls.
 getClientWorld ∷ Member (State ClientCtx) r ⇒ Eff r SomeWorld
@@ -296,6 +309,24 @@ sendToWorld c args
   = do w   ← getClientWorld
        pid ← getClientPlayerID
        liftIO $ scheduleCommand w c (Just pid) args
+
+-- | Return 'True' iff a window with the given ID is shown.
+hasWindow ∷ Member (State ClientCtx) r ⇒ WindowID → Eff r Bool
+hasWindow wid
+  = do ctx ← get
+       return $ basicHasWindow wid (ctx ∷ ClientCtx)
+
+-- | Insert a new window to the client.
+insertWindow ∷ (Member (State ClientCtx) r, Window w) ⇒ w → Eff r ()
+insertWindow win
+  = do ctx ← get
+       put $ basicInsertWindow win (ctx ∷ ClientCtx)
+
+-- | Delete windows with the given ID from the client.
+deleteWindow ∷ Member (State ClientCtx) r ⇒ WindowID → Eff r ()
+deleteWindow wid
+  = do ctx ← get
+       put $ basicDeleteWindow wid (ctx ∷ ClientCtx)
 
 -------------------------------------------------------------------------------
 -- World-side context
