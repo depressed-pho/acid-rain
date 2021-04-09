@@ -31,8 +31,9 @@ import Data.Maybe (fromJust)
 import Data.MultiHashMap.Set.Strict (MultiHashMap)
 import qualified Data.MultiHashMap.Set.Strict as MHM
 import Data.Unique (Unique, newUnique)
-import Game.AcidRain.World.Command
+import Game.AcidRain.World
   ( Command(..), CommandType(..), CommandID, SomeCommand
+  , CommandSetUpdated(..)
   , IClientCtx(..), ClientCtx )
 import Game.AcidRain.World.Player (PlayerID, PlayerMoved(..))
 import Game.AcidRain.World.Position (wpX, wpY)
@@ -42,7 +43,7 @@ import Game.AcidRain.TUI.Widgets.WorldView
   ( WorldView, wvWorld, wvPlayer, worldView
   , renderWorldView, redrawWorldView, updatePlayerOffset )
 import Game.AcidRain.World
-  ( World(..), WorldState(..), WorldStateChanged(..), CommandSetUpdated(..) )
+  ( World(..), WorldState(..), WorldStateChanged(..) )
 import qualified Game.AcidRain.World.Event as WE
 import qualified Graphics.Vty as V
 import Lens.Micro ((^.), (.~), (&), (%~), traverseOf)
@@ -68,11 +69,8 @@ data Client
 makeLenses ''Client
 
 instance IClientCtx Client where
+  basicGetClientWorld = (^.cliWorldView.wvWorld)
   basicGetClientPlayerID = (^.cliWorldView.wvPlayer)
-  basicSendToWorld cli c args
-    = do let w = cli^.cliWorldView.wvWorld
-             p = cli^.cliWorldView.wvPlayer
-         scheduleCommand w c (Just p) args
 
 newtype ClientEvent = ClientEvent WE.SomeEvent
   deriving Show

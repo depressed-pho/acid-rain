@@ -17,7 +17,7 @@ import Data.Proxy (Proxy(..))
 import Game.AcidRain.Module.Builtin.Commands.TH (mkWalkCmd)
 import Game.AcidRain.Module.Loader (LoaderContext, registerCommand)
 import Game.AcidRain.TUI.Keystroke (keyQ)
-import Game.AcidRain.World.Command
+import Game.AcidRain.World
   ( Command(..), CommandType(..), BadArgumentsException(..)
   , ClientOnlyCommandException(..), throwSomeExc )
 import Game.AcidRain.World.Position (wpX, wpY)

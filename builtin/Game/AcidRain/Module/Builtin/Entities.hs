@@ -18,7 +18,7 @@ import Data.Proxy (Proxy(..))
 import Game.AcidRain.TUI
   ( HasAppearance(..), begin, end, (⊳), unicode, ascii, bold )
 import Game.AcidRain.Module.Loader (LoaderContext, registerEntityType)
-import Game.AcidRain.World.Command (modifyPlayer, fireEvent)
+import Game.AcidRain.World (modifyPlayer, fireEvent)
 import Game.AcidRain.World.Entity (EntityType(..), Entity(..))
 import Game.AcidRain.World.Player (PlayerID, PlayerMoved(..), plPos)
 import Lens.Micro ((.~))

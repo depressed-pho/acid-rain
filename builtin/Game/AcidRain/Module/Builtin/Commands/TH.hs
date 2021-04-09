@@ -7,7 +7,7 @@ module Game.AcidRain.Module.Builtin.Commands.TH
 import Control.Monad (void)
 import Data.Proxy (Proxy)
 import Game.AcidRain.TUI.Keystroke (Keystroke)
-import Game.AcidRain.World.Command
+import Game.AcidRain.World
   ( Command(..), CommandType(..), CommandID, BadArgumentsException(..)
   , throwSomeExc, getPlayer, getPlayer, tryMoveEntity )
 import Game.AcidRain.World.Player (plPos)

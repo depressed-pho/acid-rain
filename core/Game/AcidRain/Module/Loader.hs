@@ -61,12 +61,11 @@ import Game.AcidRain.Module.Types
   ( Module(..), SomeModule(..), ModuleMap, LoaderContext(..)
   , lcWorldSeed, lcMods, lcTileReg, lcBiomeReg
   , lcEntityReg, lcCommandReg, lcChunkGen )
-import Game.AcidRain.World (WorldSeed)
+import Game.AcidRain.World (WorldSeed, Command, CommandID, SomeCommand)
 import Game.AcidRain.World.Biome (Biome, BiomeID, SomeBiome)
 import Game.AcidRain.World.Biome.Registry (BiomeRegistry)
 import qualified Game.AcidRain.World.Biome.Registry as BR
 import Game.AcidRain.World.Chunk.Generator (ChunkGenerator)
-import Game.AcidRain.World.Command (Command, CommandID, SomeCommand)
 import Game.AcidRain.World.Command.Registry (CommandRegistry)
 import qualified Game.AcidRain.World.Command.Registry as CR
 import Game.AcidRain.World.Entity (EntityType, EntityTypeID, SomeEntityType)

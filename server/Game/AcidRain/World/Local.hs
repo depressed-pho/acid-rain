@@ -39,18 +39,16 @@ import Game.AcidRain.Module.Loader
 import qualified Game.AcidRain.Module.Builtin.Entities as B
 import Game.AcidRain.World
   ( World(..), WorldMode(..), WorldState(..)
-  , WorldSeed, WorldStateChanged(..), CommandSetUpdated(..), ChunkArrived(..)
-  , ChunkUpdated(..)
-  , WorldNotRunningException(..), UnknownPlayerIDException(..) )
+  , WorldSeed, WorldStateChanged(..), ChunkArrived(..)
+  , Command(..), SomeCommand, IWorldCtx(..), WorldCtx
+  , ChunkUpdated(..), CommandSetUpdated(..)
+  , WorldNotRunningException(..), UnknownPlayerIDException(..), throwSomeExc )
 import qualified Game.AcidRain.World.Biome.Palette as BPal
 import Game.AcidRain.World.Chunk
   ( Chunk, putEntity, deleteEntity, entityAt, canEntityEnter )
 import Game.AcidRain.World.Chunk.Manager.Local (LocalChunkManager)
 import qualified Game.AcidRain.World.Chunk.Manager.Local as LCM
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
-import Game.AcidRain.World.Command
-  ( Command(..), SomeCommand, IWorldCtx(..), WorldCtx
-  , throwSomeExc )
 import Game.AcidRain.World.Command.Registry (CommandRegistry)
 import qualified Game.AcidRain.World.Command.Registry as CR
 import qualified Game.AcidRain.World.Entity as E
@@ -268,7 +266,7 @@ instance World LocalWorld where
       do rs ← assumeRunning lw
          LPM.subscribeToChunks pid chunks (rs^.rsPlayers)
 
-  getPlayer lw pid
+  getPlayerFromWorld lw pid
     = liftIO $ atomically $ assumeRunning lw >>= get'
     where
       get' rs | U.null pid = case lw^.lwMode of

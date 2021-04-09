@@ -35,7 +35,7 @@ import qualified Data.HashSet as HS
 import Data.MonoTraversable
   ( Element, MonoFunctor, MonoFoldable, MonoTraversable, GrowingAppend
   , otraverse )
-import Game.AcidRain.World.Command (Command(..), CommandID, SomeCommand(..))
+import Game.AcidRain.World (Command(..), CommandID, SomeCommand(..))
 import Prelude hiding (lookup)
 
 

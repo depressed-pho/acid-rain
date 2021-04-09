@@ -23,7 +23,7 @@ import Control.Monad.STM (STM)
 import Data.Kind (Type)
 import Data.Text (Text)
 import Game.AcidRain.TUI (HasAppearance(..))
-import Game.AcidRain.World.Command (WorldCtx)
+import {-# SOURCE #-} Game.AcidRain.World (WorldCtx)
 import Game.AcidRain.World.Position (WorldPos)
 
 

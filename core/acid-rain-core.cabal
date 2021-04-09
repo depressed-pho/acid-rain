@@ -25,6 +25,7 @@ library
     Game.AcidRain.Module.Loader
     Game.AcidRain.TUI
     Game.AcidRain.TUI.Keystroke
+    Game.AcidRain.TUI.Window
     Game.AcidRain.World
     Game.AcidRain.World.Biome
     Game.AcidRain.World.Biome.Palette
@@ -33,7 +34,6 @@ library
     Game.AcidRain.World.Chunk.Generator
     Game.AcidRain.World.Chunk.Position
     Game.AcidRain.World.Climate
-    Game.AcidRain.World.Command
     Game.AcidRain.World.Command.Registry
     Game.AcidRain.World.Direction
     Game.AcidRain.World.Entity
@@ -58,6 +58,7 @@ library
   build-depends:
     base                 ==  4.*,
     base-unicode-symbols ^>= 0.2.4.2,
+    brick                ^>= 0.60.2,
     colour               ^>= 2.3.5,
     containers           ^>= 0.6.2.1,
     convertible          ^>= 1.1.1.0,
