@@ -1,7 +1,9 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE UnicodeSyntax #-}
@@ -15,14 +17,15 @@ module Game.AcidRain.TUI.Client
 
 import Brick.BChan (BChan, writeBChan)
 import Brick.Types (BrickEvent(..), Location(..), Widget, EventM)
+import Brick.Widgets.Core (Named(..))
 import Control.Concurrent (forkIO)
 import Control.Eff (Eff, Member, Lift, Lifted, lift, runLift)
 import Control.Eff.Exception (Exc, runError)
 import Control.Eff.State.Strict (State, execState, get, put, modify)
 import Control.Exception (SomeException)
-import Control.Monad (void)
+import Control.Monad (join, void)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Foldable (traverse_, foldr')
+import Data.Foldable (traverse_, foldr', toList)
 import Data.Function (fix)
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
@@ -30,9 +33,9 @@ import Data.HashSet (HashSet)
 import Data.Maybe (fromJust)
 import Data.MultiHashMap.Set.Strict (MultiHashMap)
 import qualified Data.MultiHashMap.Set.Strict as MHM
-import Data.Sequence (Seq)
+import Data.Sequence (Seq((:<|)))
 import qualified Data.Sequence as S
-import Data.Sequence.Unicode ((⊳), (⋈))
+import Data.Sequence.Unicode ((⊲), (⊳), (⋈))
 import Data.Unique (Unique, newUnique)
 import Game.AcidRain.World
   ( Command(..), CommandType(..), CommandID, SomeCommand
@@ -47,10 +50,10 @@ import Game.AcidRain.TUI.Widgets.WorldView
   , renderWorldView, redrawWorldView, updatePlayerOffset )
 import Game.AcidRain.World
   ( World(..), WorldState(..), WorldStateChanged(..) )
-import Game.AcidRain.TUI.Window (Window(..), WindowType(..), SomeWindow)
+import qualified Game.AcidRain.TUI.Window as W
 import qualified Game.AcidRain.World.Event as WE
 import qualified Graphics.Vty as V
-import Lens.Micro ((^.), (.~), (&), (%~), traverseOf)
+import Lens.Micro ((^.), (.~), (&), (%~), to, traverseOf)
 import Lens.Micro.TH (makeLenses)
 import Prelude.Unicode ((∘), (≡), (≢))
 
@@ -61,9 +64,10 @@ import Prelude.Unicode ((∘), (≡), (≢))
 -- events and updates Brick widgets accordingly.
 data Client
   = Client
-    { _cliWorldView    ∷ !(WorldView Unique)
-      -- | Invariant: no 'Modal' windows come before 'HUD'.
-    , _cliWindows      ∷ !(Seq SomeWindow)
+    { _cliEvChan       ∷ !(BChan SomeAppEvent)
+    , _cliWorldView    ∷ !(WorldView Unique)
+      -- | Invariant: no 'HUD' windows come before 'Modal'.
+    , _cliWindows      ∷ !(Seq ShownWindow)
       -- | The latest 'WorldState' we have observed.
     , _cliWorldState   ∷ !(WorldState ())
     , _cliAllCommands  ∷ !(HashSet SomeCommand)
@@ -72,24 +76,45 @@ data Client
     , _cliClosed       ∷ !Bool
     }
 
+data ShownWindow
+  = ShownWindow
+    { _swWindow  ∷ !W.SomeWindow
+      -- | Becomes 'True' after invoking 'W.windowStartEvent'.
+    , _swStarted ∷ !Bool
+    }
+
 makeLenses ''Client
+makeLenses ''ShownWindow
+
+instance Named ShownWindow Unique where
+  getName = getName ∘ (^.swWindow)
 
 instance IClientCtx Client where
   basicGetClientWorld = (^.cliWorldView.wvWorld)
   basicGetClientPlayerID = (^.cliWorldView.wvPlayer)
-  basicHasWindow wid = any ((≡ wid) ∘ windowID) ∘ (^.cliWindows)
-  basicInsertWindow win = cliWindows %~ insWin
+  basicHasWindow wid = any ((≡ wid) ∘ (^.swWindow.to W.windowID)) ∘ (^.cliWindows)
+  basicInsertWindow win cli
+    = do let sWin = ShownWindow (W.upcastWindow win) False
+             cli' = case W.windowType win of
+                      W.HUD   → cli & cliWindows %~ insHUD sWin
+                      W.Modal → cli & cliWindows %~ (sWin ⊲)
+         liftIO $ writeBChan (cli^.cliEvChan) (upcastAppEvent $ WindowInserted $ getName sWin)
+         return cli'
     where
-      insWin ∷ Seq SomeWindow → Seq SomeWindow
-      insWin ws
-        = let (huds, modals) = S.spanl ((≡ HUD) ∘ windowType) ws
+      insHUD ∷ ShownWindow → Seq ShownWindow → Seq ShownWindow
+      insHUD sWin ws
+        = let (modals, huds) = S.spanl ((≡ W.HUD) ∘ (^.swWindow.to W.windowType)) ws
           in
-            (huds ⊳ upcastWindow win) ⋈ modals
-  basicDeleteWindow wid = cliWindows %~ S.filter ((≢ wid) ∘ windowID)
+            modals ⋈ (sWin ⊲ huds)
+  basicDeleteWindow wid
+    = cliWindows %~ S.filter ((≢ wid) ∘ (^.swWindow.to W.windowID))
 
-newtype ClientEvent = ClientEvent WE.SomeEvent
-  deriving Show
-instance AppEvent ClientEvent
+data ClientEvent
+  = -- | A world event has been fired.
+    GotWorldEvent !WE.SomeEvent
+    -- | A new 'Window' with the given name has been inserted.
+  | WindowInserted !Unique
+  deriving AppEvent
 
 -- | Create a 'Client' interacting with a given 'World'.
 newClient ∷ (World w, MonadIO μ)
@@ -106,7 +131,7 @@ newClient uni w pid evChan
        void $ liftIO $ forkIO $ fix $ \loop →
          do mwEv ← waitForEvent w
             case mwEv of
-              Just wEv → writeBChan evChan (upcastAppEvent $ ClientEvent wEv) *> loop
+              Just wEv → writeBChan evChan (upcastAppEvent $ GotWorldEvent wEv) *> loop
               Nothing  → return ()
 
        -- We don't need to send an event to the channel here just to
@@ -115,7 +140,8 @@ newClient uni w pid evChan
 
        ws ← getWorldState w
        return Client
-         { _cliWorldView    = worldView name uni w pid
+         { _cliEvChan       = evChan
+         , _cliWorldView    = worldView name uni w pid
          , _cliWindows      = mempty
          , _cliWorldState   = () <$ ws
          , _cliAllCommands  = mempty
@@ -128,8 +154,17 @@ newClient uni w pid evChan
 -- this function returns a list of them.
 drawClient ∷ Client → [Widget Unique]
 drawClient cli
-  = renderWorldView (cli^.cliWorldView)
-    : concatMap renderWindow (cli^.cliWindows)
+  = let wins = join $ fmap renderWindow (cli^.cliWindows)
+        wv   = renderWorldView (cli^.cliWorldView)
+    in
+      toList (wins ⊳ wv)
+  where
+    renderWindow ∷ ShownWindow → Seq (Widget Unique)
+    renderWindow sWin
+      = if sWin^.swStarted then
+          W.renderWindow (sWin^.swWindow)
+        else
+          S.empty
 
 isClientClosed ∷ Client → Bool
 isClientClosed = (^.cliClosed)
@@ -139,9 +174,6 @@ handleClientEvent cli be
   = case be of
       VtyEvent (V.EvResize _ _) →
         traverseOf cliWorldView redrawWorldView cli
-
-      AppEvent (downcastAppEvent → Just (ClientEvent we)) →
-        handleWorldEvent cli we
 
       _ →
         case cli^.cliWorldState of
@@ -157,8 +189,12 @@ handleEventWhileLoading ∷ Client
                         → EventM Unique Client
 handleEventWhileLoading cli be
   = case be of
+      AppEvent (downcastAppEvent → Just (GotWorldEvent we)) →
+        handleWorldEvent cli we
+
       VtyEvent (V.EvKey V.KEsc []) →
         return $ cli & cliClosed .~ True
+
       _ → return cli
 
 handleEventWhileRunning ∷ Client
@@ -166,11 +202,61 @@ handleEventWhileRunning ∷ Client
                         → EventM Unique Client
 handleEventWhileRunning cli be
   = case be of
-      VtyEvent (V.EvKey V.KEsc []) →
+      AppEvent (downcastAppEvent → Just (GotWorldEvent we)) →
+        -- World events are always propagated through all the windows
+        -- and the client itself.
+        do let handleWE = traverseOf swWindow (flip W.handleWorldEvent we)
+           cli' ← traverseOf cliWindows (traverse handleWE) cli
+           handleWorldEvent cli' we
+
+      AppEvent (downcastAppEvent → Just (WindowInserted n)) →
+        traverseOf cliWindows (windowStart n)cli
+
+      VtyEvent ev →
+        -- Vty events are propagated through modal windows and finally
+        -- to the client itself.
+        do (ws', pr) ← propagateVtyEvent ev (cli^.cliWindows)
+           let cli' = cli & cliWindows .~ ws'
+           if pr
+             then handleVtyEventWhileRunning cli' ev
+             else return cli'
+
+      _ → return cli
+
+  where
+    windowStart ∷ Unique → Seq ShownWindow → EventM Unique (Seq ShownWindow)
+    windowStart n = go S.empty
+      where
+        go ∷ Seq ShownWindow → Seq ShownWindow → EventM Unique (Seq ShownWindow)
+        go done S.Empty      = return done
+        go done (sw :<| sws) = if getName sw ≡ n then
+                                 do sw' ← traverseOf swWindow W.windowStartEvent sw
+                                    return $ (done ⊳ (sw' & swStarted .~ True)) ⋈ sws
+                               else
+                                 go (done ⊳ sw) sws
+
+    propagateVtyEvent ∷ V.Event → Seq ShownWindow → EventM Unique (Seq ShownWindow, Bool)
+    propagateVtyEvent ev = go True S.empty
+      where
+        go ∷ Bool → Seq ShownWindow → Seq ShownWindow → EventM Unique (Seq ShownWindow, Bool)
+        go False done rest         = return (rest ⋈ done, False)
+        go True  done S.Empty      = return (done, True)
+        go True  done (sw :<| sws)
+          = case W.windowType (sw^.swWindow) of
+              W.Modal →
+                do (w', pr) ← W.handleVtyEvent (sw^.swWindow) ev
+                   go pr (done ⊳ (sw & swWindow .~ w')) sws
+              W.HUD →
+                return (done ⋈ (sw ⊲ sws), True)
+
+handleVtyEventWhileRunning ∷ Client → V.Event → EventM Unique Client
+handleVtyEventWhileRunning cli ev
+  = case ev of
+      V.EvKey V.KEsc [] →
         -- FIXME: Show pause screen
         return $ cli & cliClosed .~ True
 
-      VtyEvent (V.EvKey key mods) →
+      V.EvKey key mods →
         do let ks   = keystroke key mods
                cmds = MHM.lookup ks (cli^.cliKeyMap)
            withClientCtx cli $

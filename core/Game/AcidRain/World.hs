@@ -266,7 +266,7 @@ class Typeable ctx ⇒ IClientCtx ctx where
   -- | Return 'True' iff a window with the given ID is shown.
   basicHasWindow ∷ WindowID → ctx → Bool
   -- | Insert a new window to the client.
-  basicInsertWindow ∷ Window w ⇒ w → ctx → ctx
+  basicInsertWindow ∷ (MonadIO μ, Window w) ⇒ w → ctx → μ ctx
   -- | Delete windows with the given ID from the client.
   basicDeleteWindow ∷ WindowID → ctx → ctx
 
@@ -284,7 +284,7 @@ instance IClientCtx ClientCtx where
   basicGetClientWorld (ClientCtx ctx) = basicGetClientWorld ctx
   basicGetClientPlayerID (ClientCtx ctx) = basicGetClientPlayerID ctx
   basicHasWindow wid (ClientCtx ctx) = basicHasWindow wid ctx
-  basicInsertWindow w (ClientCtx ctx) = ClientCtx $ basicInsertWindow w ctx
+  basicInsertWindow w (ClientCtx ctx) = ClientCtx <$> basicInsertWindow w ctx
   basicDeleteWindow wid (ClientCtx ctx) = ClientCtx $ basicDeleteWindow wid ctx
 
 -- | Get the world the client controls.
@@ -317,10 +317,11 @@ hasWindow wid
        return $ basicHasWindow wid (ctx ∷ ClientCtx)
 
 -- | Insert a new window to the client.
-insertWindow ∷ (Member (State ClientCtx) r, Window w) ⇒ w → Eff r ()
+insertWindow ∷ (Window w, MonadIO (Eff r), Member (State ClientCtx) r) ⇒ w → Eff r ()
 insertWindow win
-  = do ctx ← get
-       put $ basicInsertWindow win (ctx ∷ ClientCtx)
+  = do ctx  ← get
+       ctx' ← basicInsertWindow win (ctx ∷ ClientCtx)
+       put ctx'
 
 -- | Delete windows with the given ID from the client.
 deleteWindow ∷ Member (State ClientCtx) r ⇒ WindowID → Eff r ()
