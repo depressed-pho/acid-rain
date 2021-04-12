@@ -15,9 +15,11 @@ module Game.AcidRain.World.Chunk.Types
 
   , IndexedTileState(..)
   , Chunk(..)
-  , cTileReg, cTilePal, cTiles, cClimates, cBiomeReg, cBiomePal, cBiomes, cEntCat, cEntities
+  , cTileReg, cTilePal, cTiles, cClimates, cRivers, cBiomeReg, cBiomePal
+  , cBiomes, cEntCat, cEntities
   , MutableChunk(..)
-  , mcTileReg, mcTilePal, mcTiles, mcClimates, mcBiomeReg, mcBiomePal, mcBiomes, mcEntCat, mcEntities
+  , mcTileReg, mcTilePal, mcTiles, mcClimates, mcRivers, mcBiomeReg
+  , mcBiomePal, mcBiomes, mcEntCat, mcEntities
 
   , toIndexed
 
@@ -26,6 +28,7 @@ module Game.AcidRain.World.Chunk.Types
 
   , writeTileState
   , writeClimate
+  , writeRiver
   , writeBiome
   ) where
 
@@ -123,6 +126,7 @@ data Chunk
     , _cTilePal  ∷ !TilePalette
     , _cTiles    ∷ !(UV.Vector IndexedTileState)
     , _cClimates ∷ !(UV.Vector Climate)
+    , _cRivers   ∷ !(UV.Vector Float)
     , _cBiomeReg ∷ !BiomeRegistry
     , _cBiomePal ∷ !BiomePalette
     , _cBiomes   ∷ !(UV.Vector BiomeIndex)
@@ -151,6 +155,7 @@ data MutableChunk σ
     , _mcTilePal  ∷ !TilePalette
     , _mcTiles    ∷ !(UV.MVector σ IndexedTileState)
     , _mcClimates ∷ !(UV.MVector σ Climate)
+    , _mcRivers   ∷ !(UV.MVector σ Float)
     , _mcBiomeReg ∷ !BiomeRegistry
     , _mcBiomePal ∷ !BiomePalette
     , _mcBiomes   ∷ !(UV.MVector σ BiomeIndex)
@@ -184,12 +189,14 @@ freezeChunk ∷ PrimMonad μ ⇒ MutableChunk (PrimState μ) → μ Chunk
 freezeChunk mc
   = do tiles    ← GV.freeze $ mc^.mcTiles
        climates ← GV.freeze $ mc^.mcClimates
+       rivers   ← GV.freeze $ mc^.mcRivers
        biomes   ← GV.freeze $ mc^.mcBiomes
        return Chunk
          { _cTileReg  = mc^.mcTileReg
          , _cTilePal  = mc^.mcTilePal
          , _cTiles    = tiles
          , _cClimates = climates
+         , _cRivers   = rivers
          , _cBiomeReg = mc^.mcBiomeReg
          , _cBiomePal = mc^.mcBiomePal
          , _cBiomes   = biomes
@@ -201,12 +208,14 @@ thawChunk ∷ PrimMonad μ ⇒ Chunk → μ (MutableChunk (PrimState μ))
 thawChunk c
   = do tiles    ← GV.thaw $ c^.cTiles
        climates ← GV.thaw $ c^.cClimates
+       rivers   ← GV.thaw $ c^.cRivers
        biomes   ← GV.thaw $ c^.cBiomes
        return MutableChunk
          { _mcTileReg  = c^.cTileReg
          , _mcTilePal  = c^.cTilePal
          , _mcTiles    = tiles
          , _mcClimates = climates
+         , _mcRivers   = rivers
          , _mcBiomeReg = c^.cBiomeReg
          , _mcBiomePal = c^.cBiomePal
          , _mcBiomes   = biomes
@@ -235,6 +244,14 @@ writeClimate off@(TileOffset { x, y, .. }) cli mc
         y' = fromIntegral y ∷ Int
     in
       GMV.write (mc^.mcClimates) (y'⋅chunkSize + x') cli
+
+writeRiver ∷ PrimMonad μ ⇒ TileOffset → Float → MutableChunk (PrimState μ) → μ ()
+writeRiver off@(TileOffset { x, y, .. }) river mc
+  = assertValidOffset off $
+    let x' = fromIntegral x ∷ Int
+        y' = fromIntegral y ∷ Int
+    in
+      GMV.write (mc^.mcRivers) (y'⋅chunkSize + x') river
 
 writeBiome ∷ (Biome β, MonadThrow μ, PrimMonad μ)
            ⇒ TileOffset

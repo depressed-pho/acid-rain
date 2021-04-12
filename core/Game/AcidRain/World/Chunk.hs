@@ -16,6 +16,7 @@ module Game.AcidRain.World.Chunk
     -- * Querying chunks
   , tileStateAt
   , climateAt
+  , riverAt
   , biomeAt
   , entityAt
   , hasEntityAt
@@ -35,7 +36,7 @@ import qualified Game.AcidRain.World.Biome.Registry as BR
 import Game.AcidRain.World.Chunk.Types
   ( Chunk(..), TileOffset(..), IndexedTileState(..)
   , cTileReg, cTilePal, cTiles
-  , cClimates
+  , cClimates, cRivers
   , cBiomeReg, cBiomePal, cBiomes
   , cEntities, chunkSize, chunkHeight
   , assertValidOffset, assertValidEntity
@@ -72,6 +73,7 @@ new tReg tPal bReg bPal eCat tFill bFill
          , _cTilePal  = tPal
          , _cTiles    = GV.replicate (chunkSize⋅chunkSize⋅chunkHeight) its
          , _cClimates = GV.replicate (chunkSize⋅chunkSize) def
+         , _cRivers   = GV.replicate (chunkSize⋅chunkSize) 0
          , _cBiomeReg = bReg
          , _cBiomePal = bPal
          , _cBiomes   = GV.replicate (chunkSize⋅chunkSize) bIdx
@@ -116,6 +118,15 @@ climateAt off@(TileOffset { x, y, .. }) c
         y' = fromIntegral y ∷ Int
     in
       (c^.cClimates) GV.! (y'⋅chunkSize + x')
+
+-- | Get the river strength at a given @(x, y)@ offset in a chunk.
+riverAt ∷ TileOffset → Chunk → Float
+riverAt off@(TileOffset { x, y, .. }) c
+  = assertValidOffset off $
+    let x' = fromIntegral x ∷ Int
+        y' = fromIntegral y ∷ Int
+    in
+      (c^.cRivers) GV.! (y'⋅chunkSize + x')
 
 -- | Get the biome at a given @(x, y)@ offset in a chunk.
 biomeAt ∷ MonadThrow μ ⇒ TileOffset → Chunk → μ SomeBiome

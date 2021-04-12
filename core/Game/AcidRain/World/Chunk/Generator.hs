@@ -17,6 +17,7 @@ module Game.AcidRain.World.Chunk.Generator
     -- * Modifying state
   , putTileState
   , putClimate
+  , putRiver
   , putBiome
 
     -- * Running chunk generators
@@ -37,7 +38,7 @@ import qualified Game.AcidRain.World.Biome.Registry as BR
 import qualified Game.AcidRain.World.Chunk as C
 import Game.AcidRain.World.Chunk.Types
   ( TileOffset, mcTileReg, freezeChunk, thawChunk
-  , writeTileState, writeClimate, writeBiome )
+  , writeTileState, writeClimate, writeRiver, writeBiome )
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
 import Game.AcidRain.World.Chunk.Types (Chunk, MutableChunk)
 import Game.AcidRain.World.Climate (Climate)
@@ -119,6 +120,13 @@ putClimate off cli
   = lift $ ChunkGenM $
     do mc ← (^.cgChunk) <$> get
        lift $ writeClimate off cli mc
+
+-- | Put a river strength value at a given @(x, y)@ tile offset.
+putRiver ∷ Lifted ChunkGenM r ⇒ TileOffset → Float → Eff r ()
+putRiver off cli
+  = lift $ ChunkGenM $
+    do mc ← (^.cgChunk) <$> get
+       lift $ writeRiver off cli mc
 
 -- | Put a biome type at a given @(x, y)@ tile offset.
 putBiome ∷ (Biome β, Lifted ChunkGenM r) ⇒ TileOffset → β → Eff r ()

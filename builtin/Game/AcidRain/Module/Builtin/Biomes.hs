@@ -104,7 +104,7 @@ biomeChooser tReg
          }
 
 chooseBiome ∷ Double → Double → Climate → BiomeChooser → SomeBiomeGen
-chooseBiome river height cli bc
+chooseBiome height river cli bc
   | height < 0  = bcOcean bc
   | river > 0.7 = bcRiver bc
   | otherwise   = chooseBiomeForClimate cli (bcClimateBased bc)

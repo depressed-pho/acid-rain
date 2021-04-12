@@ -24,7 +24,7 @@ import Data.Unique (Unique, newUnique)
 import Game.AcidRain.TUI.Window (Window(..), WindowType(..))
 import Game.AcidRain.World (World(..), SomeWorld, WorldNotRunningException)
 import Game.AcidRain.World.Biome (Biome(..))
-import Game.AcidRain.World.Chunk (tileStateAt, biomeAt, climateAt)
+import Game.AcidRain.World.Chunk (tileStateAt, biomeAt, climateAt, riverAt)
 import Game.AcidRain.World.Climate (Climate(..))
 import Game.AcidRain.World.Player (PlayerID, plPos)
 import Game.AcidRain.World.Position (WorldPos, wpX, wpY, wpZ)
@@ -71,6 +71,7 @@ redrawDebugInfo di
          Just c →
            do let off = convert (pl^.plPos)
                   cli = climateAt off c
+                  riv = riverAt   off c
               ts  ← tileStateAt off c
               bio ← biomeAt     off c
               let ws = rows
@@ -83,6 +84,7 @@ redrawDebugInfo di
                          [ renderTemp  cli
                          , renderHumid cli
                          , renderAlt   cli
+                         , renderRiv   riv
                          ]
                        ]
               return $ di & diWidgets .~ ws
@@ -141,6 +143,11 @@ renderAlt ∷ Climate → Widget n
 renderAlt cli
   = fromBuilder $
     "alt=" ⊕ formatRealFloat Fixed (Just 2) (cliAltitude cli)
+
+renderRiv ∷ Float → Widget n
+renderRiv river
+  = fromBuilder $
+    "riv=" ⊕ formatRealFloat Fixed (Just 2) river
 
 debugInfo ∷ (World w, MonadIO μ) ⇒ w → PlayerID → μ DebugInfo
 debugInfo w pid

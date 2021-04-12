@@ -33,6 +33,8 @@ data PointAttrs
       -- then further affected by a river strength which is computed
       -- using a jittered Voronoi noise.
       paHeight ∷ !Double
+      -- | River strength in @[-1, 0]@.
+    , paRiver ∷ !Double
       -- | The climate at this point. The altitude is calculated based
       -- on the height. Temperature and humidity are generated with a
       -- simplex noise but they of course are affected by the
@@ -51,8 +53,9 @@ pointAttrs bc pos
        c ← climate h pos
        return PointAttrs
          { paHeight  = h
+         , paRiver   = r
          , paClimate = c
-         , paBiome   = chooseBiome r h c bc
+         , paBiome   = chooseBiome h r c bc
          }
 
 -- | Compute the final height for a given (x, y) coordinates. For the
