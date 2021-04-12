@@ -46,4 +46,4 @@ terraform
               putRiver off0 (realToFrac $ paRiver attrs)
               putBiome off0 (B.withBiomeGenProxy (paBiome attrs) B.biomeType)
               B.withBiomeGen (paBiome attrs) $
-                \b → B.terraform b (paHeight attrs) wPos0
+                \b → B.terraform b (paHeight attrs) (paRiver attrs) wPos0

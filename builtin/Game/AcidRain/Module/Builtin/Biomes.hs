@@ -64,6 +64,7 @@ class (Biome (Proxy β), Typeable β) ⇒ BiomeChunkGen β where
   terraform ∷ (Member (Reader WorldInfo) r, Lifted ChunkGenM r)
             ⇒ β
             → Double -- ^ Height in @[-1, 1]@
+            → Double -- ^ River strength in @[-1, 1]@
             → WorldPos
             → Eff r ()
 
@@ -105,9 +106,9 @@ biomeChooser tReg
 
 chooseBiome ∷ Double → Double → Climate → BiomeChooser → SomeBiomeGen
 chooseBiome height river cli bc
-  | height < 0  = bcOcean bc
-  | river > 0.7 = bcRiver bc
-  | otherwise   = chooseBiomeForClimate cli (bcClimateBased bc)
+  | height < 0   = bcOcean bc
+  | river < -0.7 = bcRiver bc
+  | otherwise    = chooseBiomeForClimate cli (bcClimateBased bc)
 
 -- | Get a remapped height in @[-1, 0]@. The sea level becomes @-1@
 -- after remapping, and nearly every height is also remapped to
@@ -141,7 +142,7 @@ instance BiomeChunkGen Ocean where
          seawater ← defaultState <$> TR.get "acid-rain:seawater" tReg
          return Ocean { sand, seawater }
   climate _ = error "This biome is not climate-based"
-  terraform (Ocean { sand, seawater }) height wPos0
+  terraform (Ocean { sand, seawater }) height _ wPos0
     = do let rHeight = remappedHeight height
          for_ [lowestZ .. lowestZ+chunkHeight-1] $ \z →
            do let wPos = wPos0 & wpZ .~ z
@@ -165,7 +166,7 @@ instance BiomeChunkGen Plains where
               , cliHumidity    = 0.5
               , cliAltitude    = 400
               }
-  terraform (Plains { dirt, water }) height wPos0
+  terraform (Plains { dirt, water }) height _ wPos0
     = do let rHeight = remappedHeight height
          for_ [lowestZ .. lowestZ+chunkHeight-1] $ \z →
            do let wPos = wPos0 & wpZ .~ z
@@ -185,13 +186,14 @@ instance BiomeChunkGen River where
          water  ← defaultState <$> TR.get "acid-rain:water"  tReg
          return River { gravel, water }
   climate _ = error "This biome is not climate-based"
-  terraform (River { gravel, water }) height wPos0
+  terraform (River { gravel, water }) height river wPos0
     = do let rHeight = remappedHeight height
          for_ [lowestZ .. lowestZ+chunkHeight-1] $ \z →
            do let wPos = wPos0 & wpZ .~ z
                   off  = convert wPos
               case z of
                 _ | z < 0 ∧ rHeight < lowestZ → putTileState off water
+                  | z < 0 ∧ river < -0.8      → putTileState off water
                   | z ≤ rHeight               → putTileState off gravel
                   | otherwise                 → return ()
 -------------------------------------------------------------------------------

@@ -322,6 +322,7 @@ evalPoint !mv !points (!x, !y) = GV.mapM_ update points
       = do let !xDist = x - pX
                !yDist = y - pY
            shortest ← readSTRef $ mv2dShortestDistanceSq mv
+           next     ← readSTRef $ mv2dNextDistanceSq     mv
            case xDist ⋅ xDist + yDist ⋅ yDist of
              distSq
                | distSq < shortest →
@@ -329,8 +330,10 @@ evalPoint !mv !points (!x, !y) = GV.mapM_ update points
                       writeSTRef (mv2dShortestDistanceSq mv) distSq
                       writeSTRef (mv2dClosestX           mv) pX
                       writeSTRef (mv2dClosestY           mv) pY
-               | otherwise →
+               | distSq < next →
                    writeSTRef (mv2dNextDistanceSq mv) distSq
+               | otherwise →
+                   return ()
 
 -- | Return 0 in the middle of a cell and 1 on the border.
 borderValue ∷ Fractional r ⇒ Voronoi2D r → r

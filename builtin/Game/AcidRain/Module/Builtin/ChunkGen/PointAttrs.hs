@@ -154,7 +154,6 @@ riverStrength pos
        voronoi ← (\v → voronoi2D v pX pY) <$> voronoiInstance 0
        let riverFactor0 = interiorValue voronoi
            riverFactor  = bayesianAdjustment riverFactor0 0.5
-
        if riverFactor > wiRiverValleyLevel wi
          then return 0 -- No river effect
          else return $ riverFactor / wiRiverValleyLevel wi - 1
