@@ -1,0 +1,10 @@
+# -*- org -*-
+
+* DONE [#A] Make "river" in Chunk debug-only
+* TODO [#C] Proper run commands
+* TODO [#B] Templetize registries with CPP
+* TODO [#A] Use TH for unboxed vectors
+* TODO [#B] Try injective type families for things like EntityType
+* TODO [#A] Consider using polydata instead of hand-rolling Some*
+* TODO [#B] Consider using HLint
+* TODO [#C] Consider using hoogle

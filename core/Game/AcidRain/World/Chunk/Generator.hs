@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -17,7 +18,9 @@ module Game.AcidRain.World.Chunk.Generator
     -- * Modifying state
   , putTileState
   , putClimate
+#if defined(DEBUG)
   , putRiver
+#endif
   , putBiome
 
     -- * Running chunk generators
@@ -38,7 +41,11 @@ import qualified Game.AcidRain.World.Biome.Registry as BR
 import qualified Game.AcidRain.World.Chunk as C
 import Game.AcidRain.World.Chunk.Types
   ( TileOffset, mcTileReg, freezeChunk, thawChunk
-  , writeTileState, writeClimate, writeRiver, writeBiome )
+  , writeTileState, writeClimate
+#if defined(DEBUG)
+  , writeRiver
+#endif
+  , writeBiome )
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
 import Game.AcidRain.World.Chunk.Types (Chunk, MutableChunk)
 import Game.AcidRain.World.Climate (Climate)
@@ -121,12 +128,14 @@ putClimate off cli
     do mc ← (^.cgChunk) <$> get
        lift $ writeClimate off cli mc
 
+#if defined(DEBUG)
 -- | Put a river strength value at a given @(x, y)@ tile offset.
 putRiver ∷ Lifted ChunkGenM r ⇒ TileOffset → Float → Eff r ()
 putRiver off cli
   = lift $ ChunkGenM $
     do mc ← (^.cgChunk) <$> get
        lift $ writeRiver off cli mc
+#endif
 
 -- | Put a biome type at a given @(x, y)@ tile offset.
 putBiome ∷ (Biome β, Lifted ChunkGenM r) ⇒ TileOffset → β → Eff r ()

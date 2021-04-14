@@ -2,13 +2,14 @@ CABAL_BUILD_OPTS?= \
 	-j \
 	--enable-executable-dynamic \
 	--ghc-option=-fno-ignore-asserts \
-	--ghc-option=-dth-dec-file
+	--ghc-option=-dth-dec-file \
+	--flags="debug"
 
 # Because the compilation mode of Emacs get confused by escape
 # sequences.
 BUILD_TERM=dumb
 
-# Because the system terminfo currently doesn't recognize
+# Because the system terminfo in NetBSD 8.1 doesn't recognize
 # screen.xterm-256color and falls back to 8 colors mode.
 RUN_TERM=xterm-256color
 

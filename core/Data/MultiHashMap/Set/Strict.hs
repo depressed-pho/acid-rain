@@ -96,7 +96,8 @@ import Prelude.Unicode ((∘))
 
 -- | @'MultiHashMap' k@ isn't a 'Functor' because its 'fmap' would
 -- require @b@ to be 'Eq' and 'Hashable'. It's not a 'Traversable' for
--- the same reason.
+-- the same reason. The problem stems from the lack of
+-- <https://richarde.dev/papers/2020/partialdata/partialdata.pdf partial type constructors>.
 newtype MultiHashMap k v
   = MultiHashMap (HashMap k (HashSet v))
   deriving (Eq, Ord, Show, NFData, Hashable)

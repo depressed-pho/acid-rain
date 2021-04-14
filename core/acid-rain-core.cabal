@@ -16,6 +16,11 @@ source-repository head
   type:     git
   location: https://github.com/depressed-pho/acid-rain.git
 
+Flag debug
+  Description: Enable debugging features that affect run-time cost.
+  Default: False
+  Manual: True
+
 library
   exposed-modules:
     Control.Concurrent.Cache.LRU
@@ -82,6 +87,9 @@ library
     uuid                 ^>= 1.3.14,
     vector               ^>= 0.12.0.3,
     vty                  ^>= 5.33
+
+  if flag(debug)
+    GHC-Options: -DDEBUG
 
   default-language:    Haskell2010
   ghc-options:

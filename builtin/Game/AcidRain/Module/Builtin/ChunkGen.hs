@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE MonoLocalBinds #-}
@@ -16,7 +17,11 @@ import Game.AcidRain.Module.Builtin.ChunkGen.PointAttrs
 import Game.AcidRain.Module.Builtin.ChunkGen.WorldInfo (WorldInfo(..))
 import Game.AcidRain.World.Chunk (chunkSize)
 import Game.AcidRain.World.Chunk.Generator
-  ( ChunkGenM, chunkPos, tileRegistry, putClimate, putRiver, putBiome )
+  ( ChunkGenM, chunkPos, tileRegistry, putClimate
+#if defined(DEBUG)
+  , putRiver
+#endif
+  , putBiome )
 import Game.AcidRain.World.Chunk.Position (toWorldPos)
 import Game.AcidRain.World.Position (wpX, wpY)
 import Lens.Micro ((&), (+~))
@@ -43,7 +48,9 @@ terraform
 
               attrs ← pointAttrs bc wPos0
               putClimate off0 (paClimate attrs)
+#if defined(DEBUG)
               putRiver off0 (realToFrac $ paRiver attrs)
+#endif
               putBiome off0 (B.withBiomeGenProxy (paBiome attrs) B.biomeType)
               B.withBiomeGen (paBiome attrs) $
                 \b → B.terraform b (paHeight attrs) (paRiver attrs) wPos0
