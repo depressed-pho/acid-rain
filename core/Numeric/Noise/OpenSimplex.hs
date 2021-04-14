@@ -35,6 +35,7 @@ import qualified Data.Vector as BV
 import qualified Data.Vector.Generic as GV
 import qualified Data.Vector.Generic.Mutable as GMV
 import qualified Data.Vector.Unboxed as UV
+import Data.Vector.Unboxed.Deriving (derivingUnbox)
 import Lens.Micro ((&), (^.), (+~))
 import Lens.Micro.TH (makeLenses)
 import Prelude.Unicode ((⋅), (≡), (≤))
@@ -137,29 +138,11 @@ latticePoint2D xsv ysv
       xsv' = fromIntegral xsv
       ysv' = fromIntegral ysv
 
-newtype instance UV.MVector σ (LatticePoint2D i r) = MV_LP2D (UV.MVector σ (i, i, r, r))
-newtype instance UV.Vector    (LatticePoint2D i r) = V_LP2D  (UV.Vector    (i, i, r, r))
-
-instance (UV.Unbox i, UV.Unbox r) ⇒ GMV.MVector UV.MVector (LatticePoint2D i r) where
-  basicLength (MV_LP2D v) = GMV.basicLength v
-  basicUnsafeSlice s l (MV_LP2D v) = MV_LP2D $ GMV.basicUnsafeSlice s l v
-  basicOverlaps (MV_LP2D v) (MV_LP2D v') = GMV.basicOverlaps v v'
-  basicUnsafeNew l = MV_LP2D <$> GMV.basicUnsafeNew l
-  basicInitialize (MV_LP2D v) = GMV.basicInitialize v
-  basicUnsafeRead (MV_LP2D v) i
-    = do (xsv, ysv, δx, δy) ← GMV.basicUnsafeRead v i
-         return $ LatticePoint2D xsv ysv δx δy
-  basicUnsafeWrite (MV_LP2D v) i lp
-    = GMV.basicUnsafeWrite v i (lp^.lxsv, lp^.lysv, lp^.lδx, lp^.lδy)
-
-instance (UV.Unbox i, UV.Unbox r) ⇒ GV.Vector UV.Vector (LatticePoint2D i r) where
-  basicUnsafeFreeze (MV_LP2D v) = V_LP2D <$> GV.basicUnsafeFreeze v
-  basicUnsafeThaw (V_LP2D v) = MV_LP2D <$> GV.basicUnsafeThaw v
-  basicLength (V_LP2D v) = GV.basicLength v
-  basicUnsafeSlice s l (V_LP2D v) = V_LP2D $ GV.basicUnsafeSlice s l v
-  basicUnsafeIndexM (V_LP2D v) i
-    = do (xsv, ysv, δx, δy) ← GV.basicUnsafeIndexM v i
-         return $ LatticePoint2D xsv ysv δx δy
+-- Derive unboxed vectors for LatticePoint2D.
+derivingUnbox "LP2D"
+  [t| ∀i r. (UV.Unbox i, UV.Unbox r) ⇒ LatticePoint2D i r → (i, i, r, r) |]
+  [e| \lp                 → (lp^.lxsv, lp^.lysv, lp^.lδx, lp^.lδy) |]
+  [e| \(xsv, ysv, δx, δy) → LatticePoint2D xsv ysv δx δy           |]
 
 data Contribution3D i r
   = Contribution3D

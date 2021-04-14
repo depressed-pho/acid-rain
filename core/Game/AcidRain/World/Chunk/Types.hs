@@ -50,6 +50,7 @@ import Data.Hashable (Hashable)
 import qualified Data.Vector.Generic as GV
 import qualified Data.Vector.Generic.Mutable as GMV
 import qualified Data.Vector.Unboxed as UV
+import Data.Vector.Unboxed.Deriving (derivingUnbox)
 import Data.Word (Word8)
 import GHC.Generics (Generic)
 import Game.AcidRain.World.Biome (Biome(..))
@@ -104,30 +105,11 @@ data IndexedTileState
     , itsValue ∷ {-# UNPACK #-} !TileStateValue
     } deriving (Show, Eq)
 
--- | The tile state vector.
-newtype instance UV.MVector σ IndexedTileState = MV_ITS (UV.MVector σ (TileIndex, TileStateValue))
-newtype instance UV.Vector    IndexedTileState = V_ITS  (UV.Vector    (TileIndex, TileStateValue))
-
-instance GMV.MVector UV.MVector IndexedTileState where
-  basicLength (MV_ITS v) = GMV.basicLength v
-  basicUnsafeSlice s l (MV_ITS v) = MV_ITS $ GMV.basicUnsafeSlice s l v
-  basicOverlaps (MV_ITS v) (MV_ITS v') = GMV.basicOverlaps v v'
-  basicUnsafeNew l = MV_ITS <$> GMV.basicUnsafeNew l
-  basicInitialize (MV_ITS v) = GMV.basicInitialize v
-  basicUnsafeRead (MV_ITS v) i
-    = do (idx, val) ← GMV.basicUnsafeRead v i
-         return $ IndexedTileState idx val
-  basicUnsafeWrite (MV_ITS v) i its
-    = GMV.basicUnsafeWrite v i (itsIndex its, itsValue its)
-
-instance GV.Vector UV.Vector IndexedTileState where
-  basicUnsafeFreeze (MV_ITS v) = V_ITS <$> GV.basicUnsafeFreeze v
-  basicUnsafeThaw (V_ITS v) = MV_ITS <$> GV.basicUnsafeThaw v
-  basicLength (V_ITS v) = GV.basicLength v
-  basicUnsafeSlice s l (V_ITS v) = V_ITS $ GV.basicUnsafeSlice s l v
-  basicUnsafeIndexM (V_ITS v) i
-    = do (idx, val) ← GV.basicUnsafeIndexM v i
-         return $ IndexedTileState idx val
+-- Derive unboxed vectors for IndexedTileState.
+derivingUnbox "ITS"
+  [t| IndexedTileState → (TileIndex, TileStateValue) |]
+  [e| \its        → (itsIndex its, itsValue its) |]
+  [e| \(idx, val) → IndexedTileState idx val     |]
 
 data Chunk
   = Chunk
