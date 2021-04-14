@@ -45,7 +45,10 @@ import Prelude.Unicode ((⋅), (≡), (≤))
 -- 'mkSimplexGen' and is immutable.
 data SimplexGen
   = SimplexGen
-    { _sgPerm       ∷ !(UV.Vector Int)
+    { -- The length of these vectors are all statically known (1024),
+      -- but we don't use the sized vector mainly because 'Finite' is
+      -- not unboxable. We value efficiency more than safety here.
+      _sgPerm       ∷ !(UV.Vector Int)
     , _sgPerm2D     ∷ !(UV.Vector Int)
     , _sgPerm2DSph2 ∷ !(UV.Vector Int)
     , _sgPerm3D     ∷ !(UV.Vector Int)
@@ -56,13 +59,12 @@ makeLenses ''SimplexGen
 -- | Class of types that can be a result value of 'simplex2D'.
 class (Default α, Floating (BaseType α), RealFrac (BaseType α), UV.Unbox (BaseType α)) ⇒ Simplex2D α where
   type BaseType α ∷ Type
-  accumulate ∷ Integral i
-             ⇒ α
+  accumulate ∷ α
              → BaseType α -- ^ attn
              → BaseType α -- ^ extrp
              → BaseType α -- ^ gx
              → BaseType α -- ^ gy
-             → i          -- ^ gi_sph2
+             → Int        -- ^ gi_sph2
              → BaseType α -- ^ δx
              → BaseType α -- ^ δy
              → α
@@ -116,17 +118,19 @@ squish3D ∷ Floating r ⇒ r
 {-# SPECIALISE squish3D ∷ Double #-}
 squish3D = (sqrt (3 + 1) - 1) / 3
 
-data LatticePoint2D i r
+data LatticePoint2D r
   = LatticePoint2D
-    { _lxsv ∷ !i
-    , _lysv ∷ !i
+    { _lxsv ∷ !Int
+    , _lysv ∷ !Int
     , _lδx  ∷ !r
     , _lδy  ∷ !r
     }
 
 makeLenses ''LatticePoint2D
 
-latticePoint2D ∷ (Integral i, Floating r) ⇒ i → i → LatticePoint2D i r
+latticePoint2D ∷ Floating r ⇒ Int → Int → LatticePoint2D r
+{-# SPECIALISE latticePoint2D ∷ Int → Int → LatticePoint2D Float  #-}
+{-# SPECIALISE latticePoint2D ∷ Int → Int → LatticePoint2D Double #-}
 latticePoint2D xsv ysv
   = LatticePoint2D
     { _lxsv = xsv
@@ -140,40 +144,40 @@ latticePoint2D xsv ysv
 
 -- Derive unboxed vectors for LatticePoint2D.
 derivingUnbox "LP2D"
-  [t| ∀i r. (UV.Unbox i, UV.Unbox r) ⇒ LatticePoint2D i r → (i, i, r, r) |]
+  [t| ∀r. UV.Unbox r ⇒ LatticePoint2D r → (Int, Int, r, r) |]
   [e| \lp                 → (lp^.lxsv, lp^.lysv, lp^.lδx, lp^.lδy) |]
   [e| \(xsv, ysv, δx, δy) → LatticePoint2D xsv ysv δx δy           |]
 
-data Contribution3D i r
+data Contribution3D r
   = Contribution3D
-    { _cxsb  ∷ !i
-    , _cysb  ∷ !i
-    , _czsb  ∷ !i
+    { _cxsb  ∷ !Int
+    , _cysb  ∷ !Int
+    , _czsb  ∷ !Int
     , _cδx   ∷ !r
     , _cδy   ∷ !r
     , _cδz   ∷ !r
-    , _cnext ∷ !(Maybe (Contribution3D i r))
+    , _cnext ∷ !(Maybe (Contribution3D r))
     }
 
 makeLenses ''Contribution3D
 
 -- Mutable version of Contribution3D.
-data MContribution3D σ i r
+data MContribution3D σ r
   = MContribution3D
-    { _c'xsb  ∷ !i
-    , _c'ysb  ∷ !i
-    , _c'zsb  ∷ !i
+    { _c'xsb  ∷ !Int
+    , _c'ysb  ∷ !Int
+    , _c'zsb  ∷ !Int
     , _c'δx   ∷ !r
     , _c'δy   ∷ !r
     , _c'δz   ∷ !r
-    , _c'next ∷ !(STRef σ (Maybe (MContribution3D σ i r)))
+    , _c'next ∷ !(STRef σ (Maybe (MContribution3D σ r)))
     }
 
 makeLenses ''MContribution3D
 
-contribution3D ∷ (Integral i, Floating r) ⇒ MContribution3D σ i r → ST σ (Contribution3D i r)
-{-# SPECIALISE contribution3D ∷ MContribution3D σ Int Float  → ST σ (Contribution3D Int Float ) #-}
-{-# SPECIALISE contribution3D ∷ MContribution3D σ Int Double → ST σ (Contribution3D Int Double) #-}
+contribution3D ∷ Floating r ⇒ MContribution3D σ r → ST σ (Contribution3D r)
+{-# SPECIALISE contribution3D ∷ MContribution3D σ Float  → ST σ (Contribution3D Float ) #-}
+{-# SPECIALISE contribution3D ∷ MContribution3D σ Double → ST σ (Contribution3D Double) #-}
 contribution3D c'
   = do next' ← readSTRef (c'^.c'next)
        next  ← traverse contribution3D next'
@@ -187,7 +191,9 @@ contribution3D c'
          , _cnext = next
          }
 
-contribution3D' ∷ (Integral i, Floating r) ⇒ r → i → i → i → ST σ (MContribution3D σ i r)
+contribution3D' ∷ Floating r ⇒ r → Int → Int → Int → ST σ (MContribution3D σ r)
+{-# SPECIALISE contribution3D' ∷ Float  → Int → Int → Int → ST σ (MContribution3D σ Float ) #-}
+{-# SPECIALISE contribution3D' ∷ Double → Int → Int → Int → ST σ (MContribution3D σ Double) #-}
 contribution3D' multiplier xsb ysb zsb
   = do next ← newSTRef Nothing
        return MContribution3D
@@ -316,8 +322,8 @@ instance (Floating r, RealFrac r, UV.Unbox r) ⇒ Simplex2D (Disk r) where
     = let attnSq = attn ⋅ attn
           extrp' = attnSq ⋅ attnSq ⋅ extrp
       in
-        v & diskX +~ extrp' ⋅ (gradientsSph2 GV.! fromIntegral  gi_sph2     )
-          & diskY +~ extrp' ⋅ (gradientsSph2 GV.! fromIntegral (gi_sph2 + 1))
+        v & diskX +~ extrp' ⋅ (gradientsSph2 GV.! gi_sph2     )
+          & diskY +~ extrp' ⋅ (gradientsSph2 GV.! (gi_sph2 + 1))
 
 instance Num r ⇒ Default (Derivative r) where
   def = Derivative 0 0
@@ -333,9 +339,9 @@ instance (Floating r, RealFrac r, UV.Unbox r) ⇒ Simplex2D (Derivative r) where
           & dy +~ (gy ⋅ attn - 8 ⋅ dy' ⋅ extrp) ⋅ attnSq ⋅ attn
 
 -- 2D lattice lookup table (KdotJPG)
-lookup2D ∷ (Integral i, Floating r, UV.Unbox i, UV.Unbox r) ⇒ UV.Vector (LatticePoint2D i r)
-{-# SPECIALISE NOINLINE lookup2D ∷ UV.Vector (LatticePoint2D Int Float ) #-}
-{-# SPECIALISE NOINLINE lookup2D ∷ UV.Vector (LatticePoint2D Int Double) #-}
+lookup2D ∷ (Floating r, UV.Unbox r) ⇒ UV.Vector (LatticePoint2D r)
+{-# SPECIALISE NOINLINE lookup2D ∷ UV.Vector (LatticePoint2D Float ) #-}
+{-# SPECIALISE NOINLINE lookup2D ∷ UV.Vector (LatticePoint2D Double) #-}
 lookup2D = runST $
            do mv ← GMV.unsafeNew (8 * 4)
               for_ [0 .. 7] $ \i →
@@ -365,22 +371,20 @@ lookup2D = runST $
               GV.unsafeFreeze mv
 
 -- 3D contribution lookup table (DigitalShadow)
-lookup3D ∷ ∀i r. ( Integral i
-                 , Floating r
-                 , GV.Vector UV.Vector i
-                 , GMV.MVector BV.MVector (Contribution3D i r)
-                 )
-         ⇒ BV.Vector (Contribution3D i r)
-{-# SPECIALISE NOINLINE lookup3D ∷ BV.Vector (Contribution3D Int Float ) #-}
-{-# SPECIALISE NOINLINE lookup3D ∷ BV.Vector (Contribution3D Int Double) #-}
+lookup3D ∷ ∀r. ( Floating r
+               , GMV.MVector BV.MVector (Contribution3D r)
+               )
+         ⇒ BV.Vector (Contribution3D r)
+{-# SPECIALISE NOINLINE lookup3D ∷ BV.Vector (Contribution3D Float ) #-}
+{-# SPECIALISE NOINLINE lookup3D ∷ BV.Vector (Contribution3D Double) #-}
 lookup3D = runST $
            do mv ← GMV.unsafeNew 2048
               for_ [0, 2 .. (GV.length lookupPairs3D) - 1] $ \i →
-                GMV.write mv (fromIntegral (lookupPairs3D GV.! i))
-                             (contributions3D GV.! fromIntegral (lookupPairs3D GV.! (i + 1)))
+                GMV.write mv (lookupPairs3D GV.! i)
+                             (contributions3D GV.! (lookupPairs3D GV.! (i + 1)))
               GV.unsafeFreeze mv
   where
-    base3D ∷ BV.Vector (UV.Vector i)
+    base3D ∷ BV.Vector (UV.Vector Int)
     {-# NOINLINE base3D #-}
     base3D =
       GV.fromList
@@ -389,7 +393,7 @@ lookup3D = runST $
       , GV.fromList [1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 2, 1, 1, 0, 2, 1, 0, 1, 2, 0, 1, 1]
       ]
 
-    p3D ∷ UV.Vector i
+    p3D ∷ UV.Vector Int
     {-# NOINLINE p3D #-}
     p3D =
       GV.fromList
@@ -412,7 +416,7 @@ lookup3D = runST $
       ,  1,  1,  2,  0,  2,  0,  2,  1,  1,  1, -1,  2
       ,  2,  0,  0,  2,  1,  1,  1, -1,  2,  0,  2,  0 ]
 
-    lookupPairs3D ∷ UV.Vector i
+    lookupPairs3D ∷ UV.Vector Int
     {-# NOINLINE lookupPairs3D #-}
     lookupPairs3D
       = GV.fromList
@@ -435,14 +439,14 @@ lookup3D = runST $
         , 2005,  6, 2007,  6, 2032,  8, 2033,  8
         , 2034,  7, 2037,  6, 2038,  7, 2039,  6 ]
 
-    contributions3D ∷ BV.Vector (Contribution3D i r)
+    contributions3D ∷ BV.Vector (Contribution3D r)
     {-# NOINLINE contributions3D #-}
     contributions3D
       = runST $
         do mv ← GMV.unsafeNew (GV.length p3D `div` 9)
-                ∷ ST σ (BV.MVector σ (MContribution3D σ i r))
+                ∷ ST σ (BV.MVector σ (MContribution3D σ r))
            for_ [0, 9 .. (GV.length p3D) - 1] $ \i →
-             do let baseSet = base3D GV.! fromIntegral (p3D GV.! i)
+             do let baseSet = base3D GV.! (p3D GV.! i)
                 previous ← newSTRef Nothing
                 current  ← newSTRef Nothing
                 for_ [0, 4 .. (GV.length baseSet) - 1] $ \j →
@@ -517,7 +521,7 @@ mkSimplexGen seed
          , _sgPerm3D     = perm3D'
          }
 
-floorAndAbsFrac ∷ (Integral i, RealFrac r) ⇒ r → (i, r)
+floorAndAbsFrac ∷ RealFrac r ⇒ r → (Int, r)
 {-# SPECIALISE floorAndAbsFrac ∷ Float  → (Int, Float ) #-}
 {-# SPECIALISE floorAndAbsFrac ∷ Double → (Int, Double) #-}
 floorAndAbsFrac r

@@ -71,6 +71,8 @@ data MVoronoi2D σ r
     }
 
 newMutableV2D ∷ Fractional r ⇒ ST σ (MVoronoi2D σ r)
+{-# SPECIALISE newMutableV2D ∷ ST σ (MVoronoi2D σ Float ) #-}
+{-# SPECIALISE newMutableV2D ∷ ST σ (MVoronoi2D σ Double) #-}
 newMutableV2D
   = do shortest ← newSTRef (1/0) -- Infinity
        next     ← newSTRef (1/0)
