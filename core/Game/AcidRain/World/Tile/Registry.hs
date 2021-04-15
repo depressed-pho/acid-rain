@@ -28,13 +28,14 @@ import qualified Data.HashMap.Strict as HM
 import Data.MonoTraversable
   ( Element, MonoFunctor, MonoFoldable, MonoTraversable, GrowingAppend
   , otraverse )
-import Game.AcidRain.World.Tile (Tile(..), TileID, SomeTile(..))
+import Data.Poly.Strict (Poly)
+import Game.AcidRain.World.Tile (Tile(..), TileID)
 import Prelude hiding (lookup)
 
 -- | The tile registry is a data structure that contains immutable
 -- 'Tile' objects. It is constructed while loading a world, and
 -- becomes immutable afterwards.
-newtype TileRegistry = TileRegistry (HashMap TileID SomeTile)
+newtype TileRegistry = TileRegistry (HashMap TileID (Poly Tile))
   deriving ( Show, MonoFunctor, MonoFoldable, GrowingAppend, Semigroup
            , Monoid )
 
@@ -44,7 +45,7 @@ instance MonoTraversable TileRegistry where
   otraverse f (TileRegistry reg)
     = TileRegistry <$> traverse f reg
 
-type instance Element TileRegistry = SomeTile
+type instance Element TileRegistry = Poly Tile
 
 -- | Create an empty registry.
 empty ∷ TileRegistry
@@ -62,12 +63,12 @@ register tile (TileRegistry reg)
 
 -- | Lookup a tile by its ID. Return 'Nothing' if no tiles matching
 -- with the given ID has been registered.
-lookup ∷ TileID → TileRegistry → Maybe SomeTile
+lookup ∷ TileID → TileRegistry → Maybe (Poly Tile)
 lookup tid (TileRegistry reg)
   = HM.lookup tid reg
 
 -- | Get a tile by its ID. Throws if it doesn't exist.
-get ∷ MonadThrow μ ⇒ TileID → TileRegistry → μ SomeTile
+get ∷ MonadThrow μ ⇒ TileID → TileRegistry → μ (Poly Tile)
 get tid reg
   = case lookup tid reg of
       Just tile → return tile

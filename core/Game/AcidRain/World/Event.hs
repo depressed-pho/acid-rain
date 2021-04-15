@@ -9,7 +9,6 @@
 module Game.AcidRain.World.Event
   ( -- * The event class
     Event(..)
-  , SomeEvent(..)
 
     -- * Dispatching events
   , EventDispatcher
@@ -20,6 +19,7 @@ module Game.AcidRain.World.Event
   ) where
 
 import Data.Kind (Constraint, Type)
+import Data.Poly.Strict (Poly(..))
 import Data.Typeable (Typeable)
 import Data.TypeRepMap (TypeRepMap)
 import qualified Data.TypeRepMap as TRM
@@ -29,16 +29,13 @@ import Lens.Micro.TH (makeLenses)
 
 class (Show e, Typeable e) ⇒ Event e where
   -- | Erase the type of the event.
-  upcastEvent ∷ e → SomeEvent
-  upcastEvent = SomeEvent
+  upcastEvent ∷ e → Poly Event
+  upcastEvent = Poly
 
--- | A type-erased 'Event'.
-data SomeEvent = ∀e. Event e ⇒ SomeEvent !e
+instance Show (Poly Event) where
+  showsPrec d (Poly e) = showsPrec d e
 
-instance Show SomeEvent where
-  showsPrec d (SomeEvent e) = showsPrec d e
-
-instance Event SomeEvent where
+instance Event (Poly Event) where
   upcastEvent = id
 
 -- | @'EventHandler' e c f@ is a type alias to @('Event' e, c) ⇒ e →
@@ -119,8 +116,8 @@ addHandler h ed
 -- | @'dispatch' ed e@ invokes an event handler registered for the
 -- event type of @e@ if there is one. Otherwise it invokes the
 -- fallback handler.
-dispatch ∷ (c ∷ Constraint, Applicative f) ⇒ EventDispatcher c f → SomeEvent → f ()
-dispatch ed (SomeEvent e)
+dispatch ∷ (c ∷ Constraint, Applicative f) ⇒ EventDispatcher c f → Poly Event → f ()
+dispatch ed (Poly e)
   = case TRM.lookup (ed^.handlers) of
       Just (EH h) → h e
       Nothing     → (ed^.fallback) e

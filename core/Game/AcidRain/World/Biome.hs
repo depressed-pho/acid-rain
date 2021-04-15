@@ -1,11 +1,11 @@
-{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Biome
   ( Biome(..)
   , BiomeID
-  , SomeBiome(..)
   ) where
 
+import Data.Poly.Strict (Poly(..))
 import Data.Text (Text)
 import Data.Typeable (Typeable, cast)
 
@@ -27,21 +27,18 @@ type BiomeID = Text
 -- @
 class (Show β, Typeable β) ⇒ Biome β where
   -- | Erase the type of the biome.
-  upcastBiome ∷ β → SomeBiome
-  upcastBiome = SomeBiome
+  upcastBiome ∷ β → Poly Biome
+  upcastBiome = Poly
   -- | Recover the type of the biome.
-  downcastBiome ∷ SomeBiome → Maybe β
-  downcastBiome (SomeBiome b) = cast b
+  downcastBiome ∷ Poly Biome → Maybe β
+  downcastBiome (Poly b) = cast b
   -- | Get the biome ID such as @acid-rain:ocean@.
   biomeID ∷ β → BiomeID
 
--- | A type-erased 'Biome'.
-data SomeBiome = ∀β. Biome β ⇒ SomeBiome !β
+instance Show (Poly Biome) where
+  showsPrec d (Poly b) = showsPrec d b
 
-instance Show SomeBiome where
-  showsPrec d (SomeBiome b) = showsPrec d b
-
-instance Biome SomeBiome where
+instance Biome (Poly Biome) where
   upcastBiome = id
   downcastBiome = Just
-  biomeID (SomeBiome b) = biomeID b
+  biomeID (Poly b) = biomeID b

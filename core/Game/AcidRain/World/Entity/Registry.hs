@@ -28,13 +28,14 @@ import qualified Data.HashMap.Strict as HM
 import Data.MonoTraversable
   ( Element, MonoFunctor, MonoFoldable, MonoTraversable, GrowingAppend
   , otraverse )
-import Game.AcidRain.World.Entity (EntityType(..), EntityTypeID, SomeEntityType(..))
+import Data.Poly.Strict (Poly)
+import Game.AcidRain.World.Entity (EntityType(..), EntityTypeID)
 import Prelude hiding (lookup)
 
 -- | The entity registry is a data structure that contains types in
 -- the class 'EntityType'. It is constructed while loading a world,
 -- and becomes immutable afterwards.
-newtype EntityRegistry = EntityRegistry (HashMap EntityTypeID SomeEntityType)
+newtype EntityRegistry = EntityRegistry (HashMap EntityTypeID (Poly EntityType))
   deriving ( Show, MonoFunctor, MonoFoldable, GrowingAppend, Semigroup
            , Monoid )
 
@@ -44,7 +45,7 @@ instance MonoTraversable EntityRegistry where
   otraverse f (EntityRegistry reg)
     = EntityRegistry <$> traverse f reg
 
-type instance Element EntityRegistry = SomeEntityType
+type instance Element EntityRegistry = Poly EntityType
 
 -- | Create an empty registry
 empty ∷ EntityRegistry
@@ -61,12 +62,12 @@ register et (EntityRegistry reg)
         False → return $ EntityRegistry $ HM.insert etid (upcastEntityType et) reg
 
 -- | Lookup an entity type by its ID.
-lookup ∷ EntityTypeID → EntityRegistry → Maybe SomeEntityType
+lookup ∷ EntityTypeID → EntityRegistry → Maybe (Poly EntityType)
 lookup etid (EntityRegistry reg)
   = HM.lookup etid reg
 
 -- | Get an entity type by its ID. Throws if it doesn't exist.
-get ∷ MonadThrow μ ⇒ EntityTypeID → EntityRegistry → μ SomeEntityType
+get ∷ MonadThrow μ ⇒ EntityTypeID → EntityRegistry → μ (Poly EntityType)
 get etid reg
   = case lookup etid reg of
       Just et → return et

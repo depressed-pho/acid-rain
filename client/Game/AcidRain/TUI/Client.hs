@@ -33,17 +33,18 @@ import Data.HashSet (HashSet)
 import Data.Maybe (fromJust)
 import Data.MultiHashMap.Set.Strict (MultiHashMap)
 import qualified Data.MultiHashMap.Set.Strict as MHM
+import Data.Poly.Strict (Poly)
 import Data.Sequence (Seq((:<|)))
 import qualified Data.Sequence as S
 import Data.Sequence.Unicode ((⊲), (⊳), (⋈))
 import Data.Unique (Unique, newUnique)
 import Game.AcidRain.World
-  ( Command(..), CommandType(..), CommandID, SomeCommand
+  ( Command(..), CommandType(..), CommandID
   , CommandSetUpdated(..)
   , IClientCtx(..), ClientCtx )
 import Game.AcidRain.World.Player (PlayerID, PlayerMoved(..))
 import Game.AcidRain.World.Position (wpX, wpY)
-import Game.AcidRain.TUI.AppEvent (AppEvent(..), SomeAppEvent)
+import Game.AcidRain.TUI.AppEvent (AppEvent(..))
 import Game.AcidRain.TUI.Keystroke (Keystroke, keystroke)
 import Game.AcidRain.TUI.Widgets.WorldView
   ( WorldView, wvWorld, wvPlayer, worldView
@@ -64,21 +65,21 @@ import Prelude.Unicode ((∘), (≡), (≢))
 -- events and updates Brick widgets accordingly.
 data Client
   = Client
-    { _cliEvChan       ∷ !(BChan SomeAppEvent)
+    { _cliEvChan       ∷ !(BChan (Poly AppEvent))
     , _cliWorldView    ∷ !(WorldView Unique)
       -- | Invariant: no 'HUD' windows come before 'Modal'.
     , _cliWindows      ∷ !(Seq ShownWindow)
       -- | The latest 'WorldState' we have observed.
     , _cliWorldState   ∷ !(WorldState ())
-    , _cliAllCommands  ∷ !(HashSet SomeCommand)
-    , _cliKeyMap       ∷ !(MultiHashMap Keystroke SomeCommand)
+    , _cliAllCommands  ∷ !(HashSet (Poly Command))
+    , _cliKeyMap       ∷ !(MultiHashMap Keystroke (Poly Command))
     , _cliEvDispatcher ∷ !(WE.EventDispatcher () (Eff '[State Client, Lift (EventM Unique)]))
     , _cliClosed       ∷ !Bool
     }
 
 data ShownWindow
   = ShownWindow
-    { _swWindow  ∷ !W.SomeWindow
+    { _swWindow  ∷ !(Poly W.Window)
       -- | Becomes 'True' after invoking 'W.windowStartEvent'.
     , _swStarted ∷ !Bool
     }
@@ -111,7 +112,7 @@ instance IClientCtx Client where
 
 data ClientEvent
   = -- | A world event has been fired.
-    GotWorldEvent !WE.SomeEvent
+    GotWorldEvent !(Poly WE.Event)
     -- | A new 'Window' with the given name has been inserted.
   | WindowInserted !Unique
   deriving AppEvent
@@ -121,7 +122,7 @@ newClient ∷ (World w, MonadIO μ)
           ⇒ Bool     -- ^ Whether to use Unicode characters
           → w        -- ^ The world to interact
           → PlayerID -- ^ The player to interact with the world
-          → BChan SomeAppEvent -- ^ Brick application event channel
+          → BChan (Poly AppEvent) -- ^ Brick application event channel
           → μ Client
 newClient uni w pid evChan
   = do name ← liftIO newUnique
@@ -169,7 +170,7 @@ drawClient cli
 isClientClosed ∷ Client → Bool
 isClientClosed = (^.cliClosed)
 
-handleClientEvent ∷ Client → BrickEvent Unique SomeAppEvent → EventM Unique Client
+handleClientEvent ∷ Client → BrickEvent Unique (Poly AppEvent) → EventM Unique Client
 handleClientEvent cli be
   = case be of
       VtyEvent (V.EvResize _ _) →
@@ -185,7 +186,7 @@ handleClientEvent cli be
           Closed Nothing  → return $ cli & cliClosed .~ True
 
 handleEventWhileLoading ∷ Client
-                        → BrickEvent Unique SomeAppEvent
+                        → BrickEvent Unique (Poly AppEvent)
                         → EventM Unique Client
 handleEventWhileLoading cli be
   = case be of
@@ -198,7 +199,7 @@ handleEventWhileLoading cli be
       _ → return cli
 
 handleEventWhileRunning ∷ Client
-                        → BrickEvent Unique SomeAppEvent
+                        → BrickEvent Unique (Poly AppEvent)
                         → EventM Unique Client
 handleEventWhileRunning cli be
   = case be of
@@ -279,7 +280,7 @@ withClientCtx cli m
     handleCmdExc (Left  e) = error ("FIXME: command failed: " ++ show e)
     handleCmdExc (Right a) = return a
 
-handleWorldEvent ∷ Client → WE.SomeEvent → EventM Unique Client
+handleWorldEvent ∷ Client → Poly WE.Event → EventM Unique Client
 handleWorldEvent cli
   = runLift ∘ execState cli ∘ WE.dispatch (cli^.cliEvDispatcher)
 
@@ -328,7 +329,7 @@ initialEventDispatcher
                 cli1 ← lift $ traverseOf cliWorldView redrawWorldView cli0
                 put cli1
 
-defaultKeyMap ∷ HashSet SomeCommand → MultiHashMap Keystroke SomeCommand
+defaultKeyMap ∷ HashSet (Poly Command) → MultiHashMap Keystroke (Poly Command)
 defaultKeyMap = foldr' f MHM.empty
   where
     f cmd keyMap
@@ -338,15 +339,15 @@ defaultKeyMap = foldr' f MHM.empty
 
 -- | Update a key map. Old key mappings will be retained iff their
 -- commands also exist in the new one.
-updateKeyMap ∷ MultiHashMap Keystroke SomeCommand
-             → MultiHashMap Keystroke SomeCommand
-             → MultiHashMap Keystroke SomeCommand
+updateKeyMap ∷ MultiHashMap Keystroke (Poly Command)
+             → MultiHashMap Keystroke (Poly Command)
+             → MultiHashMap Keystroke (Poly Command)
 updateKeyMap old new = MHM.foldrWithKey' f MHM.empty new
   where
     f ∷ Keystroke
-      → SomeCommand
-      → MultiHashMap Keystroke SomeCommand
-      → MultiHashMap Keystroke SomeCommand
+      → Poly Command
+      → MultiHashMap Keystroke (Poly Command)
+      → MultiHashMap Keystroke (Poly Command)
     f newK cmd km
       = case HM.lookup (commandID cmd) revOld of
           Just oldK → MHM.insert oldK cmd km
@@ -356,7 +357,7 @@ updateKeyMap old new = MHM.foldrWithKey' f MHM.empty new
     revOld = MHM.foldrWithKey' g HM.empty old
 
     g ∷ Keystroke
-      → SomeCommand
+      → Poly Command
       → HashMap CommandID Keystroke
       → HashMap CommandID Keystroke
     g k cmd = HM.insert (commandID cmd) k

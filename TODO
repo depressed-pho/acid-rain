@@ -1,11 +1,18 @@
 # -*- org -*-
 
-* TODO [#A] Use size-indexed vectors (vector-sized) whenever possible
-* TODO [#C] Proper run commands
+* TODO [#A] Bias oceans towards lands
+* TODO [#A] Change the Z mapping threshold
 * TODO [#B] Templetize registries with CPP
 * TODO [#B] Try injective type families for things like EntityType
-* TODO [#A] Consider using polydata instead of hand-rolling Some*
 * TODO [#B] Consider using HLint
+* TODO [#C] Consider using the full-fledged lens instead of microlens
+* TODO [#C] Proper run commands
 * TODO [#C] Consider using hoogle
+* TODO Use size-indexed vectors (vector-sized) whenever possible
+  We don't do this yet. Haskell isn't a dependently-typed language,
+  and attempting to simulate it only clutters the (already
+  complicated) code. Also, emulations are also not efficient at
+  run-time (e.g. =Finite= being represented as =Integer=).
 * DONE [#A] Make "river" in Chunk debug-only
 * DONE [#A] Use TH for unboxed vectors
+* DONE [#A] Consider using polydata instead of hand-rolling Some*

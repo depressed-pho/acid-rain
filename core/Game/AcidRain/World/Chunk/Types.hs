@@ -47,6 +47,7 @@ import Control.Monad.Primitive (PrimMonad, PrimState)
 import Data.Convertible.Base (Convertible(..))
 import Data.HashMap.Strict (HashMap)
 import Data.Hashable (Hashable)
+import Data.Poly.Strict (Poly)
 import qualified Data.Vector.Generic as GV
 import qualified Data.Vector.Generic.Mutable as GMV
 import qualified Data.Vector.Unboxed as UV
@@ -58,7 +59,7 @@ import Game.AcidRain.World.Biome.Palette (BiomePalette, BiomeIndex)
 import qualified Game.AcidRain.World.Biome.Palette as BPal
 import Game.AcidRain.World.Biome.Registry (BiomeRegistry)
 import Game.AcidRain.World.Climate (Climate)
-import Game.AcidRain.World.Entity (EntityType(..), Entity(..), SomeEntity)
+import Game.AcidRain.World.Entity (EntityType(..), Entity(..))
 import Game.AcidRain.World.Entity.Catalogue (EntityCatalogue, (∈))
 import Game.AcidRain.World.Position (WorldPos(..), wpX, wpY, wpZ)
 import Game.AcidRain.World.Tile (Tile(..), TileState(..), TileStateValue)
@@ -124,7 +125,7 @@ data Chunk
     , _cBiomePal ∷ !BiomePalette
     , _cBiomes   ∷ !(UV.Vector BiomeIndex)
     , _cEntCat   ∷ !EntityCatalogue
-    , _cEntities ∷ !(HashMap TileOffset SomeEntity)
+    , _cEntities ∷ !(HashMap TileOffset (Poly Entity))
     }
 
 makeLenses ''Chunk
@@ -155,7 +156,7 @@ data MutableChunk σ
     , _mcBiomePal ∷ !BiomePalette
     , _mcBiomes   ∷ !(UV.MVector σ BiomeIndex)
     , _mcEntCat   ∷ !EntityCatalogue
-    , _mcEntities ∷ !(HashMap TileOffset SomeEntity)
+    , _mcEntities ∷ !(HashMap TileOffset (Poly Entity))
     }
 
 makeLenses ''MutableChunk

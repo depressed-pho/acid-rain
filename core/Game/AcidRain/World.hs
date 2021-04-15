@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnicodeSyntax #-}
@@ -12,13 +13,11 @@ module Game.AcidRain.World
   , WorldMode(..)
   , WorldState(..)
   , WorldSeed
-  , SomeWorld(..)
 
     -- * The command class
   , Command(..)
   , CommandID
   , CommandType(..)
-  , SomeCommand(..)
 
     -- * Client-side context
   , IClientCtx(..)
@@ -65,12 +64,13 @@ import Data.HashSet (HashSet)
 import Data.Hashable (Hashable(..))
 import Data.Kind (Type)
 import Data.Int (Int64)
+import Data.Poly.Strict (Poly(..))
 import Data.Text (Text)
 import Data.Typeable (Typeable, cast)
 import GHC.Generics (Generic)
 import Game.AcidRain.World.Chunk (Chunk)
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
-import Game.AcidRain.World.Event (Event(..), SomeEvent)
+import Game.AcidRain.World.Event (Event(..))
 import Game.AcidRain.World.Player (Player, PlayerID)
 import Game.AcidRain.World.Position (WorldPos)
 import Game.AcidRain.TUI.Keystroke (Keystroke)
@@ -93,8 +93,8 @@ class World w where
   -- opaque type.
   type RunningStateT w ∷ Type
   -- | Erase the type of the world.
-  upcastWorld ∷ w → SomeWorld
-  upcastWorld = SomeWorld
+  upcastWorld ∷ w → Poly World
+  upcastWorld = Poly
   -- | Get the state of the world. State changes are also reported via
   -- 'WorldStateChanged' events. Unless explicitly stated, most of the
   -- other methods of this class throws exceptions when invoked at a
@@ -102,7 +102,7 @@ class World w where
   getWorldState ∷ MonadIO μ ⇒ w → μ (WorldState (RunningStateT w))
   -- | Block until the next world event is fired, or return 'Nothing'
   -- if these is no chance that any more events can ever fire.
-  waitForEvent ∷ MonadIO μ ⇒ w → μ (Maybe SomeEvent)
+  waitForEvent ∷ MonadIO μ ⇒ w → μ (Maybe (Poly Event))
   -- | Schedule a command (along with arguments) to run on the world
   -- context in the next game tick. The argument @mPid@ indicates
   -- the player who attempted to use the command, or 'Nothing' if
@@ -128,18 +128,15 @@ class World w where
   -- | Get a player in the world having a given ID.
   getPlayerFromWorld ∷ MonadIO μ ⇒ w → PlayerID → μ Player
 
--- | A type-erased 'World'.
-data SomeWorld = ∀w. World w ⇒ SomeWorld !w
-
-instance World SomeWorld where
-  type RunningStateT SomeWorld = ()
+instance World (Poly World) where
+  type RunningStateT (Poly World) = ()
   upcastWorld = id
-  getWorldState (SomeWorld w) = (() <$) <$> getWorldState w
-  waitForEvent (SomeWorld w) = waitForEvent w
-  scheduleCommand (SomeWorld w) = scheduleCommand w
-  lookupChunk (SomeWorld w) = lookupChunk w
-  subscribeToChunks (SomeWorld w) = subscribeToChunks w
-  getPlayerFromWorld (SomeWorld w) = getPlayerFromWorld w
+  getWorldState (Poly w) = (() <$) <$> getWorldState w
+  waitForEvent (Poly w) = waitForEvent w
+  scheduleCommand (Poly w) = scheduleCommand w
+  lookupChunk (Poly w) = lookupChunk w
+  subscribeToChunks (Poly w) = subscribeToChunks w
+  getPlayerFromWorld (Poly w) = getPlayerFromWorld w
 
 data WorldMode
   = SinglePlayer
@@ -191,11 +188,11 @@ data CommandType
 
 class (Show c, Typeable c) ⇒ Command c where
   -- | Erase the type of the command.
-  upcastCommand ∷ c → SomeCommand
-  upcastCommand = SomeCommand
+  upcastCommand ∷ c → Poly Command
+  upcastCommand = Poly
   -- | Recover the type of the command.
-  downcastCommand ∷ SomeCommand → Maybe c
-  downcastCommand (SomeCommand c) = cast c
+  downcastCommand ∷ Poly Command → Maybe c
+  downcastCommand (Poly c) = cast c
   -- | Get the command ID such as @acid-rain:walk-south@.
   commandID ∷ c → CommandID
   -- | Get the command type.
@@ -223,29 +220,26 @@ class (Show c, Typeable c) ⇒ Command c where
              → [Text]         -- ^ Arguments
              → Eff r ()
 
--- | A type-erased 'Command'
-data SomeCommand = ∀c. Command c ⇒ SomeCommand !c
-
-instance Show SomeCommand where
-  showsPrec d (SomeCommand c) = showsPrec d c
+instance Show (Poly Command) where
+  showsPrec d (Poly c) = showsPrec d c
 
 -- | Two commands are equivalent if their IDs are identical.
-instance Eq SomeCommand where
-  (SomeCommand a) == (SomeCommand b)
+instance Eq (Poly Command) where
+  (Poly a) == (Poly b)
     = (commandID a) ≡ (commandID b)
 
 -- | Hash value of a command is a hash value of its ID.
-instance Hashable SomeCommand where
-  hashWithSalt salt (SomeCommand c)
+instance Hashable (Poly Command) where
+  hashWithSalt salt (Poly c)
     = salt `hashWithSalt` commandID c
 
-instance Command SomeCommand where
+instance Command (Poly Command) where
   upcastCommand = id
   downcastCommand = Just
-  commandID (SomeCommand c) = commandID c
-  commandType (SomeCommand c) = commandType c
-  runOnClient (SomeCommand c) = runOnClient c
-  runOnWorld (SomeCommand c) = runOnWorld c
+  commandID (Poly c) = commandID c
+  commandType (Poly c) = commandType c
+  runOnClient (Poly c) = runOnClient c
+  runOnWorld (Poly c) = runOnWorld c
 
 -------------------------------------------------------------------------------
 -- Client-side context
@@ -260,7 +254,7 @@ class Typeable ctx ⇒ IClientCtx ctx where
   downcastClientCtx ∷ ClientCtx → Maybe ctx
   downcastClientCtx (ClientCtx ctx) = cast ctx
   -- | Get the world the client controls.
-  basicGetClientWorld ∷ ctx → SomeWorld
+  basicGetClientWorld ∷ ctx → Poly World
   -- | Get the ID of the player whom the client controls.
   basicGetClientPlayerID ∷ ctx → PlayerID
   -- | Return 'True' iff a window with the given ID is shown.
@@ -288,7 +282,7 @@ instance IClientCtx ClientCtx where
   basicDeleteWindow wid (ClientCtx ctx) = ClientCtx $ basicDeleteWindow wid ctx
 
 -- | Get the world the client controls.
-getClientWorld ∷ Member (State ClientCtx) r ⇒ Eff r SomeWorld
+getClientWorld ∷ Member (State ClientCtx) r ⇒ Eff r (Poly World)
 getClientWorld
   = do ctx ← get
        return $ basicGetClientWorld (ctx ∷ ClientCtx)
@@ -428,7 +422,7 @@ instance Show WorldStateChanged where
 -- | Event to be fired when the set available commands have been
 -- updated. In particular, this event always fires right before a
 -- world starts running.
-newtype CommandSetUpdated = CommandSetUpdated (HashSet SomeCommand)
+newtype CommandSetUpdated = CommandSetUpdated (HashSet (Poly Command))
   deriving (Show, Event)
 
 -- | Event to be fired when a chunk which was previously unavailable

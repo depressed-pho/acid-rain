@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnicodeSyntax #-}
@@ -8,11 +9,9 @@ module Game.AcidRain.World.Entity
   ( -- * Entity types
     EntityType(..)
   , EntityTypeID
-  , SomeEntityType(..)
 
     -- * Entity instances
   , Entity(..)
-  , SomeEntity
   ) where
 
 import Control.Eff (Eff, Lifted, type(<::))
@@ -21,6 +20,7 @@ import Control.Eff.State.Strict (State)
 import Control.Exception (SomeException)
 import Control.Monad.STM (STM)
 import Data.Kind (Type)
+import Data.Poly.Strict (Poly(..))
 import Data.Text (Text)
 import Game.AcidRain.TUI (HasAppearance(..))
 import {-# SOURCE #-} Game.AcidRain.World (WorldCtx)
@@ -63,21 +63,18 @@ class Show τ ⇒ EntityType τ where
   -- class 'Entity'.
   type EntityOf τ ∷ Type
   -- | Erase the type of the entity type.
-  upcastEntityType ∷ τ → SomeEntityType
-  upcastEntityType = SomeEntityType
+  upcastEntityType ∷ τ → Poly EntityType
+  upcastEntityType = Poly
   -- | Get the entity type ID such as @acid-rain:player@.
   entityTypeID ∷ τ → EntityTypeID
 
--- | A type-erased 'EntityType'.
-data SomeEntityType = ∀τ. EntityType τ ⇒ SomeEntityType !τ
+instance Show (Poly EntityType) where
+  showsPrec d (Poly t) = showsPrec d t
 
-instance Show SomeEntityType where
-  showsPrec d (SomeEntityType t) = showsPrec d t
-
-instance EntityType SomeEntityType where
-  type EntityOf SomeEntityType = SomeEntity
+instance EntityType (Poly EntityType) where
+  type EntityOf (Poly EntityType) = Poly Entity
   upcastEntityType = id
-  entityTypeID (SomeEntityType t) = entityTypeID t
+  entityTypeID (Poly t) = entityTypeID t
 
 -- | An instance of this class defines an entity in the game. It is
 -- instantiated through an associated type 'EntityT'.
@@ -86,8 +83,8 @@ class (EntityType (EntityTypeOf ε), HasAppearance ε, Show ε) ⇒ Entity ε wh
   -- 'EntityType'.
   type EntityTypeOf ε ∷ Type
   -- | Erase the type of the entity.
-  upcastEntity ∷ ε → SomeEntity
-  upcastEntity = SomeEntity
+  upcastEntity ∷ ε → Poly Entity
+  upcastEntity = Poly
   -- | Get the type of this entity.
   entityType ∷ ε → EntityTypeOf ε
   -- | Called when an entity has been moved. Do nothing by default.
@@ -98,17 +95,14 @@ class (EntityType (EntityTypeOf ε), HasAppearance ε, Show ε) ⇒ Entity ε wh
               → Eff r ()
   entityMoved _ _ _ = return ()
 
--- | A type-erased 'Entity'.
-data SomeEntity = ∀ε. Entity ε ⇒ SomeEntity !ε
+instance Show (Poly Entity) where
+  showsPrec d (Poly t) = showsPrec d t
 
-instance Show SomeEntity where
-  showsPrec d (SomeEntity t) = showsPrec d t
+instance HasAppearance (Poly Entity) where
+  appearance (Poly e) = appearance e
 
-instance HasAppearance SomeEntity where
-  appearance (SomeEntity e) = appearance e
-
-instance Entity SomeEntity where
-  type EntityTypeOf SomeEntity = SomeEntityType
+instance Entity (Poly Entity) where
+  type EntityTypeOf (Poly Entity) = Poly EntityType
   upcastEntity = id
-  entityType (SomeEntity e) = SomeEntityType (entityType e)
-  entityMoved (SomeEntity e) = entityMoved e
+  entityType (Poly e) = Poly (entityType e)
+  entityMoved (Poly e) = entityMoved e

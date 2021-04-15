@@ -30,8 +30,9 @@ import Control.Monad.Catch (MonadThrow)
 import Data.Default (Default(..))
 import qualified Data.HashMap.Strict as HM
 import Data.Maybe (isJust)
+import Data.Poly.Strict (Poly)
 import qualified Data.Vector.Generic as GV
-import Game.AcidRain.World.Biome (Biome(..), SomeBiome)
+import Game.AcidRain.World.Biome (Biome(..))
 import Game.AcidRain.World.Biome.Palette (BiomePalette)
 import qualified Game.AcidRain.World.Biome.Palette as BPal
 import Game.AcidRain.World.Biome.Registry (BiomeRegistry)
@@ -48,7 +49,7 @@ import Game.AcidRain.World.Chunk.Types
   , assertValidOffset, assertValidEntity
   , toIndexed )
 import Game.AcidRain.World.Climate (Climate)
-import Game.AcidRain.World.Entity (Entity(..), SomeEntity)
+import Game.AcidRain.World.Entity (Entity(..))
 import Game.AcidRain.World.Entity.Catalogue (EntityCatalogue)
 import Game.AcidRain.World.Tile (TileState(..), SomeTileState, isSolid)
 import Game.AcidRain.World.Tile.Palette (TilePalette)
@@ -139,7 +140,7 @@ riverAt off@(TileOffset { x, y, .. }) c
 #endif
 
 -- | Get the biome at a given @(x, y)@ offset in a chunk.
-biomeAt ∷ MonadThrow μ ⇒ TileOffset → Chunk → μ SomeBiome
+biomeAt ∷ MonadThrow μ ⇒ TileOffset → Chunk → μ (Poly Biome)
 biomeAt off@(TileOffset { x, y, .. }) c
   = assertValidOffset off $
     let x'   = fromIntegral x ∷ Int
@@ -151,7 +152,7 @@ biomeAt off@(TileOffset { x, y, .. }) c
          return biome
 
 -- | Lookup an entity possibly located at a given offset in a chunk.
-entityAt ∷ TileOffset → Chunk → Maybe SomeEntity
+entityAt ∷ TileOffset → Chunk → Maybe (Poly Entity)
 entityAt off c
   = assertValidOffset off $
     HM.lookup off (c^.cEntities)

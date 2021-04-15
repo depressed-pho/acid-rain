@@ -7,11 +7,11 @@ module Game.AcidRain.TUI.Window
   ( Window(..)
   , WindowType(..)
   , WindowID
-  , SomeWindow(..)
   ) where
 
 import Brick.Types (Widget, EventM)
 import Brick.Widgets.Core (Named(..))
+import Data.Poly.Strict (Poly(..))
 import Data.Sequence (Seq)
 import Data.Text (Text)
 import Data.Unique (Unique)
@@ -32,8 +32,8 @@ type WindowID = Text
 -- 'Game.AcidRain.World.World' which logically doesn't make sense.
 class Named w Unique ⇒ Window w where
   -- | Erase the type of the window.
-  upcastWindow ∷ w → SomeWindow
-  upcastWindow = SomeWindow
+  upcastWindow ∷ w → Poly Window
+  upcastWindow = Poly
   -- | Get the window ID like "acid-rain:debug-info"
   windowID ∷ w → WindowID
   -- | Get the window type.
@@ -45,7 +45,7 @@ class Named w Unique ⇒ Window w where
   windowStartEvent ∷ w → EventM Unique w
   -- | Handle a world event. Unlike Vty events, world events are
   -- always propagated through all the windows and the client itself.
-  handleWorldEvent ∷ w → WE.SomeEvent → EventM Unique w
+  handleWorldEvent ∷ w → Poly WE.Event → EventM Unique w
   -- | Handle a Vty event. They are propagated through modal windows
   -- and finally to the client itself. At any time a modal window can
   -- stop the event propagation by returning @(w, 'False')@. The
@@ -67,19 +67,16 @@ data WindowType
   | Modal
   deriving (Eq, Show)
 
--- | Type-erased 'Window'.
-data SomeWindow = ∀w. Window w ⇒ SomeWindow !w
+instance Named (Poly Window) Unique where
+  getName (Poly w) = getName w
 
-instance Named SomeWindow Unique where
-  getName (SomeWindow w) = getName w
-
-instance Window SomeWindow where
+instance Window (Poly Window) where
   upcastWindow = id
-  windowID (SomeWindow w) = windowID w
-  windowType (SomeWindow w) = windowType w
-  renderWindow (SomeWindow w) = renderWindow w
-  windowStartEvent (SomeWindow w) = SomeWindow <$> windowStartEvent w
-  handleWorldEvent (SomeWindow w) = (SomeWindow <$>) ∘ handleWorldEvent w
-  handleVtyEvent (SomeWindow w) ev
+  windowID (Poly w) = windowID w
+  windowType (Poly w) = windowType w
+  renderWindow (Poly w) = renderWindow w
+  windowStartEvent (Poly w) = Poly <$> windowStartEvent w
+  handleWorldEvent (Poly w) = (Poly <$>) ∘ handleWorldEvent w
+  handleVtyEvent (Poly w) ev
     = do (w', pr) ← handleVtyEvent w ev
-         return (SomeWindow w', pr)
+         return (Poly w', pr)

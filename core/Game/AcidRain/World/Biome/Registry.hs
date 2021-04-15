@@ -28,13 +28,14 @@ import qualified Data.HashMap.Strict as HM
 import Data.MonoTraversable
   ( Element, MonoFunctor, MonoFoldable, MonoTraversable, GrowingAppend
   , otraverse )
-import Game.AcidRain.World.Biome (Biome(..), BiomeID, SomeBiome(..))
+import Data.Poly.Strict (Poly)
+import Game.AcidRain.World.Biome (Biome(..), BiomeID)
 import Prelude hiding (lookup)
 
 -- | The biome registry is a data structure that contains immutable
 -- 'Biome' objects. It is constructed while loading a world, and
 -- becomes immutable afterwards.
-newtype BiomeRegistry = BiomeRegistry (HashMap BiomeID SomeBiome)
+newtype BiomeRegistry = BiomeRegistry (HashMap BiomeID (Poly Biome))
   deriving ( Show, MonoFunctor, MonoFoldable, GrowingAppend, Semigroup
            , Monoid )
 
@@ -44,7 +45,7 @@ instance MonoTraversable BiomeRegistry where
   otraverse f (BiomeRegistry reg)
     = BiomeRegistry <$> traverse f reg
 
-type instance Element BiomeRegistry = SomeBiome
+type instance Element BiomeRegistry = Poly Biome
 
 -- | Create an empty registry.
 empty ∷ BiomeRegistry
@@ -62,12 +63,12 @@ register biome (BiomeRegistry reg)
 
 -- | Lookup a biome by its ID. Return 'Nothing' if no biomes matching
 -- with the given ID has been registered.
-lookup ∷ BiomeID → BiomeRegistry → Maybe SomeBiome
+lookup ∷ BiomeID → BiomeRegistry → Maybe (Poly Biome)
 lookup bid (BiomeRegistry reg)
   = HM.lookup bid reg
 
 -- | Get a biome by its ID. Throws if it doesn't exist.
-get ∷ MonadThrow μ ⇒ BiomeID → BiomeRegistry → μ SomeBiome
+get ∷ MonadThrow μ ⇒ BiomeID → BiomeRegistry → μ (Poly Biome)
 get bid reg
   = case lookup bid reg of
       Just biome → return biome

@@ -29,18 +29,19 @@ import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 import Data.Maybe (fromJust)
+import Data.Poly.Strict (Poly)
 import Data.Text (Text)
 import qualified Data.UUID as U
 import GHC.Clock (getMonotonicTime)
 import GHC.Conc (unsafeIOToSTM)
-import Game.AcidRain.Module (SomeModule)
+import Game.AcidRain.Module (Module)
 import Game.AcidRain.Module.Loader
   ( loadModules, lcTileReg, lcBiomeReg, lcEntityReg, lcCommandReg, lcChunkGen )
 import qualified Game.AcidRain.Module.Builtin.Entities as B
 import Game.AcidRain.World
   ( World(..), WorldMode(..), WorldState(..)
   , WorldSeed, WorldStateChanged(..), ChunkArrived(..)
-  , Command(..), SomeCommand, IWorldCtx(..), WorldCtx
+  , Command(..), IWorldCtx(..), WorldCtx
   , ChunkUpdated(..), CommandSetUpdated(..)
   , WorldNotRunningException(..), UnknownPlayerIDException(..), throwSomeExc )
 import qualified Game.AcidRain.World.Biome.Palette as BPal
@@ -53,7 +54,7 @@ import Game.AcidRain.World.Command.Registry (CommandRegistry)
 import qualified Game.AcidRain.World.Command.Registry as CR
 import qualified Game.AcidRain.World.Entity as E
 import qualified Game.AcidRain.World.Entity.Catalogue as ECat
-import Game.AcidRain.World.Event (Event(..), SomeEvent)
+import Game.AcidRain.World.Event (Event(..))
 import Game.AcidRain.World.Player.Manager.Local (LocalPlayerManager)
 import Game.AcidRain.World.Player (Player(..), Permission(..), PlayerID)
 import Game.AcidRain.World.Position (WorldPos(..))
@@ -74,14 +75,14 @@ data LocalWorld
     { _lwMode      ∷ !WorldMode
     , lwSeed       ∷ !WorldSeed
     , _lwState     ∷ !(TVar (WorldState RunningState))
-    , _lwEvents    ∷ !(TBQueue SomeEvent)
+    , _lwEvents    ∷ !(TBQueue (Poly Event))
     , _lwChunkReqs ∷ !(TBQueue ChunkPos)
     , _lwCommandQ  ∷ !(TBQueue QueuedCommand)
     }
 
 data QueuedCommand
   = QueuedCommand
-    { _qcCmd  ∷ !SomeCommand
+    { _qcCmd  ∷ !(Poly Command)
     , _qcMPid ∷ !(Maybe PlayerID)
     , _qcArgs ∷ ![Text]
     } deriving Show
@@ -290,7 +291,7 @@ instance World LocalWorld where
 
 -- | Create a new world out of thin air. The world will be
 -- asynchronously created on a separate thread.
-newWorld ∷ (Foldable f, MonadIO μ) ⇒ WorldMode → f SomeModule → WorldSeed → μ LocalWorld
+newWorld ∷ (Foldable f, MonadIO μ) ⇒ WorldMode → f (Poly Module) → WorldSeed → μ LocalWorld
 newWorld wm mods seed
   = liftIO $
     do ws    ← newTVarIO Loading

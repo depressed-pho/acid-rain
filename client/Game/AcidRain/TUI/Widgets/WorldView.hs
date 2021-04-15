@@ -26,10 +26,11 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Convertible.Base (convert)
 import Data.Int (Int32)
 import Data.Monoid.Unicode ((⊕))
+import Data.Poly.Strict (Poly)
 import Data.Text (pack)
 import Game.AcidRain.TUI (Appearance(..), HasAppearance(..))
 import Game.AcidRain.World
-  ( World(..), WorldState(..), SomeWorld, WorldNotRunningException(..) )
+  ( World(..), WorldState(..), WorldNotRunningException(..) )
 import Game.AcidRain.World.Chunk (Chunk, chunkHeight, entityAt, tileStateAt)
 import Game.AcidRain.World.Chunk.Position (ChunkPos(..), cpX, cpY, toWorldPos)
 import Game.AcidRain.World.Player (PlayerID, plPos)
@@ -48,7 +49,7 @@ data WorldView n
   = WorldView
     { _wvName    ∷ !n
     , _wvUnicode ∷ !Bool
-    , _wvWorld   ∷ !SomeWorld
+    , _wvWorld   ∷ !(Poly World)
       -- | The player to trac.
     , _wvPlayer  ∷ !PlayerID
       -- | The offset from the center of the widget where the player

@@ -15,6 +15,7 @@ import Control.Exception (Handler(..), catches)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Convertible.Base (convert)
 import Data.Monoid.Unicode ((⊕))
+import Data.Poly.Strict (Poly)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as S
 import Data.Text.Lazy (toStrict)
@@ -23,7 +24,7 @@ import Data.Text.Lazy.Builder.Int (decimal)
 import Data.Text.Lazy.Builder.RealFloat (FPFormat(..), formatRealFloat)
 import Data.Unique (Unique, newUnique)
 import Game.AcidRain.TUI.Window (Window(..), WindowType(..))
-import Game.AcidRain.World (World(..), SomeWorld, WorldNotRunningException)
+import Game.AcidRain.World (World(..), WorldNotRunningException)
 import Game.AcidRain.World.Biome (Biome(..))
 import Game.AcidRain.World.Chunk
   ( tileStateAt, biomeAt, climateAt
@@ -43,7 +44,7 @@ import Prelude.Unicode ((∘), (⋅))
 data DebugInfo
   = DebugInfo
     { _diName    ∷ !Unique
-    , _diWorld   ∷ !SomeWorld
+    , _diWorld   ∷ !(Poly World)
     , _diPlayer  ∷ !PlayerID
     , _diWidgets ∷ !(Seq (Widget Unique))
     }

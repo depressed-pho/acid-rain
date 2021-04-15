@@ -11,7 +11,6 @@
 module Game.AcidRain.Module.Builtin.Biomes
   ( -- * Per-biome chunk generator
     BiomeChunkGen(..)
-  , SomeBiomeGen
   , withBiomeGenProxy
   , withBiomeGen
 
@@ -33,10 +32,11 @@ import Data.Foldable (traverse_, for_, foldl')
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import Data.Int (Int8)
+import Data.Poly.Strict (Poly(..))
 import Data.Proxy (Proxy(..))
 import Data.Typeable (Typeable, typeOf)
 import Game.AcidRain.Module.Builtin.ChunkGen.WorldInfo (WorldInfo(..))
-import Game.AcidRain.World.Biome (Biome(..), SomeBiome(..))
+import Game.AcidRain.World.Biome (Biome(..))
 import Game.AcidRain.World.Chunk (chunkHeight)
 import Game.AcidRain.World.Chunk.Generator (ChunkGenM, putTileState)
 import Game.AcidRain.World.Climate (Climate(..))
@@ -57,8 +57,8 @@ class (Biome (Proxy β), Typeable β) ⇒ BiomeChunkGen β where
   -- | Representative climate of this biome.
   climate ∷ Proxy β → Climate
   -- | The biome type corresponding to this generator.
-  biomeType ∷ Proxy β → SomeBiome
-  biomeType p = SomeBiome p
+  biomeType ∷ Proxy β → Poly Biome
+  biomeType p = Poly p
   -- | Place tiles at the given @(x, y)@ coordinates for all @z@
   -- positions.
   terraform ∷ (Member (Reader WorldInfo) r, Lifted ChunkGenM r)
@@ -69,28 +69,27 @@ class (Biome (Proxy β), Typeable β) ⇒ BiomeChunkGen β where
             → Eff r ()
 
 data SomeBiomeProxy = ∀β. BiomeChunkGen β ⇒ SomeBiomeProxy !(Proxy β)
-data SomeBiomeGen   = ∀β. BiomeChunkGen β ⇒ SomeBiomeGen !β
 
-instance Show SomeBiomeGen where
-  showsPrec d (SomeBiomeGen b)
+instance Show (Poly BiomeChunkGen) where
+  showsPrec d (Poly b)
     = showsPrec d (typeOf b)
 
 -- | Evaluate a function with a 'BiomeChunkGen'.
-withBiomeGen ∷ SomeBiomeGen → (∀β. BiomeChunkGen β ⇒ β → α) → α
-withBiomeGen (SomeBiomeGen b) f = f b
+withBiomeGen ∷ Poly BiomeChunkGen → (∀β. BiomeChunkGen β ⇒ β → α) → α
+withBiomeGen (Poly b) f = f b
 
 -- | Evaluate a function with a proxy of 'BiomeChunkGen'.
-withBiomeGenProxy ∷ SomeBiomeGen → (∀β. BiomeChunkGen β ⇒ Proxy β → α) → α
-withBiomeGenProxy (SomeBiomeGen (_ ∷ β)) f
+withBiomeGenProxy ∷ Poly BiomeChunkGen → (∀β. BiomeChunkGen β ⇒ Proxy β → α) → α
+withBiomeGenProxy (Poly (_ ∷ β)) f
   = f (Proxy ∷ Proxy β)
 
-type BiomeSet = HashMap Climate SomeBiomeGen
+type BiomeSet = HashMap Climate (Poly BiomeChunkGen)
 
 data BiomeChooser
   = BiomeChooser
     { bcClimateBased ∷ !BiomeSet
-    , bcOcean        ∷ !SomeBiomeGen
-    , bcRiver        ∷ !SomeBiomeGen
+    , bcOcean        ∷ !(Poly BiomeChunkGen)
+    , bcRiver        ∷ !(Poly BiomeChunkGen)
     }
 
 biomeChooser ∷ MonadThrow μ ⇒ TileRegistry → μ BiomeChooser
@@ -100,11 +99,11 @@ biomeChooser tReg
        river        ← instantiate (Proxy ∷ Proxy River) tReg
        return BiomeChooser
          { bcClimateBased = climateBased
-         , bcOcean        = SomeBiomeGen ocean
-         , bcRiver        = SomeBiomeGen river
+         , bcOcean        = Poly ocean
+         , bcRiver        = Poly river
          }
 
-chooseBiome ∷ Double → Double → Climate → BiomeChooser → SomeBiomeGen
+chooseBiome ∷ Double → Double → Climate → BiomeChooser → Poly BiomeChunkGen
 chooseBiome height river cli bc
   | height < 0   = bcOcean bc
   | river < -0.7 = bcRiver bc
@@ -218,14 +217,14 @@ climateBasedBiomes ∷ MonadThrow μ ⇒ TileRegistry → μ BiomeSet
 climateBasedBiomes tReg
   = flip traverse climateBasedBiomeProxies $
     \(SomeBiomeProxy bp) →
-      SomeBiomeGen <$> instantiate bp tReg
+      Poly <$> instantiate bp tReg
 
 -- | Find the closest matching biome generator for a given climate.
-chooseBiomeForClimate ∷ Climate → BiomeSet → SomeBiomeGen
+chooseBiomeForClimate ∷ Climate → BiomeSet → Poly BiomeChunkGen
 chooseBiomeForClimate cli biomes
   = snd $ foldl' f ((1/0), error "impossible: no biomes") biomes
   where
-    f ∷ (Float, SomeBiomeGen) → SomeBiomeGen → (Float, SomeBiomeGen)
+    f ∷ (Float, Poly BiomeChunkGen) → Poly BiomeChunkGen → (Float, Poly BiomeChunkGen)
     f best@(shortestDistSq, _) biome
       = let cli'   = withBiomeGenProxy biome climate
             pow2 d = d⋅d

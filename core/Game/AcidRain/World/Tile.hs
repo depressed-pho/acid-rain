@@ -5,7 +5,6 @@
 module Game.AcidRain.World.Tile
   ( Tile(..)
   , TileID
-  , SomeTile(..)
   , TileState(..)
   , TileStateValue
   , SomeTileState
@@ -13,6 +12,7 @@ module Game.AcidRain.World.Tile
   , isSolid
   ) where
 
+import Data.Poly.Strict (Poly(..))
 import Data.Text (Text)
 import Data.Typeable (Typeable, cast)
 import Data.Word (Word32)
@@ -39,11 +39,11 @@ type TileID = Text
 -- @
 class (Show τ, Typeable τ) ⇒ Tile τ where
   -- | Erase the type of the tile.
-  upcastTile ∷ τ → SomeTile
-  upcastTile = SomeTile
+  upcastTile ∷ τ → Poly Tile
+  upcastTile = Poly
   -- | Recover the type of the tile.
-  downcastTile ∷ SomeTile → Maybe τ
-  downcastTile (SomeTile t) = cast t
+  downcastTile ∷ Poly Tile → Maybe τ
+  downcastTile (Poly t) = cast t
   -- | Get the tile ID such as @acid-rain:dirt@.
   tileID ∷ τ → TileID
   -- | Get the default state value of the tile.
@@ -56,19 +56,16 @@ class (Show τ, Typeable τ) ⇒ Tile τ where
   -- position.
   appearanceAt ∷ τ → TileStateValue → WorldPos → Appearance
 
--- | A type-erased 'Tile'.
-data SomeTile = ∀τ. Tile τ ⇒ SomeTile !τ
+instance Show (Poly Tile) where
+  showsPrec d (Poly t) = showsPrec d t
 
-instance Show SomeTile where
-  showsPrec d (SomeTile t) = showsPrec d t
-
-instance Tile SomeTile where
+instance Tile (Poly Tile) where
   upcastTile = id
   downcastTile = Just
-  tileID (SomeTile t) = tileID t
-  defaultStateValue (SomeTile t) = defaultStateValue t
-  isSolidAt (SomeTile τ) = isSolidAt τ
-  appearanceAt (SomeTile t) = appearanceAt t
+  tileID (Poly t) = tileID t
+  defaultStateValue (Poly t) = defaultStateValue t
+  isSolidAt (Poly τ) = isSolidAt τ
+  appearanceAt (Poly t) = appearanceAt t
 
 -- | TileState is a type containing a 'Tile' and a single integral
 -- state value. The interpretation of the state value depends on the
@@ -94,7 +91,7 @@ instance Tile τ ⇒ HasAppearance (TileState τ, WorldPos) where
     = appearanceAt (tsTile ts) (tsValue ts) pos
 
 -- | A type-erased version of 'TileState'.
-type SomeTileState = TileState SomeTile
+type SomeTileState = TileState (Poly Tile)
 
 defaultState ∷ Tile τ ⇒ τ → TileState τ
 defaultState t

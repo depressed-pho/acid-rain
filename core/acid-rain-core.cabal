@@ -26,6 +26,7 @@ library
     Control.Concurrent.Cache.LRU
     Control.Eff.Instances.Catch
     Data.MultiHashMap.Set.Strict
+    Data.Poly.Strict
     Game.AcidRain.Module
     Game.AcidRain.Module.Loader
     Game.AcidRain.TUI

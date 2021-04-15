@@ -8,13 +8,14 @@ import Brick.Main (
   App(..), neverShowCursor, continue, halt, customMain )
 import Brick.Types (BrickEvent(..), Widget, EventM, Next)
 import Control.Monad (void)
+import Data.Poly.Strict (Poly)
+import Data.Proxy (Proxy(..))
 import Data.UUID (nil)
 import Data.Unique (Unique)
-import Data.Proxy (Proxy(..))
 import GHC.Conc (setNumCapabilities, getNumProcessors)
 import Game.AcidRain.Module (Module(..))
 import Game.AcidRain.Module.Builtin (BuiltinModule)
-import Game.AcidRain.TUI.AppEvent (SomeAppEvent)
+import Game.AcidRain.TUI.AppEvent (AppEvent)
 import Game.AcidRain.TUI.Client
   ( Client, newClient, drawClient, handleClientEvent, isClientClosed )
 import Game.AcidRain.World (WorldMode(..))
@@ -37,7 +38,7 @@ main
        initialVty ← buildVty
        void $ customMain initialVty buildVty (Just evChan) theApp cli
 
-theApp ∷ App Client SomeAppEvent Unique
+theApp ∷ App Client (Poly AppEvent) Unique
 theApp = App
          { appDraw         = drawUI
          , appChooseCursor = neverShowCursor
@@ -49,7 +50,7 @@ theApp = App
 drawUI ∷ Client → [Widget Unique]
 drawUI = drawClient
 
-appEvent ∷ Client → BrickEvent Unique SomeAppEvent → EventM Unique (Next Client)
+appEvent ∷ Client → BrickEvent Unique (Poly AppEvent) → EventM Unique (Next Client)
 appEvent cli be
   = do cli' ← handleClientEvent cli be
        if isClientClosed cli'

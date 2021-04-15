@@ -57,21 +57,22 @@ import Control.Monad.Catch (MonadThrow)
 import Data.Default (Default(..))
 import Data.Foldable (traverse_, toList)
 import qualified Data.HashMap.Strict as HM
+import Data.Poly.Strict (Poly)
 import Game.AcidRain.Module.Types
-  ( Module(..), SomeModule(..), ModuleMap, LoaderContext(..)
+  ( Module(..), ModuleMap, LoaderContext(..)
   , lcWorldSeed, lcMods, lcTileReg, lcBiomeReg
   , lcEntityReg, lcCommandReg, lcChunkGen )
-import Game.AcidRain.World (WorldSeed, Command, CommandID, SomeCommand)
-import Game.AcidRain.World.Biome (Biome, BiomeID, SomeBiome)
+import Game.AcidRain.World (WorldSeed, Command, CommandID)
+import Game.AcidRain.World.Biome (Biome, BiomeID)
 import Game.AcidRain.World.Biome.Registry (BiomeRegistry)
 import qualified Game.AcidRain.World.Biome.Registry as BR
 import Game.AcidRain.World.Chunk.Generator (ChunkGenerator)
 import Game.AcidRain.World.Command.Registry (CommandRegistry)
 import qualified Game.AcidRain.World.Command.Registry as CR
-import Game.AcidRain.World.Entity (EntityType, EntityTypeID, SomeEntityType)
+import Game.AcidRain.World.Entity (EntityType, EntityTypeID)
 import Game.AcidRain.World.Entity.Registry (EntityRegistry)
 import qualified Game.AcidRain.World.Entity.Registry as ER
-import Game.AcidRain.World.Tile (Tile, TileID, SomeTile)
+import Game.AcidRain.World.Tile (Tile, TileID)
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
 import qualified Game.AcidRain.World.Tile.Registry as TR
 import Lens.Micro ((%~), (.~))
@@ -110,14 +111,14 @@ loadMod m
 -- This function only makes sense for client and server
 -- implementations. Modules shouldn't use this.
 loadModules ∷ (Foldable f, MonadThrow μ)
-            ⇒ f SomeModule
+            ⇒ f (Poly Module)
             → WorldSeed
             → μ LoaderContext
 loadModules mods seed
   = do mods' ← reorderMods mods
        runLift $ execState (empty seed) (traverse_ loadMod mods')
 
-reorderMods ∷ (Foldable f, MonadThrow μ) ⇒ f SomeModule → μ [SomeModule]
+reorderMods ∷ (Foldable f, MonadThrow μ) ⇒ f (Poly Module) → μ [Poly Module]
 reorderMods = return . toList -- FIXME: Actually reorder it.
 
 -- | Get the seed of which the world that the modules are being loaded
@@ -143,12 +144,12 @@ registerTile tile
   = getTileRegistry >>= TR.register tile >>= putTileRegistry
 
 -- | Lookup a tile by its ID.
-lookupTile ∷ Member (State LoaderContext) r ⇒ TileID → Eff r (Maybe SomeTile)
+lookupTile ∷ Member (State LoaderContext) r ⇒ TileID → Eff r (Maybe (Poly Tile))
 lookupTile tid
   = getTileRegistry >>= return ∘ TR.lookup tid
 
 -- | Get a tile by its ID. Throws if it doesn't exist.
-getTile ∷ (Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ TileID → Eff r SomeTile
+getTile ∷ (Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ TileID → Eff r (Poly Tile)
 getTile tid
   = getTileRegistry >>= TR.get tid
 
@@ -170,12 +171,12 @@ registerBiome biome
   = getBiomeRegistry >>= BR.register biome >>= putBiomeRegistry
 
 -- | Lookup a biome by its ID.
-lookupBiome ∷ Member (State LoaderContext) r ⇒ BiomeID → Eff r (Maybe SomeBiome)
+lookupBiome ∷ Member (State LoaderContext) r ⇒ BiomeID → Eff r (Maybe (Poly Biome))
 lookupBiome bid
   = getBiomeRegistry >>= return ∘ BR.lookup bid
 
 -- | Get a biome by its ID. Throws if it doesn't exist.
-getBiome ∷ (Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ BiomeID → Eff r SomeBiome
+getBiome ∷ (Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ BiomeID → Eff r (Poly Biome)
 getBiome bid
   = getBiomeRegistry >>= BR.get bid
 
@@ -197,12 +198,12 @@ registerEntityType et
   = getEntityRegistry >>= ER.register et >>= putEntityRegistry
 
 -- | Lookup an entity type by its ID.
-lookupEntityType ∷ Member (State LoaderContext) r ⇒ EntityTypeID → Eff r (Maybe SomeEntityType)
+lookupEntityType ∷ Member (State LoaderContext) r ⇒ EntityTypeID → Eff r (Maybe (Poly EntityType))
 lookupEntityType etid
   = getEntityRegistry >>= return ∘ ER.lookup etid
 
 -- | Get an entity type by its ID. Throws if it doesn't exist.
-getEntityType ∷ (Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ EntityTypeID → Eff r SomeEntityType
+getEntityType ∷ (Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ EntityTypeID → Eff r (Poly EntityType)
 getEntityType etid
   = getEntityRegistry >>= ER.get etid
 
@@ -224,12 +225,12 @@ registerCommand command
   = getCommandRegistry >>= CR.register command >>= putCommandRegistry
 
 -- | Lookup a command by its ID.
-lookupCommand ∷ Member (State LoaderContext) r ⇒ CommandID → Eff r (Maybe SomeCommand)
+lookupCommand ∷ Member (State LoaderContext) r ⇒ CommandID → Eff r (Maybe (Poly Command))
 lookupCommand cid
   = getCommandRegistry >>= return ∘ CR.lookup cid
 
 -- | Get a command by its ID. Throws if it doesn't exist.
-getCommand ∷ (Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ CommandID → Eff r SomeCommand
+getCommand ∷ (Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ CommandID → Eff r (Poly Command)
 getCommand cid
   = getCommandRegistry >>= CR.get cid
 

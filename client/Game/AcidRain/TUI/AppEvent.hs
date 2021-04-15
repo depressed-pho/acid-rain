@@ -1,25 +1,22 @@
-{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.TUI.AppEvent
   ( AppEvent(..)
-  , SomeAppEvent(..)
   ) where
 
+import Data.Poly.Strict (Poly(..))
 import Data.Typeable (Typeable, cast)
 
 
 -- | Application event for Brick.
 class Typeable ε ⇒ AppEvent ε where
   -- | Erase the type of the application event.
-  upcastAppEvent ∷ ε → SomeAppEvent
-  upcastAppEvent = SomeAppEvent
+  upcastAppEvent ∷ ε → Poly AppEvent
+  upcastAppEvent = Poly
   -- | Recover the type of the application event.
-  downcastAppEvent ∷ SomeAppEvent → Maybe ε
-  downcastAppEvent (SomeAppEvent e) = cast e
+  downcastAppEvent ∷ Poly AppEvent → Maybe ε
+  downcastAppEvent (Poly e) = cast e
 
--- | A type-erased 'AppEvent', suitable for passing from\/to Brick.
-data SomeAppEvent = ∀ε. AppEvent ε ⇒ SomeAppEvent !ε
-
-instance AppEvent SomeAppEvent where
+instance AppEvent (Poly AppEvent) where
   upcastAppEvent = id
   downcastAppEvent = Just

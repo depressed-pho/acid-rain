@@ -35,14 +35,15 @@ import qualified Data.HashSet as HS
 import Data.MonoTraversable
   ( Element, MonoFunctor, MonoFoldable, MonoTraversable, GrowingAppend
   , otraverse )
-import Game.AcidRain.World (Command(..), CommandID, SomeCommand(..))
+import Data.Poly.Strict (Poly)
+import Game.AcidRain.World (Command(..), CommandID)
 import Prelude hiding (lookup)
 
 
 -- | The command registry is a data structure that contains immutable
 -- 'Command' objects. It is constructed while loading a world, and
 -- becomes immutable afterwards.
-newtype CommandRegistry = CommandRegistry (HashMap CommandID SomeCommand)
+newtype CommandRegistry = CommandRegistry (HashMap CommandID (Poly Command))
   deriving ( Show, MonoFunctor, MonoFoldable, GrowingAppend, Semigroup
            , Monoid )
 
@@ -52,7 +53,7 @@ instance MonoTraversable CommandRegistry where
   otraverse f (CommandRegistry reg)
     = CommandRegistry <$> traverse f reg
 
-type instance Element CommandRegistry = SomeCommand
+type instance Element CommandRegistry = Poly Command
 
 -- | Create an empty registry.
 empty ∷ CommandRegistry
@@ -70,19 +71,19 @@ register command (CommandRegistry reg)
 
 -- | Lookup a command by its ID. Return 'Nothing' if no commands matching
 -- with the given ID has been registered.
-lookup ∷ CommandID → CommandRegistry → Maybe SomeCommand
+lookup ∷ CommandID → CommandRegistry → Maybe (Poly Command)
 lookup cid (CommandRegistry reg)
   = HM.lookup cid reg
 
 -- | Get a command by its ID. Throws if it doesn't exist.
-get ∷ MonadThrow μ ⇒ CommandID → CommandRegistry → μ SomeCommand
+get ∷ MonadThrow μ ⇒ CommandID → CommandRegistry → μ (Poly Command)
 get cid reg
   = case lookup cid reg of
       Just command → return command
       Nothing      → throwM $ UnknownCommandIDException cid
 
 -- | Get the entire commands in the registry.
-valuesSet ∷ CommandRegistry → HashSet SomeCommand
+valuesSet ∷ CommandRegistry → HashSet (Poly Command)
 valuesSet (CommandRegistry reg)
   = HM.foldr' HS.insert HS.empty reg
 

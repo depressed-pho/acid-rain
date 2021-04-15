@@ -10,8 +10,9 @@ module Game.AcidRain.Module.Builtin.ChunkGen.PointAttrs
 
 import Control.Eff (Eff, Member)
 import Control.Eff.Reader.Lazy (Reader, ask)
+import Data.Poly.Strict (Poly)
 import Game.AcidRain.Module.Builtin.Biomes
-  ( SomeBiomeGen, BiomeChooser, chooseBiome )
+  ( BiomeChunkGen, BiomeChooser, chooseBiome )
 import Game.AcidRain.Module.Builtin.ChunkGen.WorldInfo
   ( WorldInfo(..), simplexInstance, voronoiInstance )
 import Game.AcidRain.World.Climate (Climate(..))
@@ -41,7 +42,7 @@ data PointAttrs
       -- altitude.
     , paClimate ∷ !Climate
       -- | Per-biome chunk generator chosen for this point.
-    , paBiome   ∷ !SomeBiomeGen
+    , paBiome   ∷ !(Poly BiomeChunkGen)
     } deriving (Show)
 
 -- | Compute 'PointAttrs' for a given @(x, y)@ coordinates. The @z@
