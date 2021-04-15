@@ -2,7 +2,6 @@
 
 * TODO [#A] Bias oceans towards lands
 * TODO [#A] Change the Z mapping threshold
-* TODO [#B] Templetize registries with CPP
 * TODO [#B] Try injective type families for things like EntityType
 * TODO [#B] Consider using HLint
 * TODO [#C] Consider using the full-fledged lens instead of microlens
@@ -16,3 +15,5 @@
 * DONE [#A] Make "river" in Chunk debug-only
 * DONE [#A] Use TH for unboxed vectors
 * DONE [#A] Consider using polydata instead of hand-rolling Some*
+* DONE [#B] Templetize registries with CPP
+  Decided not to do this. Its' simply not worth it.

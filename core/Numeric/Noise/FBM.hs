@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE UnicodeSyntax #-}
 -- | This module implements fractional Brownian motion with a
 -- user-supplied noise function and parameters. See also
@@ -28,10 +29,10 @@ fBm ∷ (Num r, Integral i)
     ∷ (Double → v → v) → (v → Double) → Int → Double → Double → Double → Double → v → Double #-}
 fBm scale noise oct amp0 gain freq0 lac vec = go amp0 freq0 0 0
   where
-    go amp freq i sum
+    go !amp !freq !i !sum
       | i ≥ oct   = sum
-      | otherwise = let amp'  = amp ⋅ gain
-                        freq' = freq ⋅ lac
-                        sum'  = sum + amp ⋅ noise (scale freq vec)
+      | otherwise = let !amp'  = amp ⋅ gain
+                        !freq' = freq ⋅ lac
+                        !sum'  = sum + amp ⋅ noise (scale freq vec)
                     in
                       go amp' freq' (i + 1) sum'

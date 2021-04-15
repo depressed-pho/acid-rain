@@ -96,7 +96,7 @@ class (EntityType (EntityTypeOf ε), HasAppearance ε, Show ε) ⇒ Entity ε wh
   entityMoved _ _ _ = return ()
 
 instance Show (Poly Entity) where
-  showsPrec d (Poly t) = showsPrec d t
+  showsPrec d (Poly e) = showsPrec d e
 
 instance HasAppearance (Poly Entity) where
   appearance (Poly e) = appearance e
