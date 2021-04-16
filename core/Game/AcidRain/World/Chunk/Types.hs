@@ -3,6 +3,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnicodeSyntax #-}
@@ -48,6 +49,7 @@ import Data.Convertible.Base (Convertible(..))
 import Data.HashMap.Strict (HashMap)
 import Data.Hashable (Hashable)
 import Data.Poly.Strict (Poly)
+import Data.Proxy (Proxy(..))
 import qualified Data.Vector.Generic as GV
 import qualified Data.Vector.Generic.Mutable as GMV
 import qualified Data.Vector.Unboxed as UV
@@ -59,7 +61,7 @@ import Game.AcidRain.World.Biome.Palette (BiomePalette, BiomeIndex)
 import qualified Game.AcidRain.World.Biome.Palette as BPal
 import Game.AcidRain.World.Biome.Registry (BiomeRegistry)
 import Game.AcidRain.World.Climate (Climate)
-import Game.AcidRain.World.Entity (EntityType(..), Entity(..))
+import Game.AcidRain.World.Entity (Entity(..))
 import Game.AcidRain.World.Entity.Catalogue (EntityCatalogue, (∈))
 import Game.AcidRain.World.Position (WorldPos(..), wpX, wpY, wpZ)
 import Game.AcidRain.World.Tile (Tile(..), TileState(..), TileStateValue)
@@ -169,9 +171,9 @@ assertValidOffset (TileOffset { x, y, z })
     assert (z < chunkHeight)
 
 -- | Assert that the given entity is in the catalogue.
-assertValidEntity ∷ Entity ε ⇒ ε → Chunk → α → α
-assertValidEntity e c
-  = assert (entityTypeID (entityType e) ∈ c^.cEntCat)
+assertValidEntity ∷ ∀ε α. Entity ε ⇒ ε → Chunk → α → α
+assertValidEntity _ c
+  = assert (entityTypeID (Proxy ∷ Proxy ε) ∈ c^.cEntCat)
 
 toIndexed ∷ MonadThrow μ ⇒ TilePalette → TileState τ → μ IndexedTileState
 toIndexed palette (TileState { tsTile, tsValue })

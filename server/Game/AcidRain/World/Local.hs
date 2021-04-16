@@ -2,6 +2,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
@@ -37,7 +38,6 @@ import GHC.Conc (unsafeIOToSTM)
 import Game.AcidRain.Module (Module)
 import Game.AcidRain.Module.Loader
   ( loadModules, lcTileReg, lcBiomeReg, lcEntityReg, lcCommandReg, lcChunkGen )
-import qualified Game.AcidRain.Module.Builtin.Entities as B
 import Game.AcidRain.World
   ( World(..), WorldMode(..), WorldState(..)
   , WorldSeed, WorldStateChanged(..), ChunkArrived(..)
@@ -54,6 +54,8 @@ import Game.AcidRain.World.Command.Registry (CommandRegistry)
 import qualified Game.AcidRain.World.Command.Registry as CR
 import qualified Game.AcidRain.World.Entity as E
 import qualified Game.AcidRain.World.Entity.Catalogue as ECat
+import Game.AcidRain.World.Entity.Registry (EntityRegistry)
+import qualified Game.AcidRain.World.Entity.Registry as EReg
 import Game.AcidRain.World.Event (Event(..))
 import Game.AcidRain.World.Player.Manager.Local (LocalPlayerManager)
 import Game.AcidRain.World.Player (Player(..), Permission(..), PlayerID)
@@ -92,6 +94,7 @@ data RunningState
   = RunningState
     { _rsChunks   ∷ !LocalChunkManager
     , _rsPlayers  ∷ !LocalPlayerManager
+    , _rsEntities ∷ !EntityRegistry
     , _rsCommands ∷ !CommandRegistry
     } deriving Show
 
@@ -155,7 +158,7 @@ instance IWorldCtx LocalWorldCtx where
               cSrc ← lift $ LCM.get cpSrc lcm
               case entityAt offSrc cSrc of
                 Nothing  → return False -- But there's no entity here.
-                Just ent →
+                Just ent → E.withEntity ent $ \ent' →
                   -- The entity does exist. We still don't know if the
                   -- entity really can enter the destination.
                   if cpSrc ≡ cpDest
@@ -167,11 +170,11 @@ instance IWorldCtx LocalWorldCtx where
                        c        ← lift $ LCM.get cp lcm
                        canEnter ← canEntityEnter offDest c
                        if canEnter
-                         then do let c' = putEntity offDest ent $ deleteEntity offSrc cSrc
+                         then do let c' = putEntity offDest ent' $ deleteEntity offSrc cSrc
                                  snapshotChunk cp
                                  lift $ LCM.put cp c' lcm
                                  withWorldCtxUpcasted $
-                                   E.entityMoved ent src dest
+                                   E.entityMoved ent' src dest
                                  return True
                          else return False
                   else
@@ -181,10 +184,10 @@ instance IWorldCtx LocalWorldCtx where
                        if canEnter
                          then do snapshotChunk cpSrc
                                  snapshotChunk cpDest
-                                 lift $ LCM.modify (deleteEntity offSrc)   cpSrc  lcm
-                                 lift $ LCM.modify (putEntity offDest ent) cpDest lcm
+                                 lift $ LCM.modify (deleteEntity offSrc)    cpSrc  lcm
+                                 lift $ LCM.modify (putEntity offDest ent') cpDest lcm
                                  withWorldCtxUpcasted $
-                                   E.entityMoved ent src dest
+                                   E.entityMoved ent' src dest
                                  return $ True
                          else return False
 
@@ -343,6 +346,7 @@ newWorld wm mods seed
                    return $ RunningState
                      { _rsChunks   = lcm
                      , _rsPlayers  = lpm
+                     , _rsEntities = eReg
                      , _rsCommands = lc^.lcCommandReg
                      }
            atomically $
@@ -538,13 +542,15 @@ spawnEntity pos e rs
 -- | Spawn a new player in the world.
 newPlayer ∷ PlayerID → Permission → RunningState → STM Player
 newPlayer pid perm rs
-  = do spawn ← initialSpawn rs
-       let pl = Player
-                { _plID       = pid
-                , _plPerm     = perm
-                , _plPos      = spawn
-                , _plIsOnline = True
-                }
+  = do spawn  ← initialSpawn rs
+       plEntT ← EReg.get "acid-rain:player" (rs^.rsEntities)
+       let pl    = Player
+                   { _plID       = pid
+                   , _plPerm     = perm
+                   , _plPos      = spawn
+                   , _plIsOnline = True
+                   }
+           plEnt = E.dynInstantiate plEntT pid
        LPM.put pl (rs^.rsPlayers)
-       void $ spawnEntity spawn (B.Player pid) rs
+       void $ E.withEntity plEnt $ \ent → spawnEntity spawn ent rs
        return pl

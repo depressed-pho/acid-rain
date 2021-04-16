@@ -58,6 +58,7 @@ import Data.Default (Default(..))
 import Data.Foldable (traverse_, toList)
 import qualified Data.HashMap.Strict as HM
 import Data.Poly.Strict (Poly)
+import Data.Proxy (Proxy)
 import Game.AcidRain.Module.Types
   ( Module(..), ModuleMap, LoaderContext(..)
   , lcWorldSeed, lcMods, lcTileReg, lcBiomeReg
@@ -69,7 +70,7 @@ import qualified Game.AcidRain.World.Biome.Registry as BR
 import Game.AcidRain.World.Chunk.Generator (ChunkGenerator)
 import Game.AcidRain.World.Command.Registry (CommandRegistry)
 import qualified Game.AcidRain.World.Command.Registry as CR
-import Game.AcidRain.World.Entity (EntityType, EntityTypeID)
+import Game.AcidRain.World.Entity (Entity, EntityTypeID, SomeEntityType)
 import Game.AcidRain.World.Entity.Registry (EntityRegistry)
 import qualified Game.AcidRain.World.Entity.Registry as ER
 import Game.AcidRain.World.Tile (Tile, TileID)
@@ -193,17 +194,17 @@ putEntityRegistry entities
   = modify $ lcEntityReg .~ entities
 
 -- | Register an entity type. Throws if it's already been registered.
-registerEntityType ∷ (EntityType τ, Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ τ → Eff r ()
+registerEntityType ∷ (Entity ε, Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ Proxy ε → Eff r ()
 registerEntityType et
   = getEntityRegistry >>= ER.register et >>= putEntityRegistry
 
 -- | Lookup an entity type by its ID.
-lookupEntityType ∷ Member (State LoaderContext) r ⇒ EntityTypeID → Eff r (Maybe (Poly EntityType))
+lookupEntityType ∷ Member (State LoaderContext) r ⇒ EntityTypeID → Eff r (Maybe SomeEntityType)
 lookupEntityType etid
   = getEntityRegistry >>= return ∘ ER.lookup etid
 
 -- | Get an entity type by its ID. Throws if it doesn't exist.
-getEntityType ∷ (Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ EntityTypeID → Eff r (Poly EntityType)
+getEntityType ∷ (Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ EntityTypeID → Eff r SomeEntityType
 getEntityType etid
   = getEntityRegistry >>= ER.get etid
 

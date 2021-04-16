@@ -26,7 +26,6 @@ Flag debug
 library
   exposed-modules:
     Game.AcidRain.Module.Builtin
-    Game.AcidRain.Module.Builtin.Entities
 
   other-modules:
     Game.AcidRain.Module.Builtin.ChunkGen
@@ -35,6 +34,7 @@ library
     Game.AcidRain.Module.Builtin.Biomes
     Game.AcidRain.Module.Builtin.Commands
     Game.AcidRain.Module.Builtin.Commands.TH
+    Game.AcidRain.Module.Builtin.Entities
     Game.AcidRain.Module.Builtin.Tiles
     Game.AcidRain.Module.Builtin.Window.HUD.DebugInfo
 

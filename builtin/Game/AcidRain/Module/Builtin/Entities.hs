@@ -2,12 +2,11 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.Module.Builtin.Entities
-  ( Player(..)
-
-  , loadEntities
+  ( loadEntities
   ) where
 
 import Control.Eff (Eff, Member)
@@ -19,31 +18,30 @@ import Game.AcidRain.TUI
   ( HasAppearance(..), begin, end, (⊳), unicode, ascii, bold )
 import Game.AcidRain.Module.Loader (LoaderContext, registerEntityType)
 import Game.AcidRain.World (modifyPlayer, fireEvent)
-import Game.AcidRain.World.Entity (EntityType(..), Entity(..))
+import Game.AcidRain.World.Entity (Entity(..), HasEntityType(..), SomeEntityType)
 import Game.AcidRain.World.Player (PlayerID, PlayerMoved(..), plPos)
 import Lens.Micro ((.~))
 
 
-instance EntityType (Proxy Player) where
-  type EntityOf (Proxy Player) = Player
-  entityTypeID _ = "acid-rain:player"
-
 data Player = Player !PlayerID deriving Show
 instance Entity Player where
-  type EntityTypeOf Player = Proxy Player
-  entityType _ = Proxy
+  type EntityGeneOf Player = PlayerID
+  entityTypeID _ = "acid-rain:player"
+  instantiate _ pid = Player pid
   entityMoved (Player pid) src dest
     = do let f = plPos .~ dest
          modifyPlayer f pid
          fireEvent $ PlayerMoved pid src dest
-
 instance HasAppearance Player where
   appearance _
     = begin ⊳ unicode "@" ⊳ ascii '@' ⊳ bold ⊳ end
 
 
-loadEntities ∷ (Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ Eff r ()
+loadEntities ∷ ∀r. (Member (State LoaderContext) r, MonadThrow (Eff r)) ⇒ Eff r ()
 loadEntities
-  = traverse_ registerEntityType
+  = traverse_ go
     [ upcastEntityType (Proxy ∷ Proxy Player)
     ]
+  where
+    go ∷ SomeEntityType → Eff r ()
+    go someET = withEntityType someET registerEntityType

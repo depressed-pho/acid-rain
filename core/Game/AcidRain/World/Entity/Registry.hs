@@ -28,14 +28,14 @@ import qualified Data.HashMap.Strict as HM
 import Data.MonoTraversable
   ( Element, MonoFunctor, MonoFoldable, MonoTraversable, GrowingAppend
   , otraverse )
-import Data.Poly.Strict (Poly)
-import Game.AcidRain.World.Entity (EntityType(..), EntityTypeID)
+import Data.Proxy (Proxy)
+import Game.AcidRain.World.Entity ( Entity(..), SomeEntityType, EntityTypeID )
 import Prelude hiding (lookup)
 
 -- | The entity registry is a data structure that contains types in
 -- the class 'EntityType'. It is constructed while loading a world,
 -- and becomes immutable afterwards.
-newtype EntityRegistry = EntityRegistry (HashMap EntityTypeID (Poly EntityType))
+newtype EntityRegistry = EntityRegistry (HashMap EntityTypeID SomeEntityType)
   deriving ( Show, MonoFunctor, MonoFoldable, GrowingAppend, Semigroup
            , Monoid )
 
@@ -45,7 +45,7 @@ instance MonoTraversable EntityRegistry where
   otraverse f (EntityRegistry reg)
     = EntityRegistry <$> traverse f reg
 
-type instance Element EntityRegistry = Poly EntityType
+type instance Element EntityRegistry = SomeEntityType
 
 -- | Create an empty registry
 empty ∷ EntityRegistry
@@ -53,21 +53,22 @@ empty = EntityRegistry HM.empty
 
 -- | Register an entity type to the registry. Throws if it's already been
 -- registered.
-register ∷ (EntityType τ, MonadThrow μ) ⇒ τ → EntityRegistry → μ EntityRegistry
+register ∷ (Entity ε, MonadThrow μ) ⇒ Proxy ε → EntityRegistry → μ EntityRegistry
 register et (EntityRegistry reg)
-  = let etid = entityTypeID et
+  = let etid  = entityTypeID et
+        someT = upcastEntityType et
     in
       case HM.member etid reg of
         True  → throwM $ ConflictingEntityTypeIDException etid
-        False → return $ EntityRegistry $ HM.insert etid (upcastEntityType et) reg
+        False → return $ EntityRegistry $ HM.insert etid someT reg
 
 -- | Lookup an entity type by its ID.
-lookup ∷ EntityTypeID → EntityRegistry → Maybe (Poly EntityType)
+lookup ∷ EntityTypeID → EntityRegistry → Maybe (SomeEntityType)
 lookup etid (EntityRegistry reg)
   = HM.lookup etid reg
 
 -- | Get an entity type by its ID. Throws if it doesn't exist.
-get ∷ MonadThrow μ ⇒ EntityTypeID → EntityRegistry → μ (Poly EntityType)
+get ∷ MonadThrow μ ⇒ EntityTypeID → EntityRegistry → μ (SomeEntityType)
 get etid reg
   = case lookup etid reg of
       Just et → return et

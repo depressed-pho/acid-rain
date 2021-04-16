@@ -19,7 +19,8 @@ module Game.AcidRain.World.Entity.Catalogue
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.MonoTraversable (ofoldl')
-import Game.AcidRain.World.Entity (EntityType(..), EntityTypeID)
+import Game.AcidRain.World.Entity
+  ( Entity(..), HasEntityType(..), EntityTypeID )
 import Game.AcidRain.World.Entity.Registry (EntityRegistry)
 import Lens.Micro ((&), (%~), (^.))
 import Lens.Micro.TH (makeLenses)
@@ -44,7 +45,7 @@ empty = EntityCatalogue HS.empty
 -- creating a fresh new world, as catalogues must contain every
 -- possible entity type ID that can appear in any existing chunks.
 fromRegistry ∷ EntityRegistry → EntityCatalogue
-fromRegistry = ofoldl' (\c et → insert (entityTypeID et) c) empty
+fromRegistry = ofoldl' (\c et → insert (withEntityType et entityTypeID) c) empty
 
 -- | Insert an entity type ID in the catalogue. Inserting the same ID
 -- twice is not an error. It will just be ignored.

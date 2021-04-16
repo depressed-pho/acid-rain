@@ -1,17 +1,23 @@
+{-# LANGUAGE ConstrainedClassMethods #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Entity
-  ( -- * Entity types
-    EntityType(..)
+  ( Entity(..)
   , EntityTypeID
 
-    -- * Entity instances
-  , Entity(..)
+  , HasEntity(..)
+
+  , HasEntityType(..)
+  , SomeEntityType(..)
+  , dynInstantiate
   ) where
 
 import Control.Eff (Eff, Lifted, type(<::))
@@ -21,17 +27,19 @@ import Control.Exception (SomeException)
 import Control.Monad.STM (STM)
 import Data.Kind (Type)
 import Data.Poly.Strict (Poly(..))
+import Data.Proxy (Proxy(..))
 import Data.Text (Text)
+import Data.Type.Equality (TestEquality(..))
+import GHC.Stack (HasCallStack)
 import Game.AcidRain.TUI (HasAppearance(..))
 import {-# SOURCE #-} Game.AcidRain.World (WorldCtx)
 import Game.AcidRain.World.Position (WorldPos)
+import Type.Reflection (Typeable, (:~:)(Refl), typeOf, typeRep)
 
 
 type EntityTypeID = Text
 
--- | An instance of this class defines an entity type in the game. The
--- purpose of entity types is to define how individual entities are
--- spawned, serialised, or deserialised.
+-- | An instance of this class defines an entity in the game.
 --
 -- Unlike tiles, every entity in a chunk is individually serialized on
 -- disk and instantiated in memory. But worlds still have a catalogue
@@ -48,45 +56,19 @@ type EntityTypeID = Text
 -- There can be no more than one entity at the same world position
 -- (Pauli exclusion principle). Item piles are /not/ entities.
 --
--- Note that an instance of 'EntityType' typically has no values, and
--- instead implements the class on 'Data.Proxy.Proxy' like:
---
--- @
--- {-\# LANGUAGE OverloadedStrings \#-}
--- data Player
--- instance 'EntityType' ('Data.Proxy.Proxy' Player) where
---   entityID _ = "acid-rain:player"
---   ..
--- @
-class Show τ ⇒ EntityType τ where
-  -- | The entity instance of this entity type. It has to be in the
-  -- class 'Entity'.
-  type EntityOf τ ∷ Type
+class (HasAppearance ε, Show ε, Typeable (EntityGeneOf ε)) ⇒ Entity ε where
+  -- | Data needed for instantiating this entity.
+  type EntityGeneOf ε ∷ Type
   -- | Erase the type of the entity type.
-  upcastEntityType ∷ τ → Poly EntityType
-  upcastEntityType = Poly
-  -- | Get the entity type ID such as @acid-rain:player@.
-  entityTypeID ∷ τ → EntityTypeID
-
-instance Show (Poly EntityType) where
-  showsPrec d (Poly t) = showsPrec d t
-
-instance EntityType (Poly EntityType) where
-  type EntityOf (Poly EntityType) = Poly Entity
-  upcastEntityType = id
-  entityTypeID (Poly t) = entityTypeID t
-
--- | An instance of this class defines an entity in the game. It is
--- instantiated through an associated type 'EntityT'.
-class (EntityType (EntityTypeOf ε), HasAppearance ε, Show ε) ⇒ Entity ε where
-  -- | The entity type of this entity. It has to be in the class
-  -- 'EntityType'.
-  type EntityTypeOf ε ∷ Type
-  -- | Erase the type of the entity.
+  upcastEntityType ∷ Proxy ε → SomeEntityType
+  upcastEntityType = SomeEntityType
+    -- | Erase the type of the entity.
   upcastEntity ∷ ε → Poly Entity
   upcastEntity = Poly
-  -- | Get the type of this entity.
-  entityType ∷ ε → EntityTypeOf ε
+  -- | Get the entity type ID such as @acid-rain:player@.
+  entityTypeID ∷ Proxy ε → EntityTypeID
+  -- | Create an instance of this entity.
+  instantiate ∷ Proxy ε → EntityGeneOf ε → ε
   -- | Called when an entity has been moved. Do nothing by default.
   entityMoved ∷ (Lifted STM r, [State WorldCtx, Exc SomeException] <:: r)
               ⇒ ε
@@ -95,14 +77,50 @@ class (EntityType (EntityTypeOf ε), HasAppearance ε, Show ε) ⇒ Entity ε wh
               → Eff r ()
   entityMoved _ _ _ = return ()
 
+-- | Type-erased proxy of an 'Entity'.
+data SomeEntityType = ∀ε. Entity ε ⇒ SomeEntityType !(Proxy ε)
+
+instance Show SomeEntityType where
+  showsPrec d (SomeEntityType t) = showsPrec d t
+
 instance Show (Poly Entity) where
   showsPrec d (Poly e) = showsPrec d e
 
 instance HasAppearance (Poly Entity) where
   appearance (Poly e) = appearance e
 
-instance Entity (Poly Entity) where
-  type EntityTypeOf (Poly Entity) = Poly EntityType
-  upcastEntity = id
-  entityType (Poly e) = Poly (entityType e)
-  entityMoved (Poly e) = entityMoved e
+class HasEntityType τ where
+  -- | Evaluate a function with a proxy of some 'Entity'.
+  withEntityType ∷ τ → (∀ε. Entity ε ⇒ Proxy ε → α) → α
+
+-- | Attempt to create an instance of entity using an any type as a
+-- gene. If the runtime type of genes don't match, this throws an
+-- exception.
+dynInstantiate ∷ (HasCallStack, HasEntityType τ, Typeable g) ⇒ τ → g → Poly Entity
+dynInstantiate t g
+  = withEntityType t $ \(proxy ∷ Proxy ε) →
+    -- This works, but I have no idea why. The type of ε is available
+    -- at run time, but how can GHC retrieve the type of (EntityGeneOf
+    -- ε)? It's an associated type family after all. Is it perhaps a
+    -- part of the dictionary of Entity?
+    let expectedType = typeRep @(EntityGeneOf ε)
+        gotType      = typeOf g
+    in
+      case testEquality expectedType gotType of
+        Just Refl → Poly $ instantiate proxy g
+        Nothing   → error ("Entity gene types don't match: expected " ++
+                           show expectedType ++ " but got " ++ show gotType)
+
+instance HasEntityType (Poly Entity) where
+  withEntityType (Poly (_ ∷ ε)) f
+    = f (Proxy ∷ Proxy ε)
+
+instance HasEntityType SomeEntityType where
+  withEntityType (SomeEntityType proxy) f = f proxy
+
+class HasEntity τ where
+  -- | Evaluate a function with some 'Entity'.
+  withEntity ∷ τ → (∀ε. Entity ε ⇒ ε → α) → α
+
+instance HasEntity (Poly Entity) where
+  withEntity (Poly e) f = f e

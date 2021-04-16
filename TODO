@@ -6,9 +6,6 @@
 * TODO [#C] Consider using the full-fledged lens instead of microlens
 * TODO [#C] Proper run commands
 * TODO [#C] Consider using hoogle
-* TODO OOP constructor for =EntityType=
-  But its argument would differ for each entity type, which means we
-  need to do some kind of dynamic type casting.
 * TODO Use size-indexed vectors (vector-sized) whenever possible
   We don't do this yet. Haskell isn't a dependently-typed language,
   and attempting to simulate it only clutters the (already
@@ -25,3 +22,8 @@
   play nice with existential types it appears. Maybe I should give up
   making =Poly EntityType= (or equivalently =SomeEntityType=) an
   instance of =EntityType=, like what I did for =SomeBiomeProxy=.
+** Note
+   After that I did exactly that.
+* DONE OOP constructor for =EntityType=
+  But its argument would differ for each entity type, which means we
+  need to do some kind of dynamic type casting.
