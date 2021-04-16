@@ -2,11 +2,13 @@
 
 * TODO [#A] Bias oceans towards lands
 * TODO [#A] Change the Z mapping threshold
-* TODO [#B] Try injective type families for things like EntityType
 * TODO [#B] Consider using HLint
 * TODO [#C] Consider using the full-fledged lens instead of microlens
 * TODO [#C] Proper run commands
 * TODO [#C] Consider using hoogle
+* TODO OOP constructor for =EntityType=
+  But its argument would differ for each entity type, which means we
+  need to do some kind of dynamic type casting.
 * TODO Use size-indexed vectors (vector-sized) whenever possible
   We don't do this yet. Haskell isn't a dependently-typed language,
   and attempting to simulate it only clutters the (already
@@ -17,3 +19,9 @@
 * DONE [#A] Consider using polydata instead of hand-rolling Some*
 * DONE [#B] Templetize registries with CPP
   Decided not to do this. Its' simply not worth it.
+* DONE [#B] Try injective type families for things like EntityType
+  I tried hard. I tried really hard, but I couldn't get rid of the
+  type family =EntityTypeOf=. Injective type families really doesn't
+  play nice with existential types it appears. Maybe I should give up
+  making =Poly EntityType= (or equivalently =SomeEntityType=) an
+  instance of =EntityType=, like what I did for =SomeBiomeProxy=.
