@@ -5,7 +5,6 @@
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.TUI.Client
   ( Client
@@ -111,8 +110,10 @@ instance IClientCtx Client where
     = cliWindows %~ S.filter ((≢ wid) ∘ (^.swWindow.to W.windowID))
 
 data ClientEvent
-  = -- | A world event has been fired.
-    GotWorldEvent !(Poly WE.Event)
+  = -- | Needed to redraw the client for whatever reason.
+    RedrawNeeded
+    -- | A world event has been fired.
+  | GotWorldEvent !(Poly WE.Event)
     -- | A new 'Window' with the given name has been inserted.
   | WindowInserted !Unique
   deriving AppEvent
@@ -135,9 +136,10 @@ newClient uni w pid evChan
               Just wEv → writeBChan evChan (upcastAppEvent $ GotWorldEvent wEv) *> loop
               Nothing  → return ()
 
-       -- We don't need to send an event to the channel here just to
-       -- redraw the client, because we'll soon get
-       -- 'WorldStateChanged'.
+       -- We need to send an event to the channel just to redraw the
+       -- client, because it's initially empty due to the way how we
+       -- render it, i.e. the extent thingy.
+       liftIO $ writeBChan evChan (upcastAppEvent RedrawNeeded)
 
        ws ← getWorldState w
        return Client
@@ -173,8 +175,11 @@ isClientClosed = (^.cliClosed)
 handleClientEvent ∷ Client → BrickEvent Unique (Poly AppEvent) → EventM Unique Client
 handleClientEvent cli be
   = case be of
-      VtyEvent (V.EvResize _ _) →
-        traverseOf cliWorldView redrawWorldView cli
+      VtyEvent (V.EvResize _ _) → redraw
+
+      AppEvent ev
+        | Just RedrawNeeded ← downcastAppEvent ev
+          → redraw
 
       _ →
         case cli^.cliWorldState of
@@ -184,14 +189,18 @@ handleClientEvent cli be
           Running _       → handleEventWhileRunning cli be
           Closed (Just _) → fail "FIXME: not implemented"
           Closed Nothing  → return $ cli & cliClosed .~ True
+  where
+    redraw =
+      traverseOf cliWorldView redrawWorldView cli
 
 handleEventWhileLoading ∷ Client
                         → BrickEvent Unique (Poly AppEvent)
                         → EventM Unique Client
 handleEventWhileLoading cli be
   = case be of
-      AppEvent (downcastAppEvent → Just (GotWorldEvent we)) →
-        handleWorldEvent cli we
+      AppEvent ev
+        | Just (GotWorldEvent we) ← downcastAppEvent ev
+          → handleWorldEvent cli we
 
       VtyEvent (V.EvKey V.KEsc []) →
         return $ cli & cliClosed .~ True
@@ -203,15 +212,16 @@ handleEventWhileRunning ∷ Client
                         → EventM Unique Client
 handleEventWhileRunning cli be
   = case be of
-      AppEvent (downcastAppEvent → Just (GotWorldEvent we)) →
-        -- World events are always propagated through all the windows
-        -- and the client itself.
-        do let handleWE = traverseOf swWindow (flip W.handleWorldEvent we)
-           cli' ← traverseOf cliWindows (traverse handleWE) cli
-           handleWorldEvent cli' we
+      AppEvent ev
+        | Just (GotWorldEvent we) ← downcastAppEvent ev
+          → -- World events are always propagated through all the windows
+            -- and the client itself.
+            do let handleWE = traverseOf swWindow (flip W.handleWorldEvent we)
+               cli' ← traverseOf cliWindows (traverse handleWE) cli
+               handleWorldEvent cli' we
 
-      AppEvent (downcastAppEvent → Just (WindowInserted n)) →
-        traverseOf cliWindows (windowStart n)cli
+        | Just (WindowInserted n) ← downcastAppEvent ev
+          → traverseOf cliWindows (windowStart n)cli
 
       VtyEvent ev →
         -- Vty events are propagated through modal windows and finally

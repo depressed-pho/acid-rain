@@ -18,7 +18,7 @@ import Brick.Main (lookupExtent)
 import Brick.Types
   ( Location(..), Widget(..), Size(..), EventM, Extent(..)
   , availWidthL, availHeightL, emptyResult, getContext, imageL, locL )
-import Brick.Widgets.Center (center)
+import Brick.Widgets.Center (center, hCenter, vCenter)
 import Brick.Widgets.Core (Named(..), fill, reportExtent, txt, txtWrap, vBox)
 import Control.Exception (Handler(..), catches)
 import Control.Monad.Catch (MonadThrow)
@@ -271,9 +271,9 @@ catchWNRE ∷ WorldNotRunningException → IO (Widget n)
 catchWNRE (WorldNotRunningException ws)
   = return $
     case ws of
-      Loading       → center $ vBox [ txt "Loading..."
-                                    , txt ""
-                                    , txt "Press ESC to cancel" ]
+      Loading       → vCenter $ vBox [ hCenter $ txt "Loading..."
+                                     , txt ""
+                                     , hCenter $ txt "Press ESC to cancel" ]
       LoadPending   → center $ txt "FIXME: LoadPending"
       LoadFailed e' → txtWrap $ "Load failed: " ⊕ pack (show e')
       Running _     → error "Impossible"
