@@ -1,6 +1,7 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.World.Tile
   ( Tile(..)
@@ -10,6 +11,7 @@ module Game.AcidRain.World.Tile
   , SomeTileState
   , defaultState
   , isSolid
+  , isLiquid
   ) where
 
 import Data.Poly.Strict (Poly(..))
@@ -52,6 +54,8 @@ class (Show τ, Typeable τ) ⇒ Tile τ where
   -- | Return 'True' iff the tile in a given state prevents entities
   -- from entering the spot where the tile exists.
   isSolidAt ∷ τ → TileStateValue → Bool
+  -- | Return 'True' iff the tile in a given state counts as liquid.
+  isLiquidAt ∷ τ → TileStateValue → Bool
   -- | Get the appearance of the tile for the given state and
   -- position.
   appearanceAt ∷ τ → TileStateValue → WorldPos → Appearance
@@ -65,6 +69,7 @@ instance Tile (Poly Tile) where
   tileID (Poly t) = tileID t
   defaultStateValue (Poly t) = defaultStateValue t
   isSolidAt (Poly τ) = isSolidAt τ
+  isLiquidAt (Poly τ) = isLiquidAt τ
   appearanceAt (Poly t) = appearanceAt t
 
 -- | TileState is a type containing a 'Tile' and a single integral
@@ -100,8 +105,12 @@ defaultState t
     , tsValue = defaultStateValue t
     }
 
-isSolid ∷ Tile τ ⇒ TileState τ → Bool
-isSolid ts
-  = isSolidAt (tsTile ts) (tsValue ts)
-
 type TileStateValue = Word32
+
+isSolid ∷ TileState τ → Bool
+isSolid TileState { tsTile, tsValue }
+  = isSolidAt tsTile tsValue
+
+isLiquid ∷ TileState τ → Bool
+isLiquid TileState { tsTile, tsValue }
+  = isLiquidAt tsTile tsValue

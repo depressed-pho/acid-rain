@@ -24,12 +24,14 @@ data Air
 instance Tile (Proxy Air) where
   tileID       _     = "acid-rain:air"
   isSolidAt    _ _   = False
+  isLiquidAt   _ _   = False
   appearanceAt _ _ _ = InvisibleAppearance
 
 data Dirt
 instance Tile (Proxy Dirt) where
   tileID       _   = "acid-rain:dirt"
   isSolidAt    _ _ = True
+  isLiquidAt   _ _ = False
   appearanceAt _ _ pos
     | pos^.wpZ ≡ lowestZ = begin ⊳ unicode "." ⊳ ascii '.' ⊳ fgColour colour ⊳ end
     | otherwise          = begin ⊳ unicode "#" ⊳ ascii '#' ⊳ fgColour colour ⊳ end
@@ -40,6 +42,7 @@ data Gravel
 instance Tile (Proxy Gravel) where
   tileID       _   = "acid-rain:gravel"
   isSolidAt    _ _ = True
+  isLiquidAt   _ _ = False
   appearanceAt _ _ pos
     | pos^.wpZ ≡ lowestZ = begin ⊳ unicode ":" ⊳ ascii ':' ⊳ fgColour colour ⊳ end
     | otherwise          = begin ⊳ unicode "%" ⊳ ascii '%' ⊳ fgColour colour ⊳ end
@@ -50,6 +53,7 @@ data Sand
 instance Tile (Proxy Sand) where
   tileID _         = "acid-rain:sand"
   isSolidAt    _ _ = True
+  isLiquidAt   _ _ = False
   appearanceAt _ _ pos
     | pos^.wpZ ≡ lowestZ = begin ⊳ unicode ":" ⊳ ascii ':' ⊳ fgColour colour ⊳ end
     | otherwise          = begin ⊳ unicode "#" ⊳ ascii '#' ⊳ fgColour colour ⊳ end
@@ -60,6 +64,7 @@ data SeaWater
 instance Tile (Proxy SeaWater) where
   tileID       _     = "acid-rain:seawater"
   isSolidAt    _ _   = False
+  isLiquidAt   _ _   = True
   appearanceAt _ _ _ = begin ⊳ unicode "~" ⊳ ascii '~' ⊳ fgColour colour ⊳ end
     where
       colour = hsl 195.0 1.0 0.4 -- Slightly darker than CSS3 deepskyblue
@@ -68,6 +73,7 @@ data Water
 instance Tile (Proxy Water) where
   tileID       _     = "acid-rain:water"
   isSolidAt    _ _   = False
+  isLiquidAt   _ _   = True
   appearanceAt _ _ _ = begin ⊳ unicode "~" ⊳ ascii '~' ⊳ fgColour colour ⊳ end
     where
       colour = hsl 195.0 1.0 0.5 -- CSS3 deepskyblue

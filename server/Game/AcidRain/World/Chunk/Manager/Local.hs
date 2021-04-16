@@ -8,13 +8,15 @@ module Game.AcidRain.World.Chunk.Manager.Local
   ( LocalChunkManager
   , ChunkStatus(..)
 
+    -- * Operations on chunks
   , new
   , lookup
   , get
   , put
   , modify
 
-  , generate
+    -- * Operations on world positions
+  , tileStateAt
   ) where
 
 import Control.Concurrent (forkIO, getNumCapabilities)
@@ -24,14 +26,18 @@ import Control.Monad (void)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.STM (STM, atomically, retry, throwSTM)
+import Data.Convertible.Base (convert)
 import qualified Focus as F
 import GHC.Conc (unsafeIOToSTM)
 import Game.AcidRain.World.Biome.Palette (BiomePalette)
 import Game.AcidRain.World.Biome.Registry (BiomeRegistry)
 import Game.AcidRain.World.Chunk (Chunk)
+import qualified Game.AcidRain.World.Chunk as C
 import Game.AcidRain.World.Chunk.Generator (ChunkGenerator, generateChunk)
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
 import Game.AcidRain.World.Entity.Catalogue (EntityCatalogue)
+import Game.AcidRain.World.Position (WorldPos)
+import Game.AcidRain.World.Tile (SomeTileState)
 import Game.AcidRain.World.Tile.Palette (TilePalette)
 import Game.AcidRain.World.Tile.Registry (TileRegistry)
 import Prelude hiding (lcm, lookup)
@@ -190,3 +196,9 @@ generate ∷ (MonadThrow μ, MonadIO μ)
          → μ Chunk
 generate cPos (LocalChunkManager { .. })
   = generateChunk lcmTileReg lcmTilePal lcmBiomeReg lcmBiomePal lcmEntCat lcmChunkGen cPos
+
+-- | Get the tile state at a given position in the world.
+tileStateAt ∷ WorldPos → LocalChunkManager → STM SomeTileState
+tileStateAt wPos lcm
+  = do chunk ← get (convert wPos) lcm
+       C.tileStateAt (convert wPos) chunk

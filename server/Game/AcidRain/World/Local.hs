@@ -1,9 +1,11 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnicodeSyntax #-}
@@ -23,13 +25,15 @@ import Control.Eff.Exception (Exc, runError)
 import Control.Eff.State.Strict (State, execState, runState, get, put)
 import Control.Exception (Exception(..), SomeException, assert, handle)
 import Control.Monad (join, void)
+import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.STM (STM, atomically, throwSTM, orElse)
 import Data.Convertible.Base (convert)
+import Data.Hashable (hash)
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, fromMaybe)
 import Data.Poly.Strict (Poly)
 import Data.Text (Text)
 import qualified Data.UUID as U
@@ -45,8 +49,8 @@ import Game.AcidRain.World
   , ChunkUpdated(..), CommandSetUpdated(..)
   , WorldNotRunningException(..), UnknownPlayerIDException(..), throwSomeExc )
 import qualified Game.AcidRain.World.Biome.Palette as BPal
-import Game.AcidRain.World.Chunk
-  ( Chunk, putEntity, deleteEntity, entityAt, canEntityEnter )
+import Game.AcidRain.World.Chunk (Chunk)
+import qualified Game.AcidRain.World.Chunk as C
 import Game.AcidRain.World.Chunk.Manager.Local (LocalChunkManager)
 import qualified Game.AcidRain.World.Chunk.Manager.Local as LCM
 import Game.AcidRain.World.Chunk.Position (ChunkPos)
@@ -59,14 +63,16 @@ import qualified Game.AcidRain.World.Entity.Registry as EReg
 import Game.AcidRain.World.Event (Event(..))
 import Game.AcidRain.World.Player.Manager.Local (LocalPlayerManager)
 import Game.AcidRain.World.Player (Player(..), Permission(..), PlayerID)
-import Game.AcidRain.World.Position (WorldPos(..))
+import Game.AcidRain.World.Position (WorldPos(..), wpX, wpY, wpZ, lowestZ)
 import qualified Game.AcidRain.World.Player.Manager.Local as LPM
+import Game.AcidRain.World.Tile (TileState, isSolid, isLiquid)
 import qualified Game.AcidRain.World.Tile.Palette as TPal
-import Lens.Micro ((^.), (&), (.~), traverseOf, traverseOf_)
+import Lens.Micro ((^.), (&), (.~), (%~), (-~), traverseOf, traverseOf_)
 import Lens.Micro.TH (makeLenses, makeLensesFor)
 import Numeric.Natural (Natural)
 import Prelude hiding (lcm)
 import Prelude.Unicode ((∘), (⋅), (≡))
+import System.Random (RandomGen, mkStdGen, uniformR)
 
 
 -- | Local world is a server-side world which is owned by a
@@ -156,7 +162,7 @@ instance IWorldCtx LocalWorldCtx where
                   offSrc  = convert src
                   offDest = convert dest
               cSrc ← lift $ LCM.get cpSrc lcm
-              case entityAt offSrc cSrc of
+              case C.entityAt offSrc cSrc of
                 Nothing  → return False -- But there's no entity here.
                 Just ent → E.withEntity ent $ \ent' →
                   -- The entity does exist. We still don't know if the
@@ -168,9 +174,9 @@ instance IWorldCtx LocalWorldCtx where
                     -- chunk.
                     do let cp = cpSrc -- or cpDest. It doesn't matter.
                        c        ← lift $ LCM.get cp lcm
-                       canEnter ← canEntityEnter offDest c
+                       canEnter ← C.canEntityEnter offDest c
                        if canEnter
-                         then do let c' = putEntity offDest ent' $ deleteEntity offSrc cSrc
+                         then do let c' = C.putEntity offDest ent' $ C.deleteEntity offSrc cSrc
                                  snapshotChunk cp
                                  lift $ LCM.put cp c' lcm
                                  withWorldCtxUpcasted $
@@ -180,12 +186,12 @@ instance IWorldCtx LocalWorldCtx where
                   else
                     -- We are moving across a chunk boundary.
                     do cDest    ← lift $ LCM.get cpDest lcm
-                       canEnter ← canEntityEnter offDest cDest
+                       canEnter ← C.canEntityEnter offDest cDest
                        if canEnter
                          then do snapshotChunk cpSrc
                                  snapshotChunk cpDest
-                                 lift $ LCM.modify (deleteEntity offSrc)    cpSrc  lcm
-                                 lift $ LCM.modify (putEntity offDest ent') cpDest lcm
+                                 lift $ LCM.modify (C.deleteEntity offSrc)    cpSrc  lcm
+                                 lift $ LCM.modify (C.putEntity offDest ent') cpDest lcm
                                  withWorldCtxUpcasted $
                                    E.entityMoved ent' src dest
                                  return $ True
@@ -344,14 +350,14 @@ newWorld wm mods seed
                    -- it and start a new one. It's okay because we are
                    -- still in the Loading state.
                    return $ RunningState
-                     { _rsChunks   = lcm
-                     , _rsPlayers  = lpm
-                     , _rsEntities = eReg
-                     , _rsCommands = lc^.lcCommandReg
+                     { _rsChunks     = lcm
+                     , _rsPlayers    = lpm
+                     , _rsEntities   = eReg
+                     , _rsCommands   = lc^.lcCommandReg
                      }
            atomically $
              do case wm of
-                  SinglePlayer → void $ newPlayer U.nil Administrator rs
+                  SinglePlayer → void $ newPlayer seed U.nil Administrator rs
                   _            → return ()
                 -- Notify clients of all the available commands.
                 fireEvent lw $ CommandSetUpdated $ CR.valuesSet (rs^.rsCommands)
@@ -519,12 +525,11 @@ notifyChunkUpdates ctx
              then fireEvent (ctx^.ctxLw) $ ChunkUpdated pls cPos
              else return ()
 
--- | Get the coordinate of the initial spawn.
-initialSpawn ∷ RunningState → STM WorldPos
-initialSpawn _rs
-  -- FIXME: The initial spawn point can only be determined after
-  -- generating the spawn chunk.
-  = return $ WorldPos 0 0 0
+-- | Get the coordinate of the initial spawn. This can't be statically
+-- located because it depends on the current state of terrain.
+initialSpawn ∷ WorldSeed → RunningState → STM WorldPos
+initialSpawn seed rs
+  = findSpawnableSpot seed (rs^.rsChunks) (WorldPos 0 0 0)
 
 -- | Spawn an entity somewhere in the world. Generate a chunk if it
 -- doesn't exist yet.
@@ -537,12 +542,12 @@ spawnEntity pos e rs
   = LCM.modify ins (convert pos) (rs^.rsChunks)
   where
     ins ∷ Chunk → Chunk
-    ins = putEntity (convert pos) e
+    ins = C.putEntity (convert pos) e
 
 -- | Spawn a new player in the world.
-newPlayer ∷ PlayerID → Permission → RunningState → STM Player
-newPlayer pid perm rs
-  = do spawn  ← initialSpawn rs
+newPlayer ∷ WorldSeed → PlayerID → Permission → RunningState → STM Player
+newPlayer seed pid perm rs
+  = do spawn  ← initialSpawn seed rs
        plEntT ← EReg.get "acid-rain:player" (rs^.rsEntities)
        let pl    = Player
                    { _plID       = pid
@@ -554,3 +559,91 @@ newPlayer pid perm rs
        LPM.put pl (rs^.rsPlayers)
        void $ E.withEntity plEnt $ \ent → spawnEntity spawn ent rs
        return pl
+
+-- | Find a spot suitable for spawning players around a given position
+-- @(x, y, z)@. For a spot to be suitable it must meet the following
+-- criteria:
+--
+-- * The tile at @(x, y, z)@ must not be solid nor liquid.
+--
+-- * The tile at @(x, y-1, z)@ must be either solid or the bottom of
+--   the world.
+--
+-- But there is a maximum number of attempts, and if it exceeds the
+-- limit we give up and let them spawn in an unsuitable place.
+--
+findSpawnableSpot ∷ WorldSeed → LocalChunkManager → WorldPos → STM WorldPos
+findSpawnableSpot seed lcm start
+  = do start' ← lowest start
+       fromMaybe start' <$> go 1 (mkStdGen (hash seed)) start'
+  where
+    lowest ∷ WorldPos → STM WorldPos
+    lowest wPos
+      = do chunk ← LCM.get (convert wPos) lcm
+           lowest' chunk wPos
+
+    lowest' ∷ MonadThrow μ ⇒ Chunk → WorldPos → μ WorldPos
+    lowest' chunk wPos
+      | (wPos^.wpZ) ≡ lowestZ = return wPos
+      | otherwise
+        = do let floorPos = wPos & wpZ -~ 1
+             ts ← C.tileStateAt (convert floorPos) chunk
+             if isSolid ts
+               then return wPos
+               else lowest' chunk floorPos
+
+    go ∷ RandomGen g ⇒ Int → g → WorldPos → STM (Maybe WorldPos)
+    go nAttempts rng cur
+      | nAttempts > maxAttempts = return Nothing
+      | otherwise
+        = do ts ← LCM.tileStateAt cur lcm
+             if isSuitable ts
+               then return $ Just cur
+               else do (next, rng') ← nextPos nAttempts rng
+                       mPos ← go (nAttempts+1) rng' next
+                       case mPos of
+                         Just _  → return mPos
+                         Nothing
+                           -- We have reached the limit without
+                           -- managing to find the best position.
+                           -- Make a compromise if the current
+                           -- position is at least tolerable.
+                           | isTolerable ts → return $ Just cur
+                           | otherwise      → return Nothing
+
+    -- The position is assumed to be 'lowest'.
+    isSuitable ∷ TileState τ → Bool
+    isSuitable ts
+      | isSolid  ts = False
+      | isLiquid ts = False
+      | otherwise   = True
+
+    -- The position is assumed to be 'lowest'.
+    isTolerable ∷ TileState τ → Bool
+    isTolerable ts
+      | isSolid ts = False
+      | otherwise  = True
+
+    -- We search for positions in polar coordinates centered around
+    -- the original position by rapidly increasing the absolute value
+    -- and randomly choosing the argument.
+    nextPos ∷ (Integral i, RandomGen g) ⇒ i → g → STM (WorldPos, g)
+    nextPos nAttempts rng
+      = let dist        = fib (fromIntegral nAttempts)
+            -- This is slightly biased because the range includes 2π but meh…
+            (arg, rng') = uniformR (0, 2⋅pi) rng
+            offX        = dist ⋅ cos arg ∷ Double
+            offY        = dist ⋅ sin arg ∷ Double
+            wPos        = start & wpX %~ (\x → round (fromIntegral x + offX))
+                                & wpY %~ (\x → round (fromIntegral x + offY))
+        in (, rng') <$> lowest wPos
+
+    maxAttempts ∷ Integral i ⇒ i
+    maxAttempts = 64
+
+-- | Fibonacci series based on its closed form. Not exactly accurate.
+fib ∷ Floating n ⇒ n → n
+fib n
+  = let sqrt5 = sqrt 5
+    in
+      (1/sqrt5) ⋅ ((((1+sqrt5)/2) ** n) - (((1-sqrt5)/2) ** n))
