@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Game.AcidRain.Module.Builtin.ChunkGen.PointAttrs
   ( PointAttrs(..)
@@ -62,34 +63,63 @@ pointAttrs bc pos
 -- | Compute the final height for a given (x, y) coordinates. For the
 -- base height we compute @fBm(p + fBm(p + fBm(p)))@ for the point
 -- @p@.
-height ∷ Member (Reader WorldInfo) r ⇒ Double → WorldPos → Eff r Double
+height ∷ ∀r. Member (Reader WorldInfo) r ⇒ Double → WorldPos → Eff r Double
 height river pos
-  = do let pt0 = (fromIntegral (pos^.wpX), fromIntegral (pos^.wpY))
+  = do lfh ← lfHeight
+       hfh ← hfHeight
+       let baseHeight = clamp (lfh + hfh) (-1) 1
 
-       noiseX  ← simplexInstance 0
-       noiseY  ← simplexInstance 1
-       let pt1 = ( evalFBm noiseX pt0
-                 , evalFBm noiseY pt0 )
-
-       noiseX' ← simplexInstance 2
-       noiseY' ← simplexInstance 3
-       let pt2 = ( evalFBm noiseX' (offset pt0 (scale warp pt1))
-                 , evalFBm noiseY' (offset pt0 (scale warp pt1)) )
-
-       noiseF  ← simplexInstance 4
-       let baseHeight = evalFBm noiseF (offset pt0 (scale warp pt2))
-
-       -- Now we obtained a height in [-1, 1]. Enhance mountains and
-       -- valleys by multiplying it by its absolute value on the power
-       -- of some constant.
+       -- Now we obtained a height in [-1, 1] with a uniform
+       -- distribution, which means 50% of the world is sunk in
+       -- water. For the beter game play we change this distribution
+       -- by remapping the range to [lo, hi] for some (lo, hi) ∈ [-1,
+       -- 1]. The resulting height is still in [-1, 1].
        wi      ← ask
+       let ratio = wiOceanLandRatio wi
+           -- ratio   0 → [ 0, 1]
+           -- ratio 0.5 → [-1, 1]
+           -- ratio   1 → [-1, 0]
+           lo = mix 0 (-1)     ((clamp ratio 0   0.5)⋅2)
+           hi = mix 0   1  (1-(((clamp ratio 0.5 1  )⋅2)-1))
+           biasedHeight
+             = mix lo hi ((baseHeight+1)/2)
+
+       -- Enhance mountains and valleys by multiplying it by its
+       -- absolute value on the power of some constant.
        let enhancedHeight
-             = baseHeight⋅(abs baseHeight)⋅(wiMountainExp wi)
+             = biasedHeight⋅(abs biasedHeight)**(wiMountainExp wi)
 
        -- Then apply a river strength unless the height is already
        -- under the sea level.
        return $ riverize enhancedHeight river
   where
+    lfHeight ∷ Eff r Double
+    lfHeight
+      = do wi      ← ask
+           let pt0 = ( fromIntegral (pos^.wpX) ⋅ wiLoFreqHeightMapScale wi
+                     , fromIntegral (pos^.wpY) ⋅ wiLoFreqHeightMapScale wi )
+
+           noiseX  ← simplexInstance 0
+           noiseY  ← simplexInstance 1
+           let pt1 = ( evalFBm noiseX pt0
+                     , evalFBm noiseY pt0 )
+
+           noiseX' ← simplexInstance 2
+           noiseY' ← simplexInstance 3
+           let pt2 = ( evalFBm noiseX' (offset pt0 (scale warp pt1))
+                     , evalFBm noiseY' (offset pt0 (scale warp pt1)) )
+
+           noiseF  ← simplexInstance 4
+           return $ evalFBm noiseF (offset pt0 (scale warp pt2))
+
+    hfHeight ∷ Eff r Double
+    hfHeight
+      = do wi ← ask
+           let pt = ( fromIntegral (pos^.wpX) ⋅ wiHiFreqHeightMapScale wi
+                    , fromIntegral (pos^.wpY) ⋅ wiHiFreqHeightMapScale wi )
+           noiseF ← simplexInstance 5
+           return $ evalFBm noiseF pt ⋅ wiHiFreqHeightMapAmp wi
+
     evalFBm ∷ SimplexGen → (Double, Double) → Double
     evalFBm gen pt
       = fBm scale (noise gen) oct 1 0.5 freq0 2 pt
@@ -229,8 +259,8 @@ climate h pos
     maxAlt = 3000
 
 -- | Linear interpolation; same as GLSL @mix()@. The third argument
--- should be in [0, 1] to give an useful result, but it doesn't have
--- to be.
+-- should be in [0, 1] to give a useful result, but it doesn't have to
+-- be.
 mix ∷ Num r ⇒ r → r → r → r
 {-# INLINE mix #-}
 mix lo hi r

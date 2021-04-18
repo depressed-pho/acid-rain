@@ -27,6 +27,17 @@ data WorldInfo
       -- | An infinite list of Voronoi noise generators of varying
       -- seeds. The starting seed is that of the world seed.
     , wiVoronois ∷ [VoronoiGen Double]
+      -- | The scale for the low-frequency height map. The lower the
+      -- scale is, the smoother the heigt map is. Make it too high and
+      -- oceans generate like a cluster of lakes.
+    , wiLoFreqHeightMapScale ∷ !Double
+      -- | The scale for the high-frequency height map. The lower the
+      -- scaleis, the smoother the heigt map is.
+    , wiHiFreqHeightMapScale ∷ !Double
+      -- | The amplitude for the high-frequency height map in [0, 1].
+    , wiHiFreqHeightMapAmp ∷ !Double
+      -- | Ocean / land ratio in [0, 1].
+    , wiOceanLandRatio ∷ !Double
       -- | Mountain and valley enhancement factor. Use zero to apply
       -- no enhancements. Higher values turn the height exponentially
       -- close to zero.
@@ -47,14 +58,18 @@ data WorldInfo
 worldInfo ∷ WorldSeed → WorldInfo
 worldInfo seed
   = WorldInfo
-    { wiSimplices        = unfoldr (\x → Just (mkSimplexGen x, x + 1)) seed
-    , wiVoronois         = unfoldr (\x → Just (mkVoronoiGen x, x + 1)) seed
-    , wiMountainExp      = 0.3
-    , wiBiomeSize        = 350
-    , wiLargeBendSize    = 140
-    , wiSmallBendSize    = 30
-    , wiRiverSeparation  = 975
-    , wiRiverValleyLevel = 140 / 450
+    { wiSimplices            = unfoldr (\x → Just (mkSimplexGen x, x + 1)) seed
+    , wiVoronois             = unfoldr (\x → Just (mkVoronoiGen x, x + 1)) seed
+    , wiLoFreqHeightMapScale = 1/20
+    , wiHiFreqHeightMapScale = 3
+    , wiHiFreqHeightMapAmp   = 0.3
+    , wiOceanLandRatio       = 0.4
+    , wiMountainExp          = 0.8
+    , wiBiomeSize            = 350
+    , wiLargeBendSize        = 140
+    , wiSmallBendSize        = 30
+    , wiRiverSeparation      = 975
+    , wiRiverValleyLevel     = 140/450
     }
 
 -- | Get the n-th cached instance of SimplexGen for use in chunk

@@ -1,7 +1,5 @@
 # -*- org -*-
 
-* TODO [#A] Bias oceans towards lands
-* TODO [#A] Change the Z mapping threshold
 * TODO [#B] Consider using HLint
 * TODO [#C] Consider using the full-fledged lens instead of microlens
 * TODO [#C] Proper run commands
@@ -27,3 +25,5 @@
 * DONE OOP constructor for =EntityType=
   But its argument would differ for each entity type, which means we
   need to do some kind of dynamic type casting.
+* DONE [#A] Bias oceans towards lands
+* DONE [#A] Change the Z mapping threshold

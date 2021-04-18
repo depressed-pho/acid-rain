@@ -126,7 +126,7 @@ remappedHeight height0
       else
         lowestZ + 1
   where
-    cutOff = 0.52 --0.78
+    cutOff = 0.65
 
 -------------------------------------------------------------------------------
 -- Individual biomes
