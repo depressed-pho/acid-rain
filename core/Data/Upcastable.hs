@@ -27,7 +27,7 @@ module Data.Upcastable
 
 import Control.Exception.Base (Exception(..), SomeException)
 import Data.Dynamic (Dynamic, Typeable, toDyn, fromDyn, fromDynamic)
-import Data.Kind (Constraint)
+import Data.Kind (Constraint, Type)
 import Data.Maybe (fromMaybe)
 
 
@@ -55,7 +55,7 @@ import Data.Maybe (fromMaybe)
 -- 'Dynamic' if it's 'Typeable' too. This is why there is no
 -- functional dependency from @c@ to @w@, nor @c@ has @w@ as an
 -- associated type.
-class (Downcastable w c, c w) ⇒ Upcastable (c ∷ * → Constraint) w where
+class (Downcastable w c, c w) ⇒ Upcastable (c ∷ Type → Constraint) w where
   -- | The function to erase the type of @a@. For 'Exception' this is
   -- 'toException'.
   upcast ∷ c a ⇒ a → w
@@ -65,7 +65,7 @@ class (Downcastable w c, c w) ⇒ Upcastable (c ∷ * → Constraint) w where
 -- always succeed (i.e. the actual types must match), the method
 -- 'downcast' returns 'Maybe'. Note that the type @c@ is uniquely
 -- determined by the type @w@.
-class Downcastable w (c ∷ * → Constraint) | w → c where
+class Downcastable w (c ∷ Type → Constraint) | w → c where
   -- | The function to unwrap @w@. For 'SomeException' this is
   -- 'fromException'.
   downcast ∷ c a ⇒ w → Maybe a

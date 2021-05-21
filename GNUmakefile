@@ -1,6 +1,11 @@
 CABAL_BUILD_OPTS?= \
 	-j \
 	--enable-executable-dynamic \
+	--allow-newer=Cabal \
+	--allow-newer=base \
+	--allow-newer=containers \
+	--allow-newer=ghc-prim \
+	--allow-newer=primitive-extras \
 	--ghc-option=-fno-ignore-asserts \
 	--ghc-option=-dth-dec-file \
 	--flags="debug"

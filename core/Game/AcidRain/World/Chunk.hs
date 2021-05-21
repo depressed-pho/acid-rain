@@ -121,7 +121,7 @@ tileStateAt off@(TileOffset { x, y, z }) c
 
 -- | Get the climate at a given @(x, y)@ offset in a chunk.
 climateAt ∷ TileOffset → Chunk → Climate
-climateAt off@(TileOffset { x, y, .. }) c
+climateAt off@(TileOffset { x, y }) c
   = assertValidOffset off $
     let x' = fromIntegral x ∷ Int
         y' = fromIntegral y ∷ Int
@@ -131,7 +131,7 @@ climateAt off@(TileOffset { x, y, .. }) c
 #if defined(DEBUG)
 -- | Get the river strength at a given @(x, y)@ offset in a chunk.
 riverAt ∷ TileOffset → Chunk → Float
-riverAt off@(TileOffset { x, y, .. }) c
+riverAt off@(TileOffset { x, y }) c
   = assertValidOffset off $
     let x' = fromIntegral x ∷ Int
         y' = fromIntegral y ∷ Int
@@ -141,7 +141,7 @@ riverAt off@(TileOffset { x, y, .. }) c
 
 -- | Get the biome at a given @(x, y)@ offset in a chunk.
 biomeAt ∷ MonadThrow μ ⇒ TileOffset → Chunk → μ (Poly Biome)
-biomeAt off@(TileOffset { x, y, .. }) c
+biomeAt off@(TileOffset { x, y }) c
   = assertValidOffset off $
     let x'   = fromIntegral x ∷ Int
         y'   = fromIntegral y ∷ Int

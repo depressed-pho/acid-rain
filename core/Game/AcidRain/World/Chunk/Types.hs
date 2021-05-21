@@ -244,7 +244,7 @@ writeTileState off@(TileOffset { x, y, .. }) ts mc
          GMV.write (mc^.mcTiles) (y'⋅chunkHeight⋅chunkSize + x'⋅chunkHeight + z') its
 
 writeClimate ∷ PrimMonad μ ⇒ TileOffset → Climate → MutableChunk (PrimState μ) → μ ()
-writeClimate off@(TileOffset { x, y, .. }) cli mc
+writeClimate off@(TileOffset { x, y }) cli mc
   = assertValidOffset off $
     let x' = fromIntegral x ∷ Int
         y' = fromIntegral y ∷ Int
@@ -253,7 +253,7 @@ writeClimate off@(TileOffset { x, y, .. }) cli mc
 
 #if defined(DEBUG)
 writeRiver ∷ PrimMonad μ ⇒ TileOffset → Float → MutableChunk (PrimState μ) → μ ()
-writeRiver off@(TileOffset { x, y, .. }) river mc
+writeRiver off@(TileOffset { x, y }) river mc
   = assertValidOffset off $
     let x' = fromIntegral x ∷ Int
         y' = fromIntegral y ∷ Int
@@ -266,7 +266,7 @@ writeBiome ∷ (Biome β, MonadThrow μ, PrimMonad μ)
            → β
            → MutableChunk (PrimState μ)
            → μ ()
-writeBiome off@(TileOffset { x, y, .. }) b mc
+writeBiome off@(TileOffset { x, y }) b mc
   = assertValidOffset off $
     let x' = fromIntegral x ∷ Int
         y' = fromIntegral y ∷ Int

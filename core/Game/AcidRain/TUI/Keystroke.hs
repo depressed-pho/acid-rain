@@ -16,8 +16,8 @@ import Data.Set (Set)
 import qualified Data.Set as S
 import Graphics.Vty.Input.Events (Key(..), Modifier(..))
 import Language.Haskell.TH (Q)
-import Language.Haskell.TH.Lift.Generics (genericLift)
-import Language.Haskell.TH.Lift.Set (genericLiftSet)
+import Language.Haskell.TH.Lift.Generics (genericLiftTyped)
+import Language.Haskell.TH.Lift.Set (genericLiftSetTyped)
 import Language.Haskell.TH.Quote (QuasiQuoter(..))
 import Language.Haskell.TH.Syntax (Lift(..))
 import Numeric.Natural (Natural)
@@ -45,12 +45,12 @@ instance Hashable Keystroke where
         = S.foldl' genericHashWithSalt salt mods
 
 instance Lift Keystroke where
-  lift ks
-    = [| Keystroke
-         { ksKey  = $(genericLift    $ ksKey  ks)
-         , ksMods = $(genericLiftSet $ ksMods ks)
-         }
-       |]
+  liftTyped ks
+    = [|| Keystroke
+          { ksKey  = $$(genericLiftTyped    $ ksKey  ks)
+          , ksMods = $$(genericLiftSetTyped $ ksMods ks)
+          }
+       ||]
 
 keystroke ∷ Key → [Modifier] → Keystroke
 keystroke key mods

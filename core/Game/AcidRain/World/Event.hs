@@ -42,14 +42,14 @@ instance Event (Poly Event) where
 -- f@, which is a function that takes an 'Event' @e@ and returns unit
 -- on a context @f@ where @c@ holds. The context @f@ needs to be an
 -- 'Applicative'.
-type EventHandler (e ∷ Type) (c ∷ Constraint) (f ∷ * → *)
+type EventHandler (e ∷ Type) (c ∷ Constraint) (f ∷ Type → Type)
   = (Event e, c, Applicative f) ⇒ e → f ()
 
 -- This is a workaround for a limitation in GHC where type functions
 -- can't to be partially applied and therefore can't parameterise
 -- TypeRepMap:
 -- https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0242-unsaturated-type-families.rst
-newtype EH (c ∷ Constraint) (f ∷ * → *) (e ∷ Type)
+newtype EH (c ∷ Constraint) (f ∷ Type → Type) (e ∷ Type)
   = EH (EventHandler e c f)
 
 -- | This is a heterogeneous set of 'EventHandler's, each taking some
@@ -72,7 +72,7 @@ newtype EH (c ∷ Constraint) (f ∷ * → *) (e ∷ Type)
 --
 -- * @'EventDispatcher' () 'IO'@ expects event handlers of type @e
 --   → 'IO' ()@ for some 'Event' @e@.
-data EventDispatcher (c ∷ Constraint) (f ∷ * → *)
+data EventDispatcher (c ∷ Constraint) (f ∷ Type → Type)
   = EventDispatcher
     { _handlers ∷ !(TypeRepMap (EH c f))
     , _fallback ∷ !(∀e. EventHandler e c f)
