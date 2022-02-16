@@ -31,7 +31,7 @@ library
     base-unicode-symbols       ^>= 0.2.4.2,
     containers                 ^>= 0.6.2.1,
     containers-unicode-symbols ^>= 0.3.1.2,
-    brick                      ^>= 0.60.2,
+    brick                      ^>= 0.67,
     convertible                ^>= 1.1.1.0,
     exceptions                 ^>= 0.10.4,
     extensible-effects         ^>= 5.0.0.1,
