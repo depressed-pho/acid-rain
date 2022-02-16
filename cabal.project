@@ -4,3 +4,30 @@ packages:
     client,
     core,
     server
+
+allow-newer:
+    Cabal,
+    base,
+    containers,
+    ghc-prim,
+    primitive-extras
+
+jobs: $ncpus
+flags: +debug
+executable-dynamic: True
+
+-- https://github.com/haskell/cabal/issues/3579
+package bin
+    ghc-options: -fno-ignore-asserts
+
+package builtin
+    ghc-options: -fno-ignore-asserts
+
+package client
+    ghc-options: -fno-ignore-asserts
+
+package core
+    ghc-options: -fno-ignore-asserts
+
+package server
+    ghc-options: -fno-ignore-asserts

@@ -2,7 +2,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnicodeSyntax #-}
 -- | An implementation of Voronoi noise, based on the code from
 -- <https://github.com/Team-RTG/Realistic-Terrain-Generation Realistic-Terrain-Generation>.
