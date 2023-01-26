@@ -8,6 +8,8 @@
   We don't do this yet. Haskell isn't a dependently-typed language,
   and attempting to simulate it only clutters the (already
   complicated) code. Also, emulations are also not efficient at
+* TODO [#A] Consider using Data.Some.Newtype from "some" on Hackage instead of hand-rolled Data.Poly.Strict
+* TODO [#A] More biomes
   run-time (e.g. =Finite= being represented as =Integer=).
 * DONE [#A] Make "river" in Chunk debug-only
 * DONE [#A] Use TH for unboxed vectors
