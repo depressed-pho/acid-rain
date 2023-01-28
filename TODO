@@ -10,6 +10,7 @@
   complicated) code. Also, emulations are also not efficient at
 * TODO [#A] Consider using Data.Some.Newtype from "some" on Hackage instead of hand-rolled Data.Poly.Strict
 * TODO [#C] Consider using "dependent-map" instead of typerep-map
+* TODO [#C] Consider using URef from "mutable-containers" instead of STRef
 * TODO [#A] More biomes
   run-time (e.g. =Finite= being represented as =Integer=).
 * DONE [#A] Make "river" in Chunk debug-only
