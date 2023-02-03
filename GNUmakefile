@@ -23,3 +23,8 @@ repl: # Usage: make COMP=foo
 
 clean:
 	cabal v2-clean
+	rm -f TAGS
+
+.PHONY: tags
+tags:
+	hasktags --etags .
